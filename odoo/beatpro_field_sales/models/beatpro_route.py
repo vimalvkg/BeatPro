@@ -86,6 +86,58 @@ class BeatproRouteLine(models.Model):
     city = fields.Char(related='partner_id.city')
     company_id = fields.Many2one(related='route_id.company_id', store=True)
 
+    today_visit_id = fields.Many2one('beatpro.visit', compute='_compute_today_visit')
+    today_status = fields.Selection([
+        ('to_visit', "To Visit"),
+        ('in_progress', "In Progress"),
+        ('visited', "Visited"),
+    ], compute='_compute_today_visit')
+
+    def _compute_today_visit(self):
+        start = fields.Datetime.to_datetime(fields.Date.context_today(self))
+        visits = self.env['beatpro.visit'].search([
+            ('partner_id', 'in', self.partner_id.ids),
+            ('user_id', '=', self.env.uid),
+            ('state', 'in', ('planned', 'in_progress', 'done')),
+            '|', ('check_in', '>=', start), ('check_in', '=', False),
+        ], order='id desc')
+        for line in self:
+            visit = visits.filtered(lambda v: v.partner_id == line.partner_id)[:1]
+            line.today_visit_id = visit
+            line.today_status = {
+                'in_progress': 'in_progress', 'done': 'visited',
+            }.get(visit.state, 'to_visit')
+
+    @api.model
+    def action_my_day(self):
+        """Today's stops for the current user, for reps working in the web client."""
+        weekday = str(fields.Date.context_today(self).weekday())
+        routes = self.env['beatpro.route'].search([
+            ('user_id', '=', self.env.uid),
+            '|', ('weekday', '=', weekday), ('weekday', '=', False),
+        ])
+        action = self.env['ir.actions.act_window']._for_xml_id('beatpro_field_sales.action_beatpro_my_day')
+        action['domain'] = [('id', 'in', routes.line_ids.ids)]
+        return action
+
+    def action_start_visit(self):
+        """Open today's visit to this customer, creating it if needed."""
+        self.ensure_one()
+        self.invalidate_recordset(['today_visit_id', 'today_status'])
+        visit = self.today_visit_id or self.env['beatpro.visit'].create({
+            'partner_id': self.partner_id.id,
+            'route_id': self.route_id.id,
+            'user_id': self.env.uid,
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'beatpro.visit',
+            'res_id': visit.id,
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'current',
+        }
+
     _partner_route_unique = models.Constraint(
         'UNIQUE(route_id, partner_id)',
         "A customer can only appear once on a route.")

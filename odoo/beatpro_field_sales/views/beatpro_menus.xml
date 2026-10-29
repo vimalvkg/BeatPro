@@ -4,10 +4,24 @@
               web_icon="beatpro_field_sales,static/description/icon.png"
               groups="beatpro_field_sales.group_beatpro_rep"/>
 
+    <menuitem id="menu_beatpro_my_day" name="My Day" parent="menu_beatpro_root"
+              action="action_server_beatpro_my_day" sequence="5"/>
     <menuitem id="menu_beatpro_visits" name="Visits" parent="menu_beatpro_root"
               action="action_beatpro_visit" sequence="10"/>
+    <menuitem id="menu_beatpro_orders" name="Orders" parent="menu_beatpro_root"
+              action="action_beatpro_orders" sequence="15"/>
     <menuitem id="menu_beatpro_day_close" name="Day-End Closes" parent="menu_beatpro_root"
               action="action_beatpro_day_close" sequence="20"/>
     <menuitem id="menu_beatpro_routes" name="Routes" parent="menu_beatpro_root"
               action="action_beatpro_route" sequence="30"/>
+
+    <menuitem id="menu_beatpro_supervisor" name="Supervisor" parent="menu_beatpro_root" sequence="40"
+              groups="beatpro_field_sales.group_beatpro_supervisor"/>
+    <menuitem id="menu_beatpro_approvals" name="Discount Approvals" parent="menu_beatpro_supervisor"
+              action="action_beatpro_orders_approval" sequence="10"/>
+    <menuitem id="menu_beatpro_visit_analysis" name="Visit Analysis" parent="menu_beatpro_supervisor"
+              action="action_beatpro_visit_analysis" sequence="20"/>
+    <menuitem id="menu_beatpro_settings" name="Settings" parent="menu_beatpro_supervisor"
+              action="action_beatpro_config_settings" sequence="90"
+              groups="base.group_system"/>
 </odoo>

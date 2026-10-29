@@ -7,3 +7,6 @@ access_beatpro_visit_rep,beatpro.visit rep,model_beatpro_visit,group_beatpro_rep
 access_beatpro_visit_supervisor,beatpro.visit supervisor,model_beatpro_visit,group_beatpro_supervisor,1,1,1,1
 access_beatpro_day_close_rep,beatpro.day.close rep,model_beatpro_day_close,group_beatpro_rep,1,1,1,0
 access_beatpro_day_close_supervisor,beatpro.day.close supervisor,model_beatpro_day_close,group_beatpro_supervisor,1,1,1,1
+access_beatpro_payment_wizard_rep,beatpro.payment.wizard rep,model_beatpro_payment_wizard,group_beatpro_rep,1,1,1,1
+access_beatpro_payment_wizard_line_rep,beatpro.payment.wizard.line rep,model_beatpro_payment_wizard_line,group_beatpro_rep,1,1,1,1
+access_account_payment_beatpro_rep,account.payment beatpro rep,account.model_account_payment,group_beatpro_rep,1,0,0,0

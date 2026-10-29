@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.GpsButtons">
+        <div class="o_beatpro_gps_buttons d-flex gap-2 mb-3">
+            <button t-if="visitState === 'planned'" type="button" class="btn btn-primary btn-lg"
+                    t-att-disabled="state.busy" t-on-click="() => this.onClick('action_check_in')">
+                <i class="fa fa-map-marker me-2"/>Check In
+            </button>
+            <button t-if="visitState === 'in_progress'" type="button" class="btn btn-primary btn-lg"
+                    t-att-disabled="state.busy" t-on-click="() => this.onClick('action_check_out')">
+                <i class="fa fa-sign-out me-2"/>Check Out
+            </button>
+            <span t-if="state.busy" class="align-self-center text-muted">Getting your location…</span>
+        </div>
+    </t>
+</templates>

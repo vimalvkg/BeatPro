@@ -28,8 +28,8 @@
         <field name="arch" type="xml">
             <form string="Visit">
                 <header>
-                    <button name="action_check_in" type="object" string="Check In" class="btn-primary" invisible="state != 'planned'"/>
-                    <button name="action_check_out" type="object" string="Check Out" class="btn-primary" invisible="state != 'in_progress'"/>
+                    <button name="action_new_order" type="object" string="New Order" class="btn-primary" invisible="state != 'in_progress'"/>
+                    <button name="action_collect_payment" type="object" string="Collect Payment" invisible="state not in ('in_progress', 'done')"/>
                     <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('planned', 'in_progress')"/>
                     <button name="action_reset_to_planned" type="object" string="Reset to Planned"
                             invisible="state != 'cancel'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
@@ -40,7 +40,10 @@
                         <button name="action_view_orders" type="object" class="oe_stat_button" icon="fa-shopping-cart">
                             <field name="sale_order_count" widget="statinfo" string="Orders"/>
                         </button>
+                        <button name="action_open_map" type="object" class="oe_stat_button" icon="fa-map"
+                                string="Map" invisible="not check_in_latitude and not check_in_longitude"/>
                     </div>
+                    <widget name="beatpro_gps_buttons"/>
                     <div class="oe_title">
                         <h1><field name="name"/></h1>
                     </div>
@@ -113,6 +116,29 @@
         </field>
     </record>
 
+    <record id="view_beatpro_visit_pivot" model="ir.ui.view">
+        <field name="name">beatpro.visit.pivot</field>
+        <field name="model">beatpro.visit</field>
+        <field name="arch" type="xml">
+            <pivot string="Visit Analysis" sample="1">
+                <field name="user_id" type="row"/>
+                <field name="result" type="col"/>
+                <field name="duration" type="measure" widget="float_time"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_beatpro_visit_graph" model="ir.ui.view">
+        <field name="name">beatpro.visit.graph</field>
+        <field name="model">beatpro.visit</field>
+        <field name="arch" type="xml">
+            <graph string="Visits by Rep" type="bar" stacked="1" sample="1">
+                <field name="user_id"/>
+                <field name="result"/>
+            </graph>
+        </field>
+    </record>
+
     <record id="view_beatpro_visit_search" model="ir.ui.view">
         <field name="name">beatpro.visit.search</field>
         <field name="model">beatpro.visit</field>
@@ -124,6 +150,7 @@
                 <field name="route_id"/>
                 <filter string="My Visits" name="my_visits" domain="[('user_id', '=', uid)]"/>
                 <separator/>
+                <filter string="Waiting" name="open" domain="[('state', 'in', ('planned', 'in_progress'))]"/>
                 <filter string="Today" name="today" domain="[('check_in', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
                 <filter string="Check-in Date" name="filter_check_in" date="check_in"/>
                 <separator/>
@@ -143,10 +170,18 @@
     <record id="action_beatpro_visit" model="ir.actions.act_window">
         <field name="name">Visits</field>
         <field name="res_model">beatpro.visit</field>
-        <field name="view_mode">list,form,calendar</field>
+        <field name="view_mode">list,form,calendar,pivot,graph</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No visits yet</p>
             <p>Visits appear here when reps check in at a shop with the BeatPro app.</p>
         </field>
+    </record>
+
+    <record id="action_beatpro_visit_analysis" model="ir.actions.act_window">
+        <field name="name">Visit Analysis</field>
+        <field name="res_model">beatpro.visit</field>
+        <field name="view_mode">graph,pivot,list,form</field>
+        <field name="domain">[('state', '=', 'done')]</field>
+        <field name="context">{'search_default_filter_check_in': 1}</field>
     </record>
 </odoo>

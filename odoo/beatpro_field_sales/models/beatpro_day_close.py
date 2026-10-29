@@ -89,8 +89,8 @@ class BeatproDayClose(models.Model):
                 ('date_order', '>=', start),
                 ('date_order', '<=', end),
             ])
-            payments = self.env['account.payment'].search([
-                ('create_uid', '=', close.user_id.id),
+            payments = self.env['account.payment'].sudo().search([
+                ('beatpro_user_id', '=', close.user_id.id),
                 ('company_id', '=', close.company_id.id),
                 ('beatpro_method', '!=', False),
                 ('state', 'not in', ('canceled', 'rejected')),

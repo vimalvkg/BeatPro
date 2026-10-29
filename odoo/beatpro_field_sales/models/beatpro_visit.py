@@ -74,7 +74,7 @@ class BeatproVisit(models.Model):
     @api.depends('payment_ids.state', 'payment_ids.amount')
     def _compute_amount_collected(self):
         for visit in self:
-            payments = visit.payment_ids.filtered(lambda p: p.state not in ('canceled', 'rejected'))
+            payments = visit.sudo().payment_ids.filtered(lambda p: p.state not in ('canceled', 'rejected'))
             visit.amount_collected = sum(payments.mapped('amount'))
 
     @api.constrains('check_in', 'check_out')
@@ -132,6 +132,52 @@ class BeatproVisit(models.Model):
     def action_reset_to_planned(self):
         self.write({'state': 'planned', 'check_in': False, 'check_out': False})
         return True
+
+    def action_new_order(self):
+        """Open a new quotation for this visit's customer, linked to the visit."""
+        self.ensure_one()
+        if self.state != 'in_progress':
+            raise UserError(self.env._("Check in to the visit before taking an order."))
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'sale.order',
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'current',
+            'context': {
+                'default_partner_id': self.partner_id.id,
+                'default_user_id': self.user_id.id,
+                'default_beatpro_visit_id': self.id,
+            },
+        }
+
+    def action_collect_payment(self):
+        """Open the Collect Payment wizard for this visit's customer."""
+        self.ensure_one()
+        wizard = self.env['beatpro.payment.wizard'].create({
+            'partner_id': self.partner_id.id,
+            'visit_id': self.id,
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': self.env._("Collect Payment"),
+            'res_model': 'beatpro.payment.wizard',
+            'res_id': wizard.id,
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'new',
+        }
+
+    def action_open_map(self):
+        """Show the check-in location in Google Maps."""
+        self.ensure_one()
+        if not (self.check_in_latitude or self.check_in_longitude):
+            raise UserError(self.env._("This visit has no check-in location."))
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'https://www.google.com/maps?q={self.check_in_latitude},{self.check_in_longitude}',
+            'target': 'new',
+        }
 
     def action_view_orders(self):
         self.ensure_one()

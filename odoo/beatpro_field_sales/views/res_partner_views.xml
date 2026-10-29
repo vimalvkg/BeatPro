@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_beatpro" model="ir.ui.view">
+        <field name="name">res.partner.form.beatpro</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button name="action_beatpro_view_visits" type="object" class="oe_stat_button" icon="fa-map-marker"
+                        groups="beatpro_field_sales.group_beatpro_rep">
+                    <field name="beatpro_visit_count" widget="statinfo" string="Visits"/>
+                </button>
+            </div>
+            <notebook position="inside">
+                <page string="Field Sales" name="beatpro" groups="beatpro_field_sales.group_beatpro_rep">
+                    <group>
+                        <group>
+                            <field name="beatpro_last_visit"/>
+                            <field name="partner_latitude"/>
+                            <field name="partner_longitude"/>
+                        </group>
+                    </group>
+                    <field name="beatpro_route_line_ids" readonly="1">
+                        <list>
+                            <field name="route_id"/>
+                            <field name="sequence"/>
+                        </list>
+                    </field>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

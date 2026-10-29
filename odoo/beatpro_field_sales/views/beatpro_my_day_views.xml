@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- My Day: today's stops for reps working in the web client instead of the app -->
+    <record id="view_beatpro_my_day_list" model="ir.ui.view">
+        <field name="name">beatpro.route.line.my.day.list</field>
+        <field name="model">beatpro.route.line</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <list string="My Day" create="0" delete="0" edit="0"
+                  decoration-success="today_status == 'visited'" decoration-info="today_status == 'in_progress'">
+                <field name="route_id"/>
+                <field name="partner_id"/>
+                <field name="phone" widget="phone"/>
+                <field name="city"/>
+                <field name="today_status" widget="badge"
+                       decoration-info="today_status == 'in_progress'"
+                       decoration-success="today_status == 'visited'"/>
+                <button name="action_start_visit" type="object" string="Start Visit" icon="fa-map-marker"
+                        class="btn-primary" invisible="today_status != 'to_visit'"/>
+                <button name="action_start_visit" type="object" string="Open Visit" icon="fa-external-link"
+                        invisible="today_status == 'to_visit'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_my_day_kanban" model="ir.ui.view">
+        <field name="name">beatpro.route.line.my.day.kanban</field>
+        <field name="model">beatpro.route.line</field>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" create="0" delete="0">
+                <field name="today_status"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <field name="partner_id" class="fs-5 fw-bold"/>
+                            <field name="today_status" widget="badge"
+                                   decoration-info="today_status == 'in_progress'"
+                                   decoration-success="today_status == 'visited'"/>
+                        </div>
+                        <div class="text-muted">
+                            <i class="fa fa-map-marker me-1" role="img" title="Area"/><field name="city"/>
+                            <span class="mx-1">·</span><field name="route_id"/>
+                        </div>
+                        <field name="phone" widget="phone"/>
+                        <div class="mt-2">
+                            <button name="action_start_visit" type="object" class="btn btn-primary"
+                                    invisible="today_status != 'to_visit'">Start Visit</button>
+                            <button name="action_start_visit" type="object" class="btn btn-secondary"
+                                    invisible="today_status == 'to_visit'">Open Visit</button>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_beatpro_my_day" model="ir.actions.act_window">
+        <field name="name">My Day</field>
+        <field name="res_model">beatpro.route.line</field>
+        <field name="view_mode">list,kanban</field>
+        <field name="mobile_view_mode">kanban</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_beatpro_my_day_list')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('view_beatpro_my_day_kanban')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing planned for today</p>
+            <p>Ask your supervisor to add customers to a route for today's weekday.</p>
+        </field>
+    </record>
+
+    <record id="action_server_beatpro_my_day" model="ir.actions.server">
+        <field name="name">My Day</field>
+        <field name="model_id" ref="model_beatpro_route_line"/>
+        <field name="group_ids" eval="[(4, ref('group_beatpro_rep'))]"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_my_day()</field>
+    </record>
+</odoo>
