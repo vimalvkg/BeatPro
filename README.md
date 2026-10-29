@@ -1,17 +1,16 @@
 # BeatPro
 
 Field sales for Odoo Community: reps plan their route, visit shops, take orders and collect
-payments on their phone, offline, and everything syncs to Odoo.
+payments, and everything lands in Odoo.
 
-| Folder | What it is |
-| --- | --- |
-| [`odoo/beatpro_field_sales`](odoo/beatpro_field_sales) | Odoo 19 Community module (server side) |
-| `app/` | Flutter mobile app (coming on the `beatproapp` branch) |
+Reps can work either way, on the same data:
 
-## Run Odoo 19 with the module
+- **Odoo web client** (desktop or phone browser): needs only the Odoo module.
+- **BeatPro mobile app**: works offline and syncs to Odoo.
 
-```bash
-docker compose up -d
-```
+| Branch | Folder | What it is |
+| --- | --- | --- |
+| `beatproodoo` | `odoo/beatpro_field_sales` | Odoo 19 Community module (server side and web screens) |
+| `beatproapp` | `app/` | Flutter mobile app (Android and iOS) |
 
-Open http://localhost:8069, create a database, then install **BeatPro Field Sales** from Apps.
+See each folder's README for setup and details.

@@ -112,8 +112,10 @@ class BeatproDayClose(models.Model):
         return True
 
     def action_close(self):
-        self.action_refresh()
-        self.write({'state': 'closed'})
+        # Days already closed are skipped: the app may retry after a dropped connection.
+        to_close = self.filtered(lambda close: close.state == 'draft')
+        to_close.action_refresh()
+        to_close.write({'state': 'closed'})
         return True
 
     def action_reopen(self):

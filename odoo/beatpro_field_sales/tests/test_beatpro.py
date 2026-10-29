@@ -242,6 +242,7 @@ class TestBeatpro(AccountTestInvoicingCommon):
         close = self.env['beatpro.day.close'].with_user(self.rep).create({})
         close.action_close()
         self.assertEqual(close.state, 'closed')
+        close.action_close()  # a retry from the app is harmless
         with self.assertRaises(UserError):
             close.write({'distance_km': 42.0})
         with self.assertRaises(UserError):
