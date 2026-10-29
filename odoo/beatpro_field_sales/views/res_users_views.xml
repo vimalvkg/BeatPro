@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_beatpro" model="ir.ui.view">
+        <field name="name">res.users.form.beatpro</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <page name="preferences" position="after">
+                <page string="BeatPro" name="beatpro" groups="beatpro_field_sales.group_beatpro_supervisor">
+                    <group>
+                        <group>
+                            <field name="beatpro_discount_limit"/>
+                            <field name="beatpro_van_warehouse_id"/>
+                        </group>
+                    </group>
+                    <field name="beatpro_route_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="weekday"/>
+                            <field name="partner_count"/>
+                        </list>
+                    </field>
+                </page>
+            </page>
+        </field>
+    </record>
+</odoo>

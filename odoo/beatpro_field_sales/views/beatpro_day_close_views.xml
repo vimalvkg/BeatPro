@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beatpro_day_close_list" model="ir.ui.view">
+        <field name="name">beatpro.day.close.list</field>
+        <field name="model">beatpro.day.close</field>
+        <field name="arch" type="xml">
+            <list string="Day-End Closes">
+                <field name="date"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="visit_count" sum="Total"/>
+                <field name="order_count" sum="Total"/>
+                <field name="order_amount" sum="Total"/>
+                <field name="total_collected" sum="Total"/>
+                <field name="distance_km" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge" decoration-success="state == 'closed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_day_close_form" model="ir.ui.view">
+        <field name="name">beatpro.day.close.form</field>
+        <field name="model">beatpro.day.close</field>
+        <field name="arch" type="xml">
+            <form string="Day-End Close">
+                <header>
+                    <button name="action_refresh" type="object" string="Refresh Totals" invisible="state != 'draft'"/>
+                    <button name="action_close" type="object" string="Close Day" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_reopen" type="object" string="Reopen"
+                            invisible="state != 'closed'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="user_id" widget="many2one_avatar_user" readonly="state == 'closed'"/>
+                            <field name="date" readonly="state == 'closed'"/>
+                            <field name="distance_km" readonly="state == 'closed'"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Visits and Orders">
+                            <field name="visit_count"/>
+                            <field name="visit_order_count"/>
+                            <field name="visit_no_order_count"/>
+                            <field name="order_count"/>
+                            <field name="order_amount"/>
+                        </group>
+                        <group string="Collections">
+                            <field name="cash_amount"/>
+                            <field name="cheque_amount"/>
+                            <field name="upi_amount"/>
+                            <field name="total_collected" class="fw-bold"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Anything the supervisor should know about today..."/>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_day_close_search" model="ir.ui.view">
+        <field name="name">beatpro.day.close.search</field>
+        <field name="model">beatpro.day.close</field>
+        <field name="arch" type="xml">
+            <search string="Day-End Closes">
+                <field name="user_id"/>
+                <filter string="My Days" name="my_days" domain="[('user_id', '=', uid)]"/>
+                <filter string="Open" name="open" domain="[('state', '=', 'draft')]"/>
+                <filter string="Date" name="filter_date" date="date"/>
+                <group>
+                    <filter string="Sales Rep" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Date" name="group_date" context="{'group_by': 'date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_day_close" model="ir.actions.act_window">
+        <field name="name">Day-End Closes</field>
+        <field name="res_model">beatpro.day.close</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No days closed yet</p>
+            <p>Reps close their day in the BeatPro app. Each close totals the day's visits, orders and collections.</p>
+        </field>
+    </record>
+</odoo>

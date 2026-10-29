@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_beatpro_route_rep,beatpro.route rep,model_beatpro_route,group_beatpro_rep,1,0,0,0
+access_beatpro_route_supervisor,beatpro.route supervisor,model_beatpro_route,group_beatpro_supervisor,1,1,1,1
+access_beatpro_route_line_rep,beatpro.route.line rep,model_beatpro_route_line,group_beatpro_rep,1,0,0,0
+access_beatpro_route_line_supervisor,beatpro.route.line supervisor,model_beatpro_route_line,group_beatpro_supervisor,1,1,1,1
+access_beatpro_visit_rep,beatpro.visit rep,model_beatpro_visit,group_beatpro_rep,1,1,1,0
+access_beatpro_visit_supervisor,beatpro.visit supervisor,model_beatpro_visit,group_beatpro_supervisor,1,1,1,1
+access_beatpro_day_close_rep,beatpro.day.close rep,model_beatpro_day_close,group_beatpro_rep,1,1,1,0
+access_beatpro_day_close_supervisor,beatpro.day.close supervisor,model_beatpro_day_close,group_beatpro_supervisor,1,1,1,1

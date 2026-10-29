@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beatpro_visit_list" model="ir.ui.view">
+        <field name="name">beatpro.visit.list</field>
+        <field name="model">beatpro.visit</field>
+        <field name="arch" type="xml">
+            <list string="Visits" decoration-muted="state == 'cancel'" decoration-info="state == 'in_progress'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="route_id" optional="show"/>
+                <field name="check_in"/>
+                <field name="duration" widget="float_time" optional="show"/>
+                <field name="result"/>
+                <field name="amount_ordered" sum="Total" optional="show"/>
+                <field name="amount_collected" sum="Total" optional="show"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'in_progress'"
+                       decoration-success="state == 'done'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_visit_form" model="ir.ui.view">
+        <field name="name">beatpro.visit.form</field>
+        <field name="model">beatpro.visit</field>
+        <field name="arch" type="xml">
+            <form string="Visit">
+                <header>
+                    <button name="action_check_in" type="object" string="Check In" class="btn-primary" invisible="state != 'planned'"/>
+                    <button name="action_check_out" type="object" string="Check Out" class="btn-primary" invisible="state != 'in_progress'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('planned', 'in_progress')"/>
+                    <button name="action_reset_to_planned" type="object" string="Reset to Planned"
+                            invisible="state != 'cancel'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <field name="state" widget="statusbar" statusbar_visible="planned,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_orders" type="object" class="oe_stat_button" icon="fa-shopping-cart">
+                            <field name="sale_order_count" widget="statinfo" string="Orders"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id" readonly="state in ('done', 'cancel')"/>
+                            <field name="user_id" widget="many2one_avatar_user" readonly="state in ('done', 'cancel')"/>
+                            <field name="route_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="result"/>
+                            <field name="no_order_reason" invisible="result != 'no_order'" required="result == 'no_order'"/>
+                            <field name="amount_ordered"/>
+                            <field name="amount_collected"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Check-in and Check-out" name="timing">
+                            <group>
+                                <group string="Check-in">
+                                    <field name="check_in"/>
+                                    <field name="check_in_latitude"/>
+                                    <field name="check_in_longitude"/>
+                                </group>
+                                <group string="Check-out">
+                                    <field name="check_out"/>
+                                    <field name="check_out_latitude"/>
+                                    <field name="check_out_longitude"/>
+                                    <field name="duration" widget="float_time"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Payments" name="payments">
+                            <field name="payment_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="date"/>
+                                    <field name="beatpro_method"/>
+                                    <field name="amount" sum="Total"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="note"/>
+                        </page>
+                        <page string="Mobile" name="mobile" groups="base.group_no_one">
+                            <group>
+                                <field name="mobile_uuid"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_visit_calendar" model="ir.ui.view">
+        <field name="name">beatpro.visit.calendar</field>
+        <field name="model">beatpro.visit</field>
+        <field name="arch" type="xml">
+            <calendar string="Visits" date_start="check_in" date_stop="check_out" color="user_id" mode="week" quick_create="0">
+                <field name="partner_id"/>
+                <field name="result"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="view_beatpro_visit_search" model="ir.ui.view">
+        <field name="name">beatpro.visit.search</field>
+        <field name="model">beatpro.visit</field>
+        <field name="arch" type="xml">
+            <search string="Visits">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <field name="route_id"/>
+                <filter string="My Visits" name="my_visits" domain="[('user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Today" name="today" domain="[('check_in', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="Check-in Date" name="filter_check_in" date="check_in"/>
+                <separator/>
+                <filter string="Order Taken" name="with_order" domain="[('result', '=', 'order')]"/>
+                <filter string="No Order" name="no_order" domain="[('result', 'in', ('no_order', 'closed'))]"/>
+                <group>
+                    <filter string="Sales Rep" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Customer" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Result" name="group_result" context="{'group_by': 'result'}"/>
+                    <filter string="No-Order Reason" name="group_reason" context="{'group_by': 'no_order_reason'}"/>
+                    <filter string="Check-in Day" name="group_check_in" context="{'group_by': 'check_in:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_visit" model="ir.actions.act_window">
+        <field name="name">Visits</field>
+        <field name="res_model">beatpro.visit</field>
+        <field name="view_mode">list,form,calendar</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No visits yet</p>
+            <p>Visits appear here when reps check in at a shop with the BeatPro app.</p>
+        </field>
+    </record>
+</odoo>

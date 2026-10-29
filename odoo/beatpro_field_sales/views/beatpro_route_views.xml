@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beatpro_route_list" model="ir.ui.view">
+        <field name="name">beatpro.route.list</field>
+        <field name="model">beatpro.route</field>
+        <field name="arch" type="xml">
+            <list string="Routes">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="weekday"/>
+                <field name="partner_count"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_route_form" model="ir.ui.view">
+        <field name="name">beatpro.route.form</field>
+        <field name="model">beatpro.route</field>
+        <field name="arch" type="xml">
+            <form string="Route">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_visits" type="object" class="oe_stat_button" icon="fa-map-marker">
+                            <field name="visit_count" widget="statinfo" string="Visits"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Andheri East - Monday"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="user_id" widget="many2one_avatar_user"/>
+                            <field name="weekday" placeholder="Any day"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Customers" name="customers">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="partner_id"/>
+                                    <field name="phone"/>
+                                    <field name="city"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="note" placeholder="Directions, parking, best time to visit..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_route_search" model="ir.ui.view">
+        <field name="name">beatpro.route.search</field>
+        <field name="model">beatpro.route</field>
+        <field name="arch" type="xml">
+            <search string="Routes">
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="line_ids" string="Customer" filter_domain="[('line_ids.partner_id', 'ilike', self)]"/>
+                <filter string="My Routes" name="my_routes" domain="[('user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter string="Sales Rep" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Weekday" name="group_weekday" context="{'group_by': 'weekday'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_route" model="ir.actions.act_window">
+        <field name="name">Routes</field>
+        <field name="res_model">beatpro.route</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create your first route</p>
+            <p>A route is the list of customers a rep visits on a given weekday. The BeatPro app shows it as the rep's plan for the day.</p>
+        </field>
+    </record>
+</odoo>

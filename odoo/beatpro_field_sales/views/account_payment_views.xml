@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_payment_form_beatpro" model="ir.ui.view">
+        <field name="name">account.payment.form.beatpro</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <field name="memo" position="after">
+                <field name="beatpro_method"/>
+                <field name="beatpro_cheque_number" invisible="beatpro_method != 'cheque'" required="beatpro_method == 'cheque'"/>
+                <field name="beatpro_cheque_date" invisible="beatpro_method != 'cheque'"/>
+                <field name="beatpro_upi_reference" invisible="beatpro_method != 'upi'"/>
+                <field name="beatpro_visit_id" readonly="1" invisible="not beatpro_visit_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>

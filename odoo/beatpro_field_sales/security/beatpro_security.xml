@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_groups_privilege_beatpro" model="res.groups.privilege">
+        <field name="name">BeatPro Field Sales</field>
+        <field name="sequence">5</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+    </record>
+
+    <record id="group_beatpro_rep" model="res.groups">
+        <field name="name">Rep: Own Routes Only</field>
+        <field name="sequence">10</field>
+        <field name="privilege_id" ref="res_groups_privilege_beatpro"/>
+        <field name="implied_ids" eval="[(4, ref('sales_team.group_sale_salesman'))]"/>
+        <field name="comment">The rep sees only their own routes, visits and day-end closes.</field>
+    </record>
+
+    <record id="group_beatpro_supervisor" model="res.groups">
+        <field name="name">Supervisor</field>
+        <field name="sequence">20</field>
+        <field name="privilege_id" ref="res_groups_privilege_beatpro"/>
+        <field name="implied_ids" eval="[(4, ref('group_beatpro_rep')), (4, ref('sales_team.group_sale_salesman_all_leads'))]"/>
+        <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        <field name="comment">The supervisor manages routes and sees every rep's visits and day-end closes.</field>
+    </record>
+
+    <data noupdate="1">
+        <!-- Reps: own records only -->
+        <record id="rule_beatpro_route_rep" model="ir.rule">
+            <field name="name">BeatPro Route: own routes</field>
+            <field name="model_id" ref="model_beatpro_route"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_route_line_rep" model="ir.rule">
+            <field name="name">BeatPro Route Customer: own routes</field>
+            <field name="model_id" ref="model_beatpro_route_line"/>
+            <field name="domain_force">[('route_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_visit_rep" model="ir.rule">
+            <field name="name">BeatPro Visit: own visits</field>
+            <field name="model_id" ref="model_beatpro_visit"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_day_close_rep" model="ir.rule">
+            <field name="name">BeatPro Day Close: own days</field>
+            <field name="model_id" ref="model_beatpro_day_close"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+
+        <!-- Supervisors: everything -->
+        <record id="rule_beatpro_route_supervisor" model="ir.rule">
+            <field name="name">BeatPro Route: all routes</field>
+            <field name="model_id" ref="model_beatpro_route"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+        <record id="rule_beatpro_route_line_supervisor" model="ir.rule">
+            <field name="name">BeatPro Route Customer: all routes</field>
+            <field name="model_id" ref="model_beatpro_route_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+        <record id="rule_beatpro_visit_supervisor" model="ir.rule">
+            <field name="name">BeatPro Visit: all visits</field>
+            <field name="model_id" ref="model_beatpro_visit"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+        <record id="rule_beatpro_day_close_supervisor" model="ir.rule">
+            <field name="name">BeatPro Day Close: all days</field>
+            <field name="model_id" ref="model_beatpro_day_close"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+
+        <!-- Multi-company -->
+        <record id="rule_beatpro_route_company" model="ir.rule">
+            <field name="name">BeatPro Route: multi-company</field>
+            <field name="model_id" ref="model_beatpro_route"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_beatpro_route_line_company" model="ir.rule">
+            <field name="name">BeatPro Route Customer: multi-company</field>
+            <field name="model_id" ref="model_beatpro_route_line"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_beatpro_visit_company" model="ir.rule">
+            <field name="name">BeatPro Visit: multi-company</field>
+            <field name="model_id" ref="model_beatpro_visit"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_beatpro_day_close_company" model="ir.rule">
+            <field name="name">BeatPro Day Close: multi-company</field>
+            <field name="model_id" ref="model_beatpro_day_close"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+    </data>
+</odoo>

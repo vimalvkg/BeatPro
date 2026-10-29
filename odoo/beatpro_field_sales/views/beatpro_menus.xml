@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_beatpro_root" name="BeatPro" sequence="15"
+              web_icon="beatpro_field_sales,static/description/icon.png"
+              groups="beatpro_field_sales.group_beatpro_rep"/>
+
+    <menuitem id="menu_beatpro_visits" name="Visits" parent="menu_beatpro_root"
+              action="action_beatpro_visit" sequence="10"/>
+    <menuitem id="menu_beatpro_day_close" name="Day-End Closes" parent="menu_beatpro_root"
+              action="action_beatpro_day_close" sequence="20"/>
+    <menuitem id="menu_beatpro_routes" name="Routes" parent="menu_beatpro_root"
+              action="action_beatpro_route" sequence="30"/>
+</odoo>
