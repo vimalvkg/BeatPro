@@ -33,6 +33,12 @@ Future<void> _loadFonts() async {
 
   await load('Roboto', ['Roboto-Regular.ttf', 'Roboto-Medium.ttf', 'Roboto-Bold.ttf']);
   await load('MaterialIcons', ['MaterialIcons-Regular.otf']);
+  // The app's own typeface, from its assets.
+  final manrope = FontLoader('Manrope');
+  for (final w in ['Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+    manrope.addFont(Future.value(ByteData.sublistView(File('assets/fonts/Manrope-$w.ttf').readAsBytesSync())));
+  }
+  await manrope.load();
 }
 
 void main() {
@@ -83,8 +89,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Home.
-    expect(find.text('Hello, Ravi'), findsOneWidget);
-    expect(find.text('0 of 4 visits done'), findsOneWidget);
+    expect(find.text('My Day'), findsOneWidget);
+    expect(find.text('0/4'), findsOneWidget);
+    expect(find.text('4 shops left today'), findsOneWidget);
     await screen('home');
 
     // Today's route.
@@ -98,7 +105,8 @@ void main() {
     expect(find.text('INV/2026/00042'), findsOneWidget);
     await tester.tap(find.text('Check in'));
     await screen('visit');
-    expect(find.textContaining('Checked in at'), findsOneWidget);
+    expect(find.text('Checked in'), findsOneWidget);
+    expect(find.textContaining('m from the shop pin'), findsOneWidget);
 
     // Take an order: 2 cases of Maggi at the customer's price, 1 box of Parle-G.
     await tester.tap(find.text('Take order'));
@@ -130,10 +138,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'UPI transaction ID (optional)'), '430912345678');
     await screen('payment');
-    await tester.tap(find.text('Record payment'));
+    expect(find.text('Record ₹1,200.00 by UPI'), findsOneWidget);
+    await tester.tap(find.text('Record ₹1,200.00 by UPI'));
     await tester.pumpAndSettle();
-    expect(find.text('PAYMENTS IN THIS VISIT'), findsOneWidget);
-    expect(find.text('UPI'), findsOneWidget);
+    expect(find.text('IN THIS VISIT'), findsOneWidget);
+    expect(find.text('UPI payment'), findsOneWidget);
     await screen('visit-with-order');
 
     // Check out: the visit, order and payment go to Odoo.
@@ -159,7 +168,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'Distance travelled'), '23');
     await screen('day-close');
-    await tester.tap(find.widgetWithText(FilledButton, 'Close day'));
+    await tester.tap(find.text('Close day and send to supervisor'));
     await tester.pumpAndSettle();
     expect(find.text('Today is closed'), findsOneWidget);
     expect(odoo.uploaded['beatpro.day.close']!.single['distance_km'], 23.0);

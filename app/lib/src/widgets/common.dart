@@ -191,3 +191,93 @@ class SyncButton extends ConsumerWidget {
     );
   }
 }
+
+/// Small uppercase heading above a group, like "NEXT" or "TODAY'S ROUTE".
+class Eyebrow extends StatelessWidget {
+  const Eyebrow(this.text, {super.key, this.padding = const EdgeInsets.fromLTRB(16, 20, 16, 8)});
+
+  final String text;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: padding,
+        child: Text(
+          text.toUpperCase(),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1, color: BeatproColors.muted),
+        ),
+      );
+}
+
+/// Round marker with a stop number, or a tick once visited.
+class NumberMarker extends StatelessWidget {
+  const NumberMarker({super.key, required this.number, this.done = false, this.current = false, this.size = 34});
+
+  final int number;
+  final bool done;
+  final bool current;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = done ? BeatproColors.successDot : current ? BeatproColors.navy : BeatproColors.blueSoft;
+    final fg = done || current ? Colors.white : BeatproColors.navy;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: done
+          ? Icon(Icons.check, size: size * 0.55, color: fg, semanticLabel: 'Visited')
+          : Text('$number', style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: size * 0.42)),
+    );
+  }
+}
+
+/// Visits done out of planned, as a ring.
+class ProgressRing extends StatelessWidget {
+  const ProgressRing({super.key, required this.done, required this.total, this.size = 72});
+
+  final int done;
+  final int total;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: '$done of $total visits done',
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Stack(alignment: Alignment.center, children: [
+            SizedBox(
+              width: size - 8,
+              height: size - 8,
+              child: CircularProgressIndicator(
+                value: total == 0 ? 0 : (done / total).clamp(0, 1).toDouble(),
+                strokeWidth: 8,
+                strokeCap: StrokeCap.round,
+                backgroundColor: BeatproColors.blueSoft,
+                color: BeatproColors.navy,
+              ),
+            ),
+            Text('$done/$total', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: BeatproColors.ink)),
+          ]),
+        ),
+      );
+}
+
+/// A label over a value, used in summary cards.
+class SmallFigure extends StatelessWidget {
+  const SmallFigure({super.key, required this.label, required this.value, this.color});
+
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: BeatproColors.muted)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+      ]);
+}

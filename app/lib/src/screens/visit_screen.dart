@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,22 @@ final _visitProvider = FutureProvider.family<LocalRecord?, String>((ref, uuid) {
   return ref.watch(localDbProvider).record(uuid);
 });
 
+/// Metres between two GPS points.
+double _distance(double lat1, double lon1, double lat2, double lon2) {
+  double rad(double d) => d * math.pi / 180;
+  final a = math.pow(math.sin(rad(lat2 - lat1) / 2), 2) +
+      math.cos(rad(lat1)) * math.cos(rad(lat2)) * math.pow(math.sin(rad(lon2 - lon1) / 2), 2);
+  return 6371000 * 2 * math.asin(math.sqrt(a));
+}
+
+String _clock(Duration d) {
+  String two(int v) => v.toString().padLeft(2, '0');
+  final h = d.inHours;
+  final m = d.inMinutes % 60;
+  final s = d.inSeconds % 60;
+  return h > 0 ? '$h:${two(m)}:${two(s)}' : '$m:${two(s)}';
+}
+
 class VisitScreen extends ConsumerStatefulWidget {
   const VisitScreen({super.key, required this.visitUuid});
 
@@ -30,7 +47,9 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 30), (_) => setState(() {}));
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -70,7 +89,6 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final money = ref.watch(moneyProvider);
     final visitValue = ref.watch(_visitProvider(widget.visitUuid));
     final orders = ref.watch(ordersProvider).value ?? const <LocalRecord>[];
@@ -84,101 +102,180 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
         if (visit == null) return const Scaffold(body: EmptyState(icon: Icons.error_outline, title: 'Visit not found'));
         final customerKey = visit.data['customerKey'] as String;
         final customer = ref.watch(customerProvider(customerKey)).value;
+        final invoices = ref.watch(invoicesProvider(customerKey)).value ?? const <OpenInvoice>[];
         final visitOrders = orders.where((o) => o.data['visitUuid'] == visit.uuid).toList();
+        final pastOrders = orders.where((o) => o.data['customerKey'] == customerKey && o.data['visitUuid'] != visit.uuid).toList();
         final inProgress = visit.data['state'] == 'in_progress';
         final checkIn = DateTime.parse(visit.data['checkIn'] as String).toLocal();
-        final minutes = DateTime.now().difference(checkIn).inMinutes;
-        final hasLocation = visit.data['checkInLat'] != null;
+        final checkOut = visit.data['checkOut'] == null ? null : DateTime.parse(visit.data['checkOut'] as String).toLocal();
+        final elapsed = (checkOut ?? DateTime.now()).difference(checkIn);
+        final lat = (visit.data['checkInLat'] as num?)?.toDouble();
+        final lng = (visit.data['checkInLng'] as num?)?.toDouble();
+        String location = 'No location recorded';
+        if (lat != null && lng != null) {
+          location = 'Location recorded';
+          if (customer?.latitude != null && customer?.longitude != null) {
+            final m = _distance(lat, lng, customer!.latitude!, customer.longitude!);
+            location += m < 1000 ? ' · ${m.round()} m from the shop pin' : ' · ${(m / 1000).toStringAsFixed(1)} km from the shop pin';
+          }
+        }
+        final due = invoices.fold<double>(0, (s, i) => s + i.amountDue);
+        double total(LocalRecord o) => ((o.data['amountTotal'] ?? o.data['total']) as num).toDouble();
+        final lastOrder = pastOrders.isEmpty ? null : pastOrders.first;
+        final usual = pastOrders.isEmpty ? null : pastOrders.take(5).fold<double>(0, (s, o) => s + total(o)) / pastOrders.take(5).length;
+        final result = VisitResult.values.where((r) => r.code == visit.data['result']).firstOrNull;
 
         return Scaffold(
-          appBar: AppBar(title: Text(customer?.name ?? 'Visit')),
-          body: ListView(padding: const EdgeInsets.only(bottom: 120), children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Card(
-                color: inProgress ? BeatproColors.amber.withValues(alpha: 0.15) : null,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(children: [
-                    Icon(inProgress ? Icons.timer_outlined : Icons.check_circle,
-                        color: inProgress ? BeatproColors.warning : BeatproColors.success),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(inProgress ? 'Checked in at ${formatTime(checkIn)}' : 'Visit finished',
-                            style: theme.textTheme.titleMedium),
-                        Text(
-                          inProgress
-                              ? '$minutes min at the shop · ${hasLocation ? 'location recorded' : 'no location'}'
-                              : (VisitResult.values.where((r) => r.code == visit.data['result']).firstOrNull?.label ?? ''),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ]),
-                    ),
-                  ]),
-                ),
+          appBar: AppBar(
+            title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(customer?.name ?? 'Visit'),
+              if (customer?.city != null)
+                Text(customer!.city!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: BeatproColors.muted)),
+            ]),
+          ),
+          body: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 120), children: [
+            // Status panel.
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: inProgress ? BeatproColors.navy : BeatproColors.ink,
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-            if (inProgress)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Row(children: [
-                  Expanded(
-                    child: _BigAction(
-                      icon: Icons.add_shopping_cart,
-                      label: 'Take order',
-                      onTap: () => context.push(
-                          '/order/new?customer=${Uri.encodeComponent(customerKey)}&visit=${visit.uuid}'),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: inProgress ? const Color(0x38F2B233) : const Color(0x402E8B57),
+                      borderRadius: BorderRadius.circular(999),
                     ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: inProgress ? BeatproColors.amber : const Color(0xFF5FD08F),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        inProgress ? 'Checked in' : 'Visit finished',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: inProgress ? const Color(0xFFFFE3A3) : const Color(0xFFC8F0DA),
+                        ),
+                      ),
+                    ]),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _BigAction(
-                      icon: Icons.payments_outlined,
-                      label: 'Collect payment',
-                      onTap: () => context.push(
-                          '/payment/new?customer=${Uri.encodeComponent(customerKey)}&visit=${visit.uuid}'),
-                    ),
+                  const Spacer(),
+                  Text(
+                    inProgress ? 'since ${formatTime(checkIn)}' : (result?.label ?? ''),
+                    style: const TextStyle(fontSize: 13, color: BeatproColors.onNavy),
                   ),
                 ]),
+                const SizedBox(height: 12),
+                Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                  Text(_clock(elapsed),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      )),
+                  const SizedBox(width: 8),
+                  const Text('at the shop', style: TextStyle(color: BeatproColors.onNavy, fontSize: 14)),
+                ]),
+                const SizedBox(height: 12),
+                Row(children: [
+                  const Icon(Icons.location_on_outlined, size: 16, color: BeatproColors.onNavy),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(location, style: const TextStyle(color: BeatproColors.onNavy, fontSize: 13))),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            // Quick actions.
+            Row(children: [
+              if (inProgress) ...[
+                Expanded(
+                  child: _Tile(
+                    icon: Icons.add_shopping_cart,
+                    label: 'Take order',
+                    onTap: () => context.push('/order/new?customer=${Uri.encodeComponent(customerKey)}&visit=${visit.uuid}'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: _Tile(
+                  icon: Icons.payments_outlined,
+                  label: 'Collect payment',
+                  warm: true,
+                  onTap: () => context.push('/payment/new?customer=${Uri.encodeComponent(customerKey)}&visit=${visit.uuid}'),
+                ),
               ),
-            Section(
-              title: 'Orders in this visit',
-              child: visitOrders.isEmpty
-                  ? const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('No order yet.'))
-                  : Column(children: [
-                      for (final o in visitOrders)
-                        ListTile(
-                          title: Text((o.data['name'] as String?) ?? 'New order'),
-                          subtitle: Text('${(o.data['lines'] as List).length} products'),
-                          trailing: Text(money(((o.data['amountTotal'] ?? o.data['total']) as num).toDouble()),
-                              style: const TextStyle(fontWeight: FontWeight.w600)),
-                          onTap: () => context.push('/orders/${o.uuid}'),
-                        ),
-                    ]),
+            ]),
+            const SizedBox(height: 14),
+            // Customer at a glance.
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(children: [
+                  Expanded(child: _Fact(label: 'Amount due', value: money(due), color: due > 0 ? BeatproColors.danger : null)),
+                  Expanded(
+                    child: _Fact(
+                      label: 'Last order',
+                      value: lastOrder == null ? '—' : '${DateTime.now().difference(lastOrder.createdAt).inDays} days',
+                    ),
+                  ),
+                  Expanded(child: _Fact(label: 'Usual order', value: usual == null ? '—' : money(usual))),
+                ]),
+              ),
             ),
-            Section(
-              title: 'Payments in this visit',
-              child: payments.isEmpty
-                  ? const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('No payment collected yet.'))
-                  : Column(children: [
-                      for (final p in payments)
-                        ListTile(
-                          title: Text(paymentMethods[p.data['method']] ?? ''),
-                          trailing: Text(money((p.data['amount'] as num).toDouble()),
-                              style: const TextStyle(fontWeight: FontWeight.w600, color: BeatproColors.success)),
-                        ),
-                    ]),
-            ),
+            const Eyebrow('In this visit', padding: EdgeInsets.fromLTRB(0, 20, 0, 8)),
+            if (visitOrders.isEmpty && payments.isEmpty)
+              const Text('No order or payment yet.', style: TextStyle(color: BeatproColors.muted))
+            else
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  for (final o in visitOrders)
+                    _Item(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'Order ${(o.data['name'] as String?) ?? ''}'.trim(),
+                      subtitle: '${(o.data['lines'] as List).length} products · '
+                          '${o.state == SyncState.synced ? (o.data['approval'] == 'waiting' ? 'Waiting for approval' : 'Confirmed') : 'Waiting to sync'}',
+                      amount: money(total(o)),
+                      onTap: () => context.push('/orders/${o.uuid}'),
+                    ),
+                  for (final p in payments)
+                    _Item(
+                      icon: Icons.check,
+                      paid: true,
+                      title: '${paymentMethods[p.data['method']] ?? ''} payment',
+                      subtitle: (p.data['invoiceIds'] as List?)?.isNotEmpty ?? false
+                          ? 'Settles ${(p.data['invoiceIds'] as List).length} invoice(s)'
+                          : 'Advance on account',
+                      amount: money((p.data['amount'] as num).toDouble()),
+                    ),
+                ]),
+              ),
           ]),
           bottomNavigationBar: inProgress
-              ? SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    child: FilledButton.icon(
-                      onPressed: () => _checkOut(visit, visitOrders.isNotEmpty),
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Check out'),
+              ? Container(
+                  decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: BeatproColors.line))),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(backgroundColor: BeatproColors.ink),
+                        onPressed: () => _checkOut(visit, visitOrders.isNotEmpty),
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Check out'),
+                      ),
                     ),
                   ),
                 )
@@ -189,27 +286,80 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
   }
 }
 
-class _BigAction extends StatelessWidget {
-  const _BigAction({required this.icon, required this.label, required this.onTap});
+class _Tile extends StatelessWidget {
+  const _Tile({required this.icon, required this.label, required this.onTap, this.warm = false});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool warm;
 
   @override
   Widget build(BuildContext context) => Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Column(children: [
-              Icon(icon, size: 32, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 8),
-              Text(label, style: Theme.of(context).textTheme.titleSmall),
+          child: Container(
+            height: 104,
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: warm ? BeatproColors.amberSoft : BeatproColors.blueSoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: warm ? const Color(0xFF8A5A00) : BeatproColors.navy),
+              ),
+              Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
             ]),
           ),
         ),
+      );
+}
+
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value, this.color});
+
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: BeatproColors.muted)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+      ]);
+}
+
+class _Item extends StatelessWidget {
+  const _Item({required this.icon, required this.title, required this.subtitle, required this.amount, this.paid = false, this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String amount;
+  final bool paid;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: paid ? BeatproColors.successSoft : BeatproColors.blueSoft,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 18, color: paid ? BeatproColors.success : BeatproColors.navy),
+        ),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        trailing: Text(amount, style: TextStyle(color: paid ? BeatproColors.success : null)),
       );
 }
 
@@ -241,17 +391,16 @@ class _CheckOutSheetState extends State<_CheckOutSheet> {
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('How did the visit go?', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        SegmentedButton<VisitResult>(
-          segments: [
-            for (final r in VisitResult.values) ButtonSegment(value: r, label: Text(r.label)),
+        Row(children: [
+          for (final r in VisitResult.values) ...[
+            if (r != VisitResult.values.first) const SizedBox(width: 8),
+            Expanded(
+              child: _Choice(label: r.label, selected: _result == r, onTap: () => setState(() => _result = r)),
+            ),
           ],
-          selected: {_result},
-          onSelectionChanged: (s) => setState(() => _result = s.first),
-        ),
+        ]),
         if (_result == VisitResult.noOrder) ...[
-          const SizedBox(height: 16),
-          Text('Why no order?', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
+          const Eyebrow('Why no order?', padding: EdgeInsets.fromLTRB(0, 18, 0, 8)),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final e in noOrderReasons.entries)
               ChoiceChip(
@@ -274,4 +423,37 @@ class _CheckOutSheetState extends State<_CheckOutSheet> {
       ]),
     );
   }
+}
+
+class _Choice extends StatelessWidget {
+  const _Choice({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        selected: selected,
+        button: true,
+        child: Material(
+          color: selected ? BeatproColors.blueSoft : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: selected ? BeatproColors.navy : BeatproColors.line, width: selected ? 2 : 1),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: SizedBox(
+              height: 52,
+              child: Center(
+                child: Text(label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.w700, color: selected ? BeatproColors.navy : BeatproColors.ink)),
+              ),
+            ),
+          ),
+        ),
+      );
 }

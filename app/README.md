@@ -4,7 +4,7 @@ Flutter app for field sales reps working with Odoo 19 Community and the
 `beatpro_field_sales` module (branch `beatproodoo`). It works offline: everything a rep
 does is saved on the phone and sent to Odoo when there's signal.
 
-| Home | Today's route | Visit | New order | Collect payment | Close the day |
+| My Day | Today's route | Visit | New order | Collect payment | Close the day |
 | --- | --- | --- | --- | --- | --- |
 | ![](docs/screenshots/02-home.png) | ![](docs/screenshots/03-route.png) | ![](docs/screenshots/10-visit-with-order.png) | ![](docs/screenshots/06-catalog.png) | ![](docs/screenshots/09-payment.png) | ![](docs/screenshots/12-day-close.png) |
 
@@ -12,9 +12,12 @@ does is saved on the phone and sent to Odoo when there's signal.
 
 - **Sign in** with the Odoo address and an API key (Odoo: profile > Security > New API Key).
   Only users in the BeatPro Rep or Supervisor group can sign in.
-- **Today's route**: customers from the rep's routes for today's weekday, in visit order, with directions.
-- **Visit**: check in and out with GPS; take orders and collect payments during the visit;
-  record the result and, for no order, the reason.
+- **My Day** (home): progress ring with the day's orders and collections, the next shop with Start visit,
+  directions and call, and today's route with each shop's status.
+- **Today's route**: customers from the rep's routes for today's weekday, in visit order.
+- **Visit**: check in and out with GPS, a live timer and the distance from the shop pin; Take order and
+  Collect payment tiles; the customer's amount due, last and usual order; record the result and,
+  for no order, the reason.
 - **Order**: catalogue with the customer's price-list prices and stock, quantity steppers,
   discounts, repeat last order, tax estimate. Discounts above the rep's limit go to a
   supervisor for approval in Odoo.
@@ -22,8 +25,12 @@ does is saved on the phone and sent to Odoo when there's signal.
   customer's open invoices.
 - **New customer** with a GPS pin.
 - **My orders** with Odoo's status (confirmed, waiting for approval).
-- **Close the day**: visits, orders and collections by method, distance travelled.
+- **Close the day**: the cash and cheques to hand in, UPI already in the bank, visits and orders, a recap
+  of each shop and the distance travelled.
 - **Sync** screen: what's waiting, what failed and why.
+
+The app uses the Manrope typeface (SIL Open Font License, `assets/fonts/OFL.txt`), the same as the
+BeatPro screens in Odoo.
 
 ## How sync works
 
