@@ -323,6 +323,15 @@ class TestBeatpro(AccountTestInvoicingCommon):
         self.assertEqual(data['reasons'][0]['count'], 1)
         ravi = next(r for r in data['reps'] if r['id'] == self.rep.id)
         self.assertEqual(ravi['visits'], '1 / 1')
+        # The supervisor took an order in the office: it counts, but they aren't a field rep.
+        office = self.env['sale.order'].with_user(self.supervisor).create({
+            'partner_id': self.shop.id,
+            'order_line': [fields.Command.create({'product_id': self.product.id, 'product_uom_qty': 1})],
+        })
+        office.action_confirm()
+        data = self.env['beatpro.dashboard'].with_user(self.supervisor).get_data('today')
+        self.assertNotIn(self.supervisor.id, [r['id'] for r in data['reps']])
+        self.assertEqual(data['order_count'], 2)
         for period in ('week', 'month'):
             self.assertEqual(self.env['beatpro.dashboard'].with_user(self.supervisor).get_data(period)['period'], period)
 

@@ -40,9 +40,9 @@
 // -- Pages (My Day, Overview) -----------------------------------------------
 
 .o_beatpro.bp-page {
+    // Odoo scrolls the page's .o_content (on phones, the action itself).
     background: var(--bp-ground);
-    height: 100%;
-    overflow: auto;
+    > .o_content { background: var(--bp-ground); }
 }
 
 .o_beatpro {

@@ -67,9 +67,11 @@ class BeatproDashboard(models.AbstractModel):
         collected = sum(by_method.values())
         with_order = len(visits.filtered(lambda v: v.result == 'order'))
 
-        # Supervisors are reps too; list only people who actually work in the field.
+        # Supervisors and admins are in the rep group too; list only people who work in the
+        # field: those with a route or a visit. Office users' orders still count in the totals.
         has_routes = env['beatpro.route'].search([('company_id', '=', company.id)]).user_id
-        reps = reps.filtered(lambda r: r in has_routes or r in visits.user_id or r in orders.user_id)
+        field_people = has_routes | visits.user_id | in_progress.user_id
+        reps = reps.filtered(lambda r: r in field_people)
 
         rep_rows = []
         for rep in reps.sorted('name'):

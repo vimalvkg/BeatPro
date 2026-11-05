@@ -2,6 +2,7 @@
 <templates xml:space="preserve">
     <t t-name="beatpro_field_sales.MyDay">
         <div class="o_action o_beatpro bp-page bp-my-day">
+            <div class="o_content">
             <t t-set="d" t-value="state.data"/>
             <header class="bp-band">
                 <div class="bp-band-in">
@@ -81,6 +82,7 @@
                 <div t-else="" class="bp-card bp-card-pad text-center bp-muted">
                     Your supervisor plans your routes in BeatPro. Nothing is planned for today.
                 </div>
+            </div>
             </div>
         </div>
     </t>

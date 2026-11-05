@@ -2,6 +2,7 @@
 <templates xml:space="preserve">
     <t t-name="beatpro_field_sales.Dashboard">
         <div class="o_action o_beatpro bp-page bp-dashboard">
+            <div class="o_content">
             <t t-set="d" t-value="state.data"/>
             <div class="bp-wrap">
                 <div class="d-flex flex-wrap align-items-end gap-3">
@@ -120,6 +121,7 @@
                         </section>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </t>
