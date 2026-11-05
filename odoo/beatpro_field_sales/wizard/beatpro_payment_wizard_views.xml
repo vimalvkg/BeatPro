@@ -4,27 +4,35 @@
         <field name="name">beatpro.payment.wizard.form</field>
         <field name="model">beatpro.payment.wizard</field>
         <field name="arch" type="xml">
-            <form string="Collect Payment">
+            <form string="Collect Payment" class="o_beatpro_payment_form">
+                <field name="currency_id" invisible="1"/>
+                <field name="company_id" invisible="1"/>
+                <field name="partner_id" invisible="1"/>
+                <field name="amount_due" invisible="1"/>
+                <div class="bp-amount-box">
+                    <label for="amount" string="Amount collected" class="text-muted fw-bold"/>
+                    <field name="amount" required="1" nolabel="1"/>
+                    <div class="bp-hint"><field name="amount_hint" nolabel="1"/></div>
+                </div>
+                <div class="bp-label">Paid by</div>
+                <div class="bp-methods">
+                    <field name="method" widget="radio" options="{'horizontal': true}" nolabel="1"/>
+                </div>
                 <group>
                     <group>
-                        <field name="partner_id" readonly="1"/>
-                        <field name="amount_due"/>
-                        <field name="method" widget="radio" options="{'horizontal': true}"/>
-                        <field name="amount" required="1"/>
-                        <field name="currency_id" invisible="1"/>
-                        <field name="company_id" invisible="1"/>
+                        <field name="upi_reference" invisible="method != 'upi'" placeholder="Optional"/>
+                        <field name="cheque_number" invisible="method != 'cheque'" required="method == 'cheque'"/>
+                        <field name="cheque_date" invisible="method != 'cheque'"/>
                     </group>
                     <group>
                         <field name="date"/>
-                        <field name="cheque_number" invisible="method != 'cheque'" required="method == 'cheque'"/>
-                        <field name="cheque_date" invisible="method != 'cheque'"/>
-                        <field name="upi_reference" invisible="method != 'upi'"/>
                         <field name="visit_id" readonly="1" invisible="not visit_id"/>
                     </group>
                 </group>
+                <div class="bp-label">Settles invoices</div>
                 <field name="line_ids" nolabel="1">
                     <list editable="bottom" create="0" delete="0" decoration-danger="overdue">
-                        <field name="selected" widget="boolean_toggle"/>
+                        <field name="selected" widget="boolean_toggle" string="Pay"/>
                         <field name="name"/>
                         <field name="due_date"/>
                         <field name="amount_due" sum="Total"/>
@@ -33,9 +41,9 @@
                         <field name="currency_id" column_invisible="1"/>
                     </list>
                 </field>
-                <p class="text-muted">Turn on the invoices this payment settles. With none selected, the payment stays on the customer's account as an advance.</p>
+                <p class="text-muted small mb-0">With no invoice selected, the payment stays on the customer's account as an advance.</p>
                 <footer>
-                    <button name="action_confirm" type="object" string="Record Payment" class="btn-primary" data-hotkey="q"/>
+                    <button name="action_confirm" type="object" string="Record payment" class="btn-primary" data-hotkey="q"/>
                     <button string="Discard" special="cancel" data-hotkey="x"/>
                 </footer>
             </form>

@@ -81,10 +81,33 @@
         </field>
     </record>
 
+    <record id="view_beatpro_route_kanban" model="ir.ui.view">
+        <field name="name">beatpro.route.kanban</field>
+        <field name="model">beatpro.route</field>
+        <field name="arch" type="xml">
+            <kanban class="o_beatpro_routes_kanban" default_group_by="weekday" group_create="0" group_delete="0" group_edit="0" quick_create="0">
+                <field name="order_rate"/>
+                <field name="order_rate_label"/>
+                <templates>
+                    <t t-name="card">
+                        <field name="name" class="bp-route-name"/>
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <field name="user_id" widget="many2one_avatar_user" options="{'display_avatar_name': True}"/>
+                        </div>
+                        <div class="bp-route-foot">
+                            <span><field name="partner_count"/> shops</span>
+                            <span t-att-class="record.order_rate.raw_value &gt;= 65 ? 'bp-rate-good' : 'bp-rate-mid'" t-esc="record.order_rate_label.value"/>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
     <record id="action_beatpro_route" model="ir.actions.act_window">
         <field name="name">Routes</field>
         <field name="res_model">beatpro.route</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">kanban,list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">Create your first route</p>
             <p>A route is the list of customers a rep visits on a given weekday. The BeatPro app shows it as the rep's plan for the day.</p>

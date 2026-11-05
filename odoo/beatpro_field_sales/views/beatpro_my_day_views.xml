@@ -76,4 +76,14 @@
         <field name="state">code</field>
         <field name="code">action = model.action_my_day()</field>
     </record>
+
+    <record id="action_beatpro_my_day_screen" model="ir.actions.client">
+        <field name="name">My Day</field>
+        <field name="tag">beatpro.my_day</field>
+    </record>
+
+    <record id="action_beatpro_dashboard" model="ir.actions.client">
+        <field name="name">Overview</field>
+        <field name="tag">beatpro.dashboard</field>
+    </record>
 </odoo>

@@ -249,3 +249,82 @@ class TestBeatpro(AccountTestInvoicingCommon):
             close.action_reopen()
         close.with_user(self.supervisor).action_reopen()
         self.assertEqual(close.state, 'draft')
+
+    # ------------------------------------------------------------------
+    # New screens: My Day, visit panel, overview, day close
+    # ------------------------------------------------------------------
+
+    def test_my_day_data(self):
+        RouteLine = self.env['beatpro.route.line'].with_user(self.rep)
+        data = RouteLine.beatpro_my_day_data()
+        self.assertEqual((data['done'], data['planned'], data['left']), (0, 1, 1))
+        self.assertEqual(data['next']['name'], 'Sharma General Store')
+        self.assertFalse(data['next_is_current'])
+        self.assertEqual(data['stops'][0]['status'], 'to_visit')
+
+        visit = self.env['beatpro.visit'].browse(
+            RouteLine.browse(data['next']['line_id']).action_start_visit()['res_id']).with_user(self.rep)
+        visit.action_check_in()
+        data = RouteLine.beatpro_my_day_data()
+        self.assertTrue(data['next_is_current'])
+        visit.action_check_out(result='closed')
+        data = RouteLine.beatpro_my_day_data()
+        self.assertEqual((data['done'], data['left']), (1, 0))
+        self.assertEqual(data['stops'][0]['status'], 'visited')
+        self.assertFalse(data['next'])
+
+    def test_visit_panel_data(self):
+        self.shop.write({'partner_latitude': 19.1136, 'partner_longitude': 72.8697})
+        self._invoice(300.0)
+        visit = self._visit(self.rep)
+        self.assertEqual(visit.beatpro_panel_data()['state'], 'planned')
+        visit.action_check_in(latitude=19.1137, longitude=72.8697)
+        self.env['account.payment'].with_user(self.rep).beatpro_register_payment([{
+            'mobile_uuid': 'panel-pay', 'partner_id': self.shop.id, 'amount': 120.0,
+            'beatpro_method': 'cash', 'beatpro_visit_id': visit.id,
+        }])
+        data = visit.beatpro_panel_data()
+        self.assertEqual(data['state'], 'in_progress')
+        self.assertIn('m from the shop pin', data['location'])
+        self.assertTrue(data['has_due'])
+        self.assertEqual([item['kind'] for item in data['items']], ['payment'])
+        visit.action_check_out(result='no_order', no_order_reason='credit', note='Owner asked to come back')
+        self.assertEqual(visit.note, 'Owner asked to come back')
+
+    def test_overview_dashboard(self):
+        with self.assertRaises(AccessError):
+            self.env['beatpro.dashboard'].with_user(self.rep).get_data()
+        visit = self._visit(self.rep)
+        visit.action_check_in()
+        visit.action_check_out(result='no_order', no_order_reason='enough_stock')
+        order = self.env['sale.order'].with_user(self.rep).create({
+            'partner_id': self.shop.id,
+            'order_line': [fields.Command.create({'product_id': self.product.id, 'product_uom_qty': 1, 'discount': 10.0})],
+        })
+        order.action_beatpro_request_approval()
+
+        data = self.env['beatpro.dashboard'].with_user(self.supervisor).get_data('today')
+        self.assertEqual(data['visits_done'], 1)
+        self.assertEqual(data['visits_planned'], 1)
+        self.assertEqual(data['approval_count'], 1)
+        self.assertEqual(data['reasons'][0]['count'], 1)
+        ravi = next(r for r in data['reps'] if r['id'] == self.rep.id)
+        self.assertEqual(ravi['visits'], '1 / 1')
+        for period in ('week', 'month'):
+            self.assertEqual(self.env['beatpro.dashboard'].with_user(self.supervisor).get_data(period)['period'], period)
+
+    def test_day_close_handover(self):
+        self.env['account.payment'].with_user(self.rep).beatpro_register_payment([
+            {'mobile_uuid': 'h-cash', 'partner_id': self.shop.id, 'amount': 500.0, 'beatpro_method': 'cash'},
+            {'mobile_uuid': 'h-chq', 'partner_id': self.shop.id, 'amount': 200.0, 'beatpro_method': 'cheque',
+             'beatpro_cheque_number': '000123'},
+            {'mobile_uuid': 'h-upi', 'partner_id': self.shop.id, 'amount': 50.0, 'beatpro_method': 'upi'},
+        ])
+        close = self.env['beatpro.day.close'].with_user(self.rep).create({})
+        # Figures are there as soon as the day close is created.
+        self.assertEqual((close.handover_amount, close.total_collected, close.cheque_count), (700.0, 750.0, 1))
+        self.assertEqual(self.route.with_user(self.supervisor).order_rate, 0)
+        # Close the day from My Day opens today's close, not a second one.
+        action = self.env['beatpro.day.close'].with_user(self.rep).action_open_today()
+        self.assertEqual(action['res_id'], close.id)
+

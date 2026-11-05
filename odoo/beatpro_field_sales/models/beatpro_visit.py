@@ -1,5 +1,9 @@
+import math
+
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
+
+from .beatpro_tools import money
 
 
 class BeatproVisit(models.Model):
@@ -108,7 +112,7 @@ class BeatproVisit(models.Model):
         })
         return True
 
-    def action_check_out(self, result=None, no_order_reason=None, latitude=0.0, longitude=0.0):
+    def action_check_out(self, result=None, no_order_reason=None, latitude=0.0, longitude=0.0, note=None):
         for visit in self:
             if visit.state != 'in_progress':
                 raise UserError(self.env._("Check in to visit %s before checking out.", visit.name))
@@ -122,8 +126,79 @@ class BeatproVisit(models.Model):
                 'check_out_longitude': longitude,
                 'result': visit_result,
                 'no_order_reason': no_order_reason or visit.no_order_reason,
+                'note': note or visit.note,
             })
         return True
+
+    def _distance_from_shop(self):
+        """Metres between the check-in position and the shop's pin, or None."""
+        self.ensure_one()
+        shop = self.partner_id
+        if not (self.check_in_latitude or self.check_in_longitude) or not (shop.partner_latitude or shop.partner_longitude):
+            return None
+        lat1, lon1 = math.radians(self.check_in_latitude), math.radians(self.check_in_longitude)
+        lat2, lon2 = math.radians(shop.partner_latitude), math.radians(shop.partner_longitude)
+        a = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+        return 6371000 * 2 * math.asin(math.sqrt(a))
+
+    def beatpro_panel_data(self):
+        """What the visit screen's top panel shows: timing, location, customer, and
+        the orders and payments taken during the visit."""
+        self.ensure_one()
+        partner = self.partner_id.commercial_partner_id
+        has_location = bool(self.check_in_latitude or self.check_in_longitude)
+        distance = self._distance_from_shop()
+        if not has_location:
+            location = self.env._("No location recorded")
+        elif distance is None:
+            location = self.env._("Location recorded")
+        elif distance < 1000:
+            location = self.env._("Location recorded · %s m from the shop pin", round(distance))
+        else:
+            location = self.env._("Location recorded · %s km from the shop pin", round(distance / 1000, 1))
+
+        past_orders = self.env['sale.order'].search([
+            ('partner_id', 'child_of', partner.id), ('state', '=', 'sale'),
+            ('id', 'not in', self.sale_order_ids.ids),
+        ], order='date_order desc', limit=5)
+        last_order_days = (fields.Datetime.now() - past_orders[0].date_order).days if past_orders else None
+        due = sum(i['amount_due'] for i in self.env['res.partner'].beatpro_open_invoices(partner.ids))
+
+        items = []
+        for order in self.sale_order_ids.filtered(lambda o: o.state != 'cancel'):
+            products = len(order.order_line.filtered(lambda l: not l.display_type))
+            state = self.env._("Waiting for approval") if order.beatpro_approval_state == 'waiting' else \
+                dict(order._fields['state'].selection).get(order.state)
+            items.append({
+                'kind': 'order', 'res_model': 'sale.order', 'res_id': order.id,
+                'title': self.env._("Order %s", order.name),
+                'sub': self.env._("%(count)s products · %(state)s", count=products, state=state),
+                'amount': money(self.env, order.amount_total),
+            })
+        method_names = dict(self.env['account.payment']._fields['beatpro_method'].selection)
+        for payment in self.sudo().payment_ids.filtered(lambda p: p.state not in ('canceled', 'rejected')):
+            settles = payment.reconciled_invoice_ids.mapped('name')
+            items.append({
+                'kind': 'payment', 'res_model': False, 'res_id': payment.id,
+                'title': self.env._("%s payment", method_names.get(payment.beatpro_method, '')),
+                'sub': self.env._("Settles %s", ', '.join(settles)) if settles else self.env._("Advance on account"),
+                'amount': money(self.env, payment.amount),
+            })
+        return {
+            'state': self.state,
+            'check_in': fields.Datetime.to_string(self.check_in) if self.check_in else False,
+            'check_out': fields.Datetime.to_string(self.check_out) if self.check_out else False,
+            'location': location,
+            'has_location': has_location,
+            'result': dict(self._fields['result'].selection).get(self.result) if self.result else False,
+            'amount_due': money(self.env, due),
+            'has_due': due > 0,
+            'last_order': self.env._("%s days", last_order_days) if last_order_days is not None else self.env._("None yet"),
+            'usual_order': money(self.env, sum(past_orders.mapped('amount_total')) / len(past_orders)) if past_orders else '—',
+            'items': items,
+            'has_order': bool(self.sale_order_ids.filtered(lambda o: o.state != 'cancel')),
+            'reasons': [{'value': k, 'label': v} for k, v in self._fields['no_order_reason'].selection],
+        }
 
     def action_cancel(self):
         self.write({'state': 'cancel'})

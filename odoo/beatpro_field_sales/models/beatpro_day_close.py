@@ -35,6 +35,11 @@ class BeatproDayClose(models.Model):
     cheque_amount = fields.Monetary(string="Cheque", readonly=True)
     upi_amount = fields.Monetary(string="UPI", readonly=True)
     total_collected = fields.Monetary(compute='_compute_total_collected', store=True)
+    handover_amount = fields.Monetary(
+        string="Hand In", compute='_compute_total_collected', store=True,
+        help="Cash and cheques the rep hands in to the office. UPI is already in the bank.")
+    cheque_count = fields.Integer(string="Cheques", readonly=True)
+    visit_ids = fields.Many2many('beatpro.visit', string="Day's Visits", compute='_compute_visit_ids')
     distance_km = fields.Float(string="Distance (km)", help="Distance travelled, as measured by the app.")
     note = fields.Text()
 
@@ -51,6 +56,47 @@ class BeatproDayClose(models.Model):
     def _compute_total_collected(self):
         for close in self:
             close.total_collected = close.cash_amount + close.cheque_amount + close.upi_amount
+            close.handover_amount = close.cash_amount + close.cheque_amount
+
+    @api.depends('user_id', 'date', 'company_id')
+    def _compute_visit_ids(self):
+        for close in self:
+            if not (close.user_id and close.date):
+                close.visit_ids = False
+                continue
+            start, end = close._day_bounds_utc()
+            close.visit_ids = self.env['beatpro.visit'].search([
+                ('user_id', '=', close.user_id.id),
+                ('company_id', '=', close.company_id.id),
+                ('state', '=', 'done'),
+                ('check_in', '>=', start),
+                ('check_in', '<=', end),
+            ], order='check_in')
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        closes = super().create(vals_list)
+        # Show the day's figures straight away, not only after a refresh.
+        closes.filtered(lambda c: c.state == 'draft').action_refresh()
+        return closes
+
+    @api.model
+    def action_open_today(self):
+        """Open the current user's close for today, creating it with today's figures."""
+        today = fields.Date.context_today(self)
+        close = self.search([('user_id', '=', self.env.uid), ('date', '=', today),
+                             ('company_id', '=', self.env.company.id)], limit=1)
+        if not close:
+            close = self.create({'user_id': self.env.uid, 'date': today})
+        elif close.state == 'draft':
+            close.action_refresh()
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'beatpro.day.close',
+            'res_id': close.id,
+            'views': [(False, 'form')],
+            'target': 'current',
+        }
 
     def write(self, vals):
         if (
@@ -108,6 +154,7 @@ class BeatproDayClose(models.Model):
                 'cash_amount': amounts['cash'],
                 'cheque_amount': amounts['cheque'],
                 'upi_amount': amounts['upi'],
+                'cheque_count': len(payments.filtered(lambda p: p.beatpro_method == 'cheque')),
             })
         return True
 

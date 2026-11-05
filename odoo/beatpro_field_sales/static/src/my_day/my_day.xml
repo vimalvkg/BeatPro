@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.MyDay">
+        <div class="o_action o_beatpro bp-page bp-my-day">
+            <t t-set="d" t-value="state.data"/>
+            <header class="bp-band">
+                <div class="bp-band-in">
+                    <div class="flex-grow-1">
+                        <div class="bp-band-title">My Day</div>
+                        <div class="bp-band-sub" t-esc="d.subtitle"/>
+                    </div>
+                    <span class="bp-avatar bp-amber" t-esc="d.user_initials" t-att-title="d.user_name"/>
+                </div>
+            </header>
+
+            <div class="bp-wrap-narrow">
+                <div class="bp-card bp-summary">
+                    <svg width="72" height="72" viewBox="0 0 72 72" role="img" t-att-aria-label="d.done + ' of ' + d.planned + ' visits done'">
+                        <circle cx="36" cy="36" r="30" fill="none" stroke="#E6EEF7" stroke-width="8"/>
+                        <circle cx="36" cy="36" r="30" fill="none" stroke="#184878" stroke-width="8" stroke-linecap="round"
+                                t-att-stroke-dasharray="ring" transform="rotate(-90 36 36)"/>
+                        <text x="36" y="41" text-anchor="middle" font-family="Manrope, sans-serif" font-size="17" font-weight="800" fill="#10243A"><t t-esc="d.done"/>/<t t-esc="d.planned"/></text>
+                    </svg>
+                    <div class="bp-summary-grid">
+                        <div><div class="bp-figure-label">Orders</div><div class="bp-figure" t-esc="d.orders_total"/></div>
+                        <div><div class="bp-figure-label">Collected</div><div class="bp-figure" style="color: var(--bp-green)" t-esc="d.collected_total"/></div>
+                        <div class="bp-small bp-muted" style="grid-column: span 2">
+                            <t t-if="d.left"><t t-esc="d.left"/> <t t-if="d.left === 1">shop</t><t t-else="">shops</t> left today</t>
+                            <t t-elif="d.planned">Every shop visited. Close the day when you're done.</t>
+                            <t t-else="">Nothing planned for today.</t>
+                        </div>
+                    </div>
+                </div>
+
+                <t t-if="d.next">
+                    <p class="bp-eyebrow mt-2" t-esc="d.next_is_current ? 'Now' : 'Next'"/>
+                    <div class="bp-next-card">
+                        <div class="d-flex align-items-start gap-3">
+                            <span class="bp-num bp-solid" t-esc="d.next.number"/>
+                            <div class="flex-grow-1" style="min-width: 0">
+                                <div style="font-size: 17px; font-weight: 800" t-esc="d.next.name"/>
+                                <div class="bp-small bp-muted" t-esc="d.next.sub"/>
+                            </div>
+                            <span t-if="d.next.due" class="bp-pill bp-due"><t t-esc="d.next.due"/> due</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="bp-btn bp-primary bp-lg flex-grow-1" t-att-disabled="state.opening" t-on-click="() => this.openStop(d.next)">
+                                <i class="fa fa-map-marker" aria-hidden="true"/>
+                                <t t-esc="d.next_is_current ? 'Open visit' : 'Start visit'"/>
+                            </button>
+                            <a t-if="d.next.latitude" class="bp-btn bp-icon" t-att-href="directionsUrl(d.next)" target="_blank" rel="noopener" aria-label="Directions" title="Directions">
+                                <i class="fa fa-location-arrow" aria-hidden="true"/>
+                            </a>
+                            <a t-if="d.next.phone" class="bp-btn bp-icon" t-att-href="'tel:' + d.next.phone" aria-label="Call" title="Call">
+                                <i class="fa fa-phone" aria-hidden="true"/>
+                            </a>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="d.stops.length">
+                    <p class="bp-eyebrow mt-2">Today's route</p>
+                    <t t-foreach="d.stops" t-as="stop" t-key="stop.line_id">
+                        <t t-set="pill" t-value="stopPill(stop)"/>
+                        <button type="button" class="bp-stop" t-on-click="() => this.openStop(stop)">
+                            <span class="bp-num" t-att-class="stopClass(stop)">
+                                <i t-if="stop.status === 'visited'" class="fa fa-check" aria-label="Visited"/>
+                                <t t-else="" t-esc="stop.number"/>
+                            </span>
+                            <span class="flex-grow-1 d-flex flex-column" style="min-width: 0">
+                                <span class="bp-stop-name" t-esc="stop.name"/>
+                                <span class="bp-small bp-muted" t-esc="stop.sub"/>
+                            </span>
+                            <span class="bp-pill" t-att-class="pill.cls" t-esc="pill.label"/>
+                        </button>
+                    </t>
+                    <button type="button" class="bp-btn bp-quiet bp-block mt-2" t-on-click="closeDay">
+                        <i class="fa fa-moon-o" aria-hidden="true"/>Close the day
+                    </button>
+                </t>
+                <div t-else="" class="bp-card bp-card-pad text-center bp-muted">
+                    Your supervisor plans your routes in BeatPro. Nothing is planned for today.
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -25,6 +25,7 @@ class BeatproPaymentWizard(models.TransientModel):
     upi_reference = fields.Char(string="UPI Reference")
     line_ids = fields.One2many('beatpro.payment.wizard.line', 'wizard_id', string="Open Invoices")
     amount_due = fields.Monetary(string="Total Due", compute='_compute_amount_due')
+    amount_hint = fields.Char(compute='_compute_amount_hint')
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -44,6 +45,17 @@ class BeatproPaymentWizard(models.TransientModel):
     def _compute_amount_due(self):
         for wizard in self:
             wizard.amount_due = sum(wizard.line_ids.mapped('amount_due'))
+
+    @api.depends('amount', 'amount_due', 'line_ids.selected', 'line_ids.amount_due')
+    def _compute_amount_hint(self):
+        for wizard in self:
+            fmt = wizard.currency_id.format
+            if not wizard.amount_due:
+                wizard.amount_hint = self.env._("No unpaid invoices · kept as an advance")
+                continue
+            left = max(wizard.amount_due - (wizard.amount or 0.0), 0.0)
+            wizard.amount_hint = self.env._(
+                "of %(due)s due · %(left)s left after this", due=fmt(wizard.amount_due), left=fmt(left))
 
     @api.onchange('line_ids')
     def _onchange_selected_invoices(self):

@@ -26,10 +26,8 @@
         <field name="name">beatpro.visit.form</field>
         <field name="model">beatpro.visit</field>
         <field name="arch" type="xml">
-            <form string="Visit">
+            <form string="Visit" class="o_beatpro_visit_form">
                 <header>
-                    <button name="action_new_order" type="object" string="New Order" class="btn-primary" invisible="state != 'in_progress'"/>
-                    <button name="action_collect_payment" type="object" string="Collect Payment" invisible="state not in ('in_progress', 'done')"/>
                     <button name="action_cancel" type="object" string="Cancel" invisible="state not in ('planned', 'in_progress')"/>
                     <button name="action_reset_to_planned" type="object" string="Reset to Planned"
                             invisible="state != 'cancel'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
@@ -43,13 +41,13 @@
                         <button name="action_open_map" type="object" class="oe_stat_button" icon="fa-map"
                                 string="Map" invisible="not check_in_latitude and not check_in_longitude"/>
                     </div>
-                    <widget name="beatpro_gps_buttons"/>
                     <div class="oe_title">
-                        <h1><field name="name"/></h1>
+                        <h1><field name="partner_id" placeholder="Customer" readonly="state in ('done', 'cancel')"/></h1>
+                        <div class="text-muted"><field name="name" class="d-inline"/></div>
                     </div>
+                    <widget name="beatpro_visit_panel"/>
                     <group>
                         <group>
-                            <field name="partner_id" readonly="state in ('done', 'cancel')"/>
                             <field name="user_id" widget="many2one_avatar_user" readonly="state in ('done', 'cancel')"/>
                             <field name="route_id"/>
                             <field name="company_id" groups="base.group_multi_company"/>

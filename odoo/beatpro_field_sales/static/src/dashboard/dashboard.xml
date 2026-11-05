@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.Dashboard">
+        <div class="o_action o_beatpro bp-page bp-dashboard">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap">
+                <div class="d-flex flex-wrap align-items-end gap-3">
+                    <div style="flex: 1 1 320px">
+                        <p class="bp-eyebrow mb-1">Field team · <t t-esc="d.date_label"/></p>
+                        <h1 class="bp-title" t-esc="greeting"/>
+                    </div>
+                    <div class="bp-segmented" role="group" aria-label="Period">
+                        <t t-foreach="periods" t-as="p" t-key="p.value">
+                            <button type="button" t-att-class="{active: state.period === p.value}" t-att-aria-pressed="state.period === p.value ? 'true' : 'false'"
+                                    t-on-click="() => this.setPeriod(p.value)" t-esc="p.label"/>
+                        </t>
+                    </div>
+                    <button type="button" class="bp-btn bp-primary" t-on-click="() => this.open('beatpro_field_sales.action_beatpro_route')">Plan routes</button>
+                </div>
+
+                <section class="bp-kpis" aria-label="Field figures">
+                    <div class="bp-card bp-kpi">
+                        <span class="bp-kpi-label">Visits done</span>
+                        <span class="bp-kpi-value"><t t-esc="d.visits_done"/><small t-if="d.visits_planned"> / <t t-esc="d.visits_planned"/></small></span>
+                        <div t-if="d.visits_planned" class="bp-bar"><span t-att-style="'width: ' + d.visits_pct + '%'"/></div>
+                        <span class="bp-small bp-muted">
+                            <t t-if="d.period === 'today'"><t t-esc="d.visits_left"/> still to visit · <t t-esc="d.reps_out"/> reps out</t>
+                            <t t-else=""><t t-esc="d.visits_with_order"/> with an order</t>
+                        </span>
+                    </div>
+                    <div class="bp-card bp-kpi">
+                        <span class="bp-kpi-label">Order value</span>
+                        <span class="bp-kpi-value" t-esc="d.order_value"/>
+                        <span class="bp-small bp-muted"><t t-esc="d.order_count"/> orders · <t t-esc="d.visits_with_order"/> of <t t-esc="d.visits_done"/> visits ordered</span>
+                        <span t-if="d.visits_done" class="bp-pill bp-done align-self-start"><t t-esc="d.strike_rate"/>% strike rate</span>
+                    </div>
+                    <div class="bp-card bp-kpi">
+                        <span class="bp-kpi-label">Collected</span>
+                        <span class="bp-kpi-value" t-esc="d.collected"/>
+                        <div class="bp-split" aria-hidden="true">
+                            <t t-foreach="d.collected_split" t-as="part" t-key="part.key">
+                                <span t-if="part.share" t-att-class="'bp-' + part.key" t-att-style="'flex: ' + part.share"/>
+                            </t>
+                        </div>
+                        <span class="bp-small bp-muted">
+                            <t t-foreach="d.collected_split" t-as="part" t-key="part.key"><t t-esc="part.label"/> <t t-esc="part.amount"/><t t-if="!part_last"> · </t></t>
+                        </span>
+                    </div>
+                    <a href="#bp-approvals" class="bp-card bp-kpi bp-kpi-alert">
+                        <span class="bp-kpi-label">Needs you</span>
+                        <span class="bp-kpi-value" t-esc="d.approval_count"/>
+                        <span class="bp-small bp-alert-text">discounts waiting for approval · <t t-esc="d.approval_value"/></span>
+                        <span t-if="d.approval_count" class="bp-small" style="font-weight: 700; color: var(--bp-navy)">Review now →</span>
+                    </a>
+                </section>
+
+                <div class="bp-columns">
+                    <section class="bp-card bp-main" aria-labelledby="bp-reps-h">
+                        <div class="d-flex align-items-center justify-content-between" style="padding: 18px 20px 12px">
+                            <h2 id="bp-reps-h" class="bp-h2">Reps on the road</h2>
+                            <a href="#" class="fw-bold" t-on-click.prevent="() => this.open('beatpro_field_sales.action_beatpro_visit')">All visits</a>
+                        </div>
+                        <div class="bp-table" role="table" aria-label="Reps on the road">
+                            <div class="bp-row bp-head" role="row">
+                                <span role="columnheader">Rep</span><span role="columnheader">Visits today</span>
+                                <span role="columnheader" class="text-end">Orders</span><span role="columnheader" class="text-end">Collected</span>
+                                <span role="columnheader">Now</span>
+                            </div>
+                            <t t-foreach="d.reps" t-as="rep" t-key="rep.id">
+                                <div class="bp-row" role="row">
+                                    <div role="cell" class="d-flex align-items-center gap-3" style="min-width: 0">
+                                        <span class="bp-avatar" t-esc="rep.initials"/>
+                                        <div class="d-flex flex-column" style="min-width: 0">
+                                            <span class="fw-bold" t-esc="rep.name"/>
+                                            <span class="bp-small bp-muted text-truncate" t-esc="rep.route"/>
+                                        </div>
+                                    </div>
+                                    <div role="cell" class="d-flex align-items-center gap-2">
+                                        <div class="bp-bar bp-bar-thin flex-grow-1"><span t-att-style="'width: ' + rep.pct + '%'"/></div>
+                                        <span class="fw-bold text-nowrap" t-esc="rep.visits"/>
+                                    </div>
+                                    <span role="cell" class="bp-num-cell" t-esc="rep.orders"/>
+                                    <span role="cell" class="bp-num-cell" t-esc="rep.collected"/>
+                                    <span role="cell">
+                                        <span class="bp-pill" t-att-class="{'bp-live': rep.status === 'live', 'bp-done': rep.status === 'done'}"><span class="bp-dot"/><t t-esc="rep.now"/></span>
+                                    </span>
+                                </div>
+                            </t>
+                            <div t-if="!d.reps.length" class="bp-row bp-muted">No users are in the BeatPro Rep group yet.</div>
+                        </div>
+                    </section>
+
+                    <div class="bp-side">
+                        <section id="bp-approvals" class="bp-card bp-card-pad d-flex flex-column gap-3" aria-labelledby="bp-appr-h">
+                            <h2 id="bp-appr-h" class="bp-h2">Discounts to approve</h2>
+                            <t t-foreach="d.approvals" t-as="ap" t-key="ap.id">
+                                <div class="bp-approval">
+                                    <a href="#" class="flex-grow-1 d-flex flex-column text-reset text-decoration-none" style="min-width: 0" t-on-click.prevent="() => this.openOrder(ap.id)">
+                                        <span class="fw-bold" t-esc="ap.shop"/>
+                                        <span class="bp-small bp-muted" t-esc="ap.detail"/>
+                                    </a>
+                                    <button type="button" class="bp-btn bp-outline" t-att-disabled="state.approving === ap.id" t-on-click="() => this.approve(ap)">Approve</button>
+                                </div>
+                            </t>
+                            <p t-if="!d.approvals.length" class="bp-small bp-muted mb-0">Nothing waiting. Discounts above a rep's limit appear here.</p>
+                        </section>
+
+                        <section class="bp-card bp-card-pad d-flex flex-column gap-3" aria-labelledby="bp-why-h">
+                            <div>
+                                <h2 id="bp-why-h" class="bp-h2">Why no order</h2>
+                                <p class="bp-small bp-muted mb-0 mt-1"><t t-esc="d.no_order_count"/> visits without an order</p>
+                            </div>
+                            <t t-foreach="d.reasons" t-as="r" t-key="r.label">
+                                <div class="bp-reason">
+                                    <span t-esc="r.label"/>
+                                    <div class="bp-bar"><span t-att-style="'width: ' + r.pct + '%'"/></div>
+                                    <span class="fw-bold text-end" t-esc="r.count"/>
+                                </div>
+                            </t>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

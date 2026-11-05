@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.VisitPanel">
+        <div class="o_beatpro bp-visit-panel">
+            <t t-set="d" t-value="state.data"/>
+            <div t-if="!d" class="bp-small bp-muted">Save the visit to check in.</div>
+            <t t-else="">
+                <!-- Status -->
+                <div t-if="d.state === 'planned'" class="bp-card bp-card-pad d-flex flex-wrap align-items-center gap-3">
+                    <div class="flex-grow-1">
+                        <div class="bp-h2">Ready when you are</div>
+                        <div class="bp-small bp-muted">Check in at the shop to record where and when the visit starts.</div>
+                    </div>
+                    <button type="button" class="bp-btn bp-primary bp-lg" t-att-disabled="state.busy" t-on-click="checkIn">
+                        <i class="fa fa-map-marker" aria-hidden="true"/>Check in
+                    </button>
+                </div>
+                <div t-elif="d.state === 'in_progress'" class="bp-hero">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span class="bp-hero-chip"><span class="bp-dot"/>Checked in</span>
+                        <span class="bp-on-navy">since <t t-esc="checkInTime"/></span>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="bp-timer" t-esc="timer"/>
+                        <span class="bp-on-navy" style="font-size: 14px">at the shop</span>
+                    </div>
+                    <div class="bp-on-navy"><i class="fa fa-map-marker me-2" aria-hidden="true"/><t t-esc="d.location"/></div>
+                </div>
+                <div t-elif="d.state === 'done'" class="bp-hero bp-hero-done">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <span class="bp-hero-chip" style="background: rgba(46,139,87,0.25); color: #C8F0DA"><span class="bp-dot" style="background: #5FD08F"/>Visit finished</span>
+                        <span class="bp-on-navy" t-esc="d.result"/>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="bp-timer" t-esc="timer"/>
+                        <span class="bp-on-navy" style="font-size: 14px">at the shop</span>
+                    </div>
+                    <div class="bp-on-navy"><i class="fa fa-map-marker me-2" aria-hidden="true"/><t t-esc="d.location"/></div>
+                </div>
+
+                <!-- Quick actions -->
+                <div t-if="d.state === 'in_progress' or d.state === 'done'" class="bp-tiles">
+                    <button t-if="d.state === 'in_progress'" type="button" class="bp-tile" t-on-click="() => this.openAction('action_new_order')">
+                        <span class="bp-tile-icon"><i class="fa fa-shopping-cart" aria-hidden="true"/></span>
+                        Take order
+                    </button>
+                    <button type="button" class="bp-tile" t-on-click="() => this.openAction('action_collect_payment')">
+                        <span class="bp-tile-icon bp-warm"><i class="fa fa-money" aria-hidden="true"/></span>
+                        Collect payment
+                    </button>
+                </div>
+
+                <!-- Customer at a glance -->
+                <div class="bp-card bp-facts">
+                    <div><span class="bp-fact-label">Amount due</span><span class="bp-fact" t-att-style="d.has_due ? 'color: var(--bp-red)' : ''" t-esc="d.amount_due"/></div>
+                    <div><span class="bp-fact-label">Last order</span><span class="bp-fact" t-esc="d.last_order"/></div>
+                    <div><span class="bp-fact-label">Usual order</span><span class="bp-fact" t-esc="d.usual_order"/></div>
+                </div>
+
+                <!-- Done during the visit -->
+                <t t-if="d.items.length">
+                    <p class="bp-eyebrow">In this visit</p>
+                    <div class="bp-card" style="overflow: hidden">
+                        <t t-foreach="d.items" t-as="item" t-key="item.kind + item.res_id">
+                            <button type="button" class="bp-item" t-att-class="{'bp-link': item.res_model}" t-on-click="() => this.openItem(item)">
+                                <span class="bp-item-icon" t-att-class="{'bp-paid': item.kind === 'payment'}">
+                                    <i t-att-class="item.kind === 'payment' ? 'fa fa-check' : 'fa fa-file-text-o'" aria-hidden="true"/>
+                                </span>
+                                <span class="flex-grow-1 d-flex flex-column" style="min-width: 0">
+                                    <span style="font-weight: 700" t-esc="item.title"/>
+                                    <span class="bp-small bp-muted" t-esc="item.sub"/>
+                                </span>
+                                <span style="font-weight: 800" t-att-class="{'bp-amount-paid': item.kind === 'payment'}" t-esc="item.amount"/>
+                            </button>
+                        </t>
+                    </div>
+                </t>
+
+                <button t-if="d.state === 'in_progress'" type="button" class="bp-btn bp-dark bp-lg bp-block" t-att-disabled="state.busy" t-on-click="checkOut">
+                    <i class="fa fa-sign-out" aria-hidden="true"/>Check out
+                </button>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="beatpro_field_sales.CheckOutDialog">
+        <Dialog title="'How did the visit go?'" size="'md'">
+            <div class="o_beatpro bp-checkout d-flex flex-column gap-3">
+                <div class="bp-choices" role="radiogroup" aria-label="Result">
+                    <t t-foreach="results" t-as="r" t-key="r.value">
+                        <button type="button" role="radio" class="bp-choice" t-att-aria-checked="state.result === r.value ? 'true' : 'false'"
+                                t-att-class="{active: state.result === r.value}" t-on-click="() => this.state.result = r.value" t-esc="r.label"/>
+                    </t>
+                </div>
+                <div t-if="state.result === 'no_order'">
+                    <p class="bp-eyebrow mb-2">Why no order?</p>
+                    <div class="bp-reasons">
+                        <t t-foreach="props.reasons" t-as="reason" t-key="reason.value">
+                            <button type="button" class="bp-reason-chip" t-att-class="{active: state.reason === reason.value}"
+                                    t-on-click="() => this.state.reason = reason.value" t-esc="reason.label"/>
+                        </t>
+                    </div>
+                </div>
+                <div>
+                    <label for="bp_checkout_note" class="bp-eyebrow mb-2 d-block">Note (optional)</label>
+                    <textarea id="bp_checkout_note" class="form-control" rows="2" t-model="state.note"/>
+                </div>
+            </div>
+            <t t-set-slot="footer">
+                <button type="button" class="btn btn-primary" t-att-disabled="!canConfirm" t-on-click="confirm">Check out</button>
+                <button type="button" class="btn btn-secondary" t-on-click="props.close">Cancel</button>
+            </t>
+        </Dialog>
+    </t>
+</templates>

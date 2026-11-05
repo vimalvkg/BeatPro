@@ -1,0 +1,243 @@
+// BeatPro look: route blue with marker amber, Manrope type.
+// Everything is scoped under .o_beatpro so the rest of Odoo is untouched.
+
+@each $weight, $file in (500: "Medium", 600: "SemiBold", 700: "Bold", 800: "ExtraBold") {
+    @font-face {
+        font-family: "Manrope";
+        font-weight: $weight;
+        font-style: normal;
+        font-display: swap;
+        src: url("/beatpro_field_sales/static/src/fonts/Manrope-#{$file}.ttf") format("truetype");
+    }
+}
+
+.o_beatpro {
+    --bp-navy: #184878;
+    --bp-ink: #10243A;
+    --bp-ground: #F4F6F9;
+    --bp-surface: #FFFFFF;
+    --bp-line: #DCE3EB;
+    --bp-line-soft: #EDF1F5;
+    --bp-muted: #5B6B7C;
+    --bp-blue-soft: #E6EEF7;
+    --bp-on-navy: #C9D8E8;
+    --bp-amber: #F2B233;
+    --bp-amber-ink: #7A4F00;
+    --bp-amber-soft: #FFF6E0;
+    --bp-amber-line: #F2D58E;
+    --bp-green: #1F6B45;
+    --bp-green-dot: #2E8B57;
+    --bp-green-soft: #E3F2EA;
+    --bp-red: #8C1D18;
+    --bp-red-soft: #FBE9E7;
+    --bp-grey-pill: #4A5A6B;
+
+    font-family: "Manrope", "Segoe UI", Roboto, sans-serif;
+    color: var(--bp-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+// -- Pages (My Day, Overview) -----------------------------------------------
+
+.o_beatpro.bp-page {
+    background: var(--bp-ground);
+    height: 100%;
+    overflow: auto;
+}
+
+.o_beatpro {
+    .bp-wrap { max-width: 1280px; margin: 0 auto; padding: 28px 24px 48px; display: flex; flex-direction: column; gap: 24px; }
+    .bp-wrap-narrow { max-width: 560px; margin: 0 auto; padding: 0 16px 32px; display: flex; flex-direction: column; gap: 12px; }
+
+    .bp-eyebrow { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bp-muted); }
+    .bp-title { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.01em; color: var(--bp-ink); }
+    .bp-h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--bp-ink); }
+    .bp-muted { color: var(--bp-muted); }
+    .bp-small { font-size: 13px; }
+
+    .bp-card { background: var(--bp-surface); border: 1px solid var(--bp-line); border-radius: 14px; }
+    .bp-card-pad { padding: 18px 20px; }
+
+    .bp-pill {
+        display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+        font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px;
+        background: var(--bp-line-soft); color: var(--bp-grey-pill);
+        .bp-dot { width: 7px; height: 7px; border-radius: 50%; background: #8A99A8; }
+        &.bp-live { background: var(--bp-amber-soft); color: var(--bp-amber-ink); .bp-dot { background: #E3A21A; } }
+        &.bp-done { background: var(--bp-green-soft); color: var(--bp-green); .bp-dot { background: var(--bp-green-dot); } }
+        &.bp-next { background: var(--bp-blue-soft); color: var(--bp-navy); }
+        &.bp-due { background: var(--bp-red-soft); color: var(--bp-red); }
+    }
+
+    .bp-btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid transparent;
+        font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none;
+        &:focus-visible { outline: 3px solid var(--bp-amber); outline-offset: 2px; }
+        &.bp-primary { background: var(--bp-navy); color: #FFFFFF; &:hover { background: #123A61; color: #FFFFFF; } }
+        &.bp-dark { background: var(--bp-ink); color: #FFFFFF; &:hover { background: #0A1828; color: #FFFFFF; } }
+        &.bp-outline { background: var(--bp-surface); color: var(--bp-navy); border-color: var(--bp-navy); &:hover { background: var(--bp-blue-soft); } }
+        &.bp-quiet { background: var(--bp-surface); color: var(--bp-navy); border-color: var(--bp-line); &:hover { background: var(--bp-blue-soft); } }
+        &.bp-icon { width: 48px; min-height: 48px; padding: 0; border-color: var(--bp-line); background: var(--bp-surface); color: var(--bp-navy); }
+        &.bp-lg { min-height: 52px; font-size: 16px; font-weight: 800; border-radius: 14px; }
+        &.bp-block { width: 100%; }
+        &:disabled { opacity: 0.6; cursor: default; }
+    }
+
+    .bp-bar { height: 8px; border-radius: 4px; background: var(--bp-blue-soft); overflow: hidden;
+        > span { display: block; height: 100%; border-radius: 4px; background: var(--bp-navy); } }
+    .bp-bar-thin { height: 6px; }
+    .bp-split { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden;
+        .bp-cash { background: var(--bp-navy); } .bp-upi { background: #4F86C6; } .bp-cheque { background: var(--bp-amber); } }
+
+    .bp-avatar {
+        width: 36px; height: 36px; border-radius: 50%; flex: none;
+        display: grid; place-items: center; font-weight: 800; font-size: 13px;
+        background: var(--bp-blue-soft); color: var(--bp-navy);
+        &.bp-amber { background: var(--bp-amber); color: var(--bp-ink); }
+    }
+}
+
+// -- My Day -----------------------------------------------------------------
+
+.o_beatpro.bp-my-day {
+    .bp-band { background: var(--bp-navy); color: #FFFFFF; padding: 16px 16px 64px; }
+    .bp-band-in { max-width: 528px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+    .bp-band-title { font-size: 20px; font-weight: 800; line-height: 1.2; }
+    .bp-band-sub { font-size: 13px; color: var(--bp-on-navy); }
+    .bp-summary { margin-top: -50px; padding: 16px; display: flex; align-items: center; gap: 16px; border: 0; box-shadow: 0 6px 18px rgba(16, 36, 58, 0.10); }
+    .bp-summary-grid { flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+    .bp-figure-label { font-size: 12px; font-weight: 700; color: var(--bp-muted); }
+    .bp-figure { font-size: 18px; font-weight: 800; }
+    .bp-next-card { border: 2px solid var(--bp-navy); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: var(--bp-surface); }
+    .bp-num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; flex: none;
+        background: var(--bp-blue-soft); color: var(--bp-navy);
+        &.bp-solid { background: var(--bp-navy); color: #FFFFFF; }
+        &.bp-ok { background: var(--bp-green-dot); color: #FFFFFF; } }
+    .bp-stop { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer;
+        background: var(--bp-surface); border: 1px solid var(--bp-line); border-radius: 14px; padding: 12px 14px;
+        display: flex; align-items: center; gap: 12px; min-height: 60px;
+        &:hover { border-color: var(--bp-navy); }
+        &:focus-visible { outline: 3px solid var(--bp-amber); outline-offset: 2px; } }
+    .bp-stop-name { font-weight: 700; font-size: 15px; }
+}
+
+// -- Overview dashboard -------------------------------------------------------
+
+.o_beatpro.bp-dashboard {
+    .bp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+    .bp-kpi { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .bp-kpi-label { font-size: 13px; font-weight: 700; color: var(--bp-muted); }
+    .bp-kpi-value { font-size: 32px; font-weight: 800; line-height: 1; small { font-size: 18px; color: var(--bp-muted); font-weight: 700; } }
+    .bp-kpi-alert { background: var(--bp-amber-soft); border-color: var(--bp-amber-line); text-decoration: none; color: var(--bp-ink);
+        .bp-kpi-label, .bp-alert-text { color: var(--bp-amber-ink); } }
+    .bp-segmented { display: flex; background: var(--bp-surface); border: 1px solid var(--bp-line); border-radius: 10px; padding: 3px;
+        button { font: inherit; font-size: 14px; font-weight: 600; border: 0; border-radius: 8px; padding: 8px 14px; background: transparent; color: var(--bp-muted); cursor: pointer;
+            &.active { background: var(--bp-blue-soft); color: var(--bp-navy); font-weight: 700; } } }
+    .bp-columns { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+    .bp-main { flex: 999 1 560px; min-width: 0; overflow: hidden; }
+    .bp-side { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+    .bp-table { overflow-x: auto; }
+    .bp-row { display: grid; grid-template-columns: minmax(200px, 2fr) minmax(150px, 1.4fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(170px, 1.5fr);
+        column-gap: 12px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--bp-line-soft); min-width: 760px; font-size: 14px;
+        &.bp-head { border-top: 0; padding-top: 10px; padding-bottom: 10px; color: var(--bp-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; } }
+    .bp-num-cell { text-align: right; font-weight: 700; }
+    .bp-approval { border: 1px solid var(--bp-line-soft); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+    .bp-reason { display: grid; grid-template-columns: 150px 1fr 24px; align-items: center; gap: 10px; font-size: 14px;
+        .bp-bar { height: 10px; background: var(--bp-line-soft); > span { background: var(--bp-amber); } } }
+}
+
+// -- Visit form ---------------------------------------------------------------
+
+.o_beatpro_visit_form {
+    .o_beatpro.bp-visit-panel { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; max-width: 760px; }
+    .bp-hero { background: var(--bp-navy); color: #FFFFFF; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+        &.bp-hero-done { background: var(--bp-ink); } }
+    .bp-hero-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 5px 10px;
+        background: rgba(242, 178, 51, 0.22); color: #FFE3A3;
+        .bp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bp-amber); } }
+    .bp-timer { font-size: 40px; font-weight: 800; line-height: 1; }
+    .bp-on-navy { color: var(--bp-on-navy); font-size: 13px; }
+    .bp-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .bp-tile { font: inherit; min-height: 104px; border: 1px solid var(--bp-line); border-radius: 16px; background: var(--bp-surface); color: var(--bp-ink);
+        display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 14px; cursor: pointer; text-align: left;
+        font-size: 15px; font-weight: 800;
+        &:hover { border-color: var(--bp-navy); }
+        .bp-tile-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--bp-blue-soft); color: var(--bp-navy); font-size: 18px; }
+        .bp-tile-icon.bp-warm { background: var(--bp-amber-soft); color: #8A5A00; } }
+    .bp-facts { padding: 14px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+        span { display: block; } .bp-fact-label { font-size: 12px; font-weight: 700; color: var(--bp-muted); } .bp-fact { font-size: 16px; font-weight: 800; } }
+    .bp-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; width: 100%; background: none; border: 0; text-align: left; font: inherit; color: inherit;
+        & + .bp-item { border-top: 1px solid var(--bp-line-soft); }
+        &.bp-link { cursor: pointer; &:hover { background: var(--bp-ground); } }
+        .bp-item-icon { width: 36px; height: 36px; border-radius: 10px; flex: none; display: grid; place-items: center; background: var(--bp-blue-soft); color: var(--bp-navy);
+            &.bp-paid { background: var(--bp-green-soft); color: var(--bp-green); } } }
+    .bp-amount-paid { color: var(--bp-green); }
+}
+
+.o_beatpro.bp-checkout {
+    .bp-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .bp-choice { font: inherit; min-height: 52px; border-radius: 12px; border: 1px solid var(--bp-line); background: var(--bp-surface); color: var(--bp-ink); font-weight: 700; cursor: pointer;
+        &.active { border: 2px solid var(--bp-navy); background: var(--bp-blue-soft); color: var(--bp-navy); } }
+    .bp-reasons { display: flex; flex-wrap: wrap; gap: 8px; }
+    .bp-reason-chip { font: inherit; font-size: 14px; font-weight: 600; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--bp-line); background: var(--bp-surface); cursor: pointer;
+        &.active { border-color: var(--bp-navy); background: var(--bp-blue-soft); color: var(--bp-navy); font-weight: 700; } }
+}
+
+// -- Collect payment ------------------------------------------------------------
+
+.o_beatpro_payment_form {
+    font-family: "Manrope", "Segoe UI", Roboto, sans-serif;
+    .bp-amount-box { background: #FFFFFF; border: 1px solid #DCE3EB; border-radius: 16px; padding: 18px 16px; margin-bottom: 16px;
+        display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+        > label, .o_form_label { display: block; font-size: 13px; font-weight: 700; color: #5B6B7C; }
+        .o_field_monetary { width: 100%; max-width: 340px; font-size: 40px; font-weight: 800; color: #10243A; justify-content: center; }
+        .o_field_monetary input { font-size: 40px; font-weight: 800; text-align: center; border: 0; color: #10243A; min-width: 0; }
+        .bp-hint, .bp-hint .o_field_widget { font-size: 13px; color: #5B6B7C; } }
+    .bp-label { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #5B6B7C; margin: 8px 0; }
+    .bp-methods { margin-bottom: 12px;
+        .o_field_widget, [role=radiogroup] { display: flex; gap: 8px; width: 100%; }
+        .o_radio_item { flex: 1 1 0; padding: 0; margin: 0; position: relative; }
+        .o_radio_input { position: absolute; opacity: 0; pointer-events: none; }
+        .o_radio_item label { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px; margin: 0;
+            border: 1px solid #DCE3EB; border-radius: 14px; font-size: 15px; font-weight: 800; color: #10243A; background: #FFFFFF; cursor: pointer; }
+        .o_radio_input:checked + label { border: 2px solid #184878; background: #E6EEF7; color: #184878; }
+        .o_radio_input:focus-visible + label { outline: 3px solid #F2B233; outline-offset: 2px; } }
+    .o_field_one2many .o_list_renderer { border: 1px solid #DCE3EB; border-radius: 14px; overflow: hidden; }
+}
+
+// BeatPro blue for the main button on BeatPro forms and dialogs.
+.o_beatpro_day_close_form .o_form_statusbar .btn-primary,
+.o_beatpro_visit_form .o_form_statusbar .btn-primary,
+.modal:has(.o_beatpro_payment_form) .modal-footer .btn-primary,
+.modal:has(.bp-checkout) .modal-footer .btn-primary {
+    background-color: #184878;
+    border-color: #184878;
+    color: #FFFFFF;
+    &:hover { background-color: #123A61; border-color: #123A61; }
+}
+
+// -- Day close --------------------------------------------------------------------
+
+.o_beatpro_day_close_form {
+    .bp-handover { background: #10243A; color: #FFFFFF; border-radius: 18px; padding: 18px 20px; margin-bottom: 16px; max-width: 760px; font-family: "Manrope", "Segoe UI", Roboto, sans-serif;
+        .bp-handover-label { font-size: 13px; font-weight: 700; color: #C9D8E8; }
+        .bp-handover-value, .bp-handover-value .o_field_widget { font-size: 38px; font-weight: 800; line-height: 1.1; color: #FFFFFF; }
+        .bp-handover-split { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.16); padding-top: 12px; margin-top: 12px;
+            .o_field_widget { color: #FFFFFF; font-size: 16px; font-weight: 800; }
+            .bp-split-label, .bp-split-sub { font-size: 12px; color: #C9D8E8; font-weight: 700; } } }
+    .bp-day-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; max-width: 760px; font-family: "Manrope", "Segoe UI", Roboto, sans-serif;
+        > div { background: #FFFFFF; border: 1px solid #DCE3EB; border-radius: 14px; padding: 12px; }
+        .bp-stat-label { font-size: 12px; font-weight: 700; color: #5B6B7C; display: block; }
+        .o_field_widget { font-size: 20px; font-weight: 800; color: #10243A; } }
+}
+
+// -- Routes board (kanban grouped by weekday) ----------------------------------------
+
+.o_beatpro_routes_kanban {
+    .o_kanban_record { border-radius: 12px; border: 1px solid #DCE3EB; font-family: "Manrope", "Segoe UI", Roboto, sans-serif; }
+    .bp-route-name { font-weight: 800; font-size: 15px; color: #10243A; }
+    .bp-route-foot { display: flex; justify-content: space-between; font-size: 13px; color: #5B6B7C; border-top: 1px solid #EDF1F5; padding-top: 8px; margin-top: 8px; }
+    .bp-rate-good { color: #1F6B45; font-weight: 700; }
+    .bp-rate-mid { color: #7A4F00; font-weight: 700; }
+}

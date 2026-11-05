@@ -1,6 +1,6 @@
 {
     'name': 'BeatPro Field Sales',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'category': 'Sales/Sales',
     'summary': 'Routes, shop visits and day-end close for field sales reps using the BeatPro mobile app',
     'description': """
@@ -36,7 +36,9 @@ Server side of the BeatPro mobile app for Odoo Community.
     ],
     'assets': {
         'web.assets_backend': [
-            'beatpro_field_sales/static/src/**/*',
+            'beatpro_field_sales/static/src/scss/*.scss',
+            'beatpro_field_sales/static/src/**/*.js',
+            'beatpro_field_sales/static/src/**/*.xml',
         ],
     },
     'installable': True,

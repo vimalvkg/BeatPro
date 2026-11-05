@@ -14,11 +14,12 @@ Menu **BeatPro**:
 
 | Menu | Who | What it does |
 | --- | --- | --- |
-| My Day | Reps | Today's customers from the rep's routes, with Start Visit / Open Visit. Cards on phones, a list on desktop. |
-| Visits | Reps | Each visit: **Check In** and **Check Out** record the browser's GPS position; **New Order** opens a quotation linked to the visit; **Collect Payment** records cash, cheque or UPI against open invoices. Calendar, pivot and graph views. |
+| Overview | Supervisors | Today's, this week's or this month's visits, order value, collections by method, every rep's progress, discounts to approve in one click and why shops didn't order |
+| My Day | Reps | Progress ring with the day's orders and collections, the next shop with Start visit, directions and call, and the route with each shop's status |
+| Visits | Reps | The visit panel: **Check in** and **Check out** record the browser's GPS position and show the distance from the shop pin; a live timer; **Take order** and **Collect payment** tiles; the customer's amount due, last and usual order; everything done during the visit. Check-out asks for the result, the no-order reason and a note. |
 | Orders | Reps | Orders taken during visits or sent from the app |
-| Day-End Closes | Reps | Totals the day's visits, orders and collections, then locks it |
-| Routes | Supervisors (reps read only) | Beat plans: customers in visit order, per weekday |
+| Day-End Closes | Reps | The cash and cheques to hand in, UPI already in the bank, visits and orders, and a list of the day's visits; closing locks the day |
+| Routes | Supervisors (reps read only) | A board of routes by weekday, with each route's rep, shops and how often its visits end with an order |
 | Supervisor > Discount Approvals | Supervisors | Orders whose discount is above the rep's limit |
 | Supervisor > Visit Analysis | Supervisors | Visits by rep and result |
 | Supervisor > Settings | Admins | Cash and bank journals for field collections |
@@ -27,6 +28,8 @@ A rep whose discount is above their limit can't confirm the order; they click **
 Approval** and a supervisor clicks **Approve Discount**.
 
 Customers get a **Field Sales** tab (routes, last visit, GPS position) and a Visits button.
+
+The BeatPro screens use the Manrope typeface (SIL Open Font License, `static/src/fonts/OFL.txt`).
 
 ## Access groups
 
