@@ -215,15 +215,14 @@ class Repository {
     required String customerKey,
     String? visitUuid,
     required double amount,
-    required String method,
+    required PaymentMethod method,
     List<int> invoiceIds = const [],
     String? chequeNumber,
     String? chequeDate,
-    String? upiReference,
+    String? reference,
   }) async {
     if (amount <= 0) throw ArgumentError('Enter the amount collected.');
-    if (!paymentMethods.containsKey(method)) throw ArgumentError('Choose cash, cheque or UPI.');
-    if (method == 'cheque' && (chequeNumber == null || chequeNumber.trim().isEmpty)) {
+    if (method.reference == 'cheque' && (chequeNumber == null || chequeNumber.trim().isEmpty)) {
       throw ArgumentError('Enter the cheque number.');
     }
     final payment = LocalRecord(
@@ -234,11 +233,14 @@ class Repository {
         'customerKey': customerKey,
         'visitUuid': visitUuid,
         'amount': amount,
-        'method': method,
+        'methodId': method.id,
+        'method': method.legacyCode,
+        'methodName': method.name,
+        'kind': method.kind,
         'invoiceIds': invoiceIds,
         'chequeNumber': chequeNumber,
         'chequeDate': chequeDate,
-        'upiReference': upiReference,
+        'reference': reference,
         'date': todayIso,
       },
     );
@@ -298,9 +300,10 @@ class Repository {
         .toList();
     final orders = await db.records(kind: RecordKind.order, since: since);
     final payments = await db.records(kind: RecordKind.payment, since: since);
-    final collected = <String, double>{for (final m in paymentMethods.keys) m: 0.0};
+    final collected = <String, double>{for (final k in collectionKinds.keys) k: 0.0};
     for (final p in payments) {
-      collected[p.data['method'] as String] = collected[p.data['method']]! + (p.data['amount'] as num).toDouble();
+      final kind = paymentKind(p.data);
+      collected[kind] = (collected[kind] ?? 0) + (p.data['amount'] as num).toDouble();
     }
     return DaySummary(
       planned: (await db.stops()).length,

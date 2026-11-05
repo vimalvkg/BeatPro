@@ -268,12 +268,15 @@ class SyncService {
               'partner_id': partnerId,
               'amount': r.data['amount'],
               'date': r.data['date'],
-              'beatpro_method': r.data['method'],
+              if (r.data['methodId'] != null)
+                'payment_method_line_id': r.data['methodId']
+              else
+                'beatpro_method': r.data['method'],
               'beatpro_visit_id': visitId ?? false,
               'invoice_ids': r.data['invoiceIds'] ?? [],
               'beatpro_cheque_number': r.data['chequeNumber'] ?? false,
               'beatpro_cheque_date': r.data['chequeDate'] ?? false,
-              'beatpro_upi_reference': r.data['upiReference'] ?? false,
+              'beatpro_reference': r.data['reference'] ?? r.data['upiReference'] ?? false,
             },
           ],
         }) as Map<String, dynamic>;
@@ -293,6 +296,22 @@ class SyncService {
         await _markSynced(r, id);
         return true;
     }
+  }
+
+  /// A link for the customer to pay an invoice online, from Odoo's payment providers.
+  /// Needs signal.
+  Future<Map<String, dynamic>> paymentLink(int invoiceId, {double? amount}) async => (await client.call(
+        'account.payment',
+        'beatpro_payment_link',
+        kwargs: {'invoice_id': invoiceId, 'amount': ?amount},
+      ) as Map<String, dynamic>);
+
+  /// Whether an invoice has been paid, e.g. after an online payment.
+  Future<bool> invoicePaid(int invoiceId) async {
+    final result = await client.call('account.payment', 'beatpro_invoice_status', kwargs: {
+      'invoice_ids': [invoiceId],
+    }) as Map<String, dynamic>;
+    return (result['$invoiceId'] as Map<String, dynamic>)['paid'] == true;
   }
 
   Future<int> _upsert(String model, String uuid, Map<String, dynamic> vals) async {

@@ -255,7 +255,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                     _Item(
                       icon: Icons.check,
                       paid: true,
-                      title: '${paymentMethods[p.data['method']] ?? ''} payment',
+                      title: '${paymentMethodName(p.data)} payment',
                       subtitle: (p.data['invoiceIds'] as List?)?.isNotEmpty ?? false
                           ? 'Settles ${(p.data['invoiceIds'] as List).length} invoice(s)'
                           : 'Advance on account',

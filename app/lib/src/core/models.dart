@@ -20,6 +20,17 @@ class AppContext {
   bool get isSupervisor => json['is_supervisor'] == true;
   double get discountLimit => _num(json['discount_limit']);
   int? get warehouseId => json['warehouse_id'] as int?;
+
+  /// Payment methods set up in Odoo for reps. Servers from before this existed
+  /// get the old fixed list.
+  List<PaymentMethod> get paymentMethods {
+    final raw = json['payment_methods'];
+    if (raw is! List) return PaymentMethod.legacy;
+    return raw.cast<Map<String, dynamic>>().map(PaymentMethod.fromJson).toList();
+  }
+
+  /// Online payment providers enabled in Odoo (Razorpay, Stripe…). Empty: no online payment.
+  List<String> get onlineProviders => (json['online_providers'] as List?)?.cast<String>() ?? const [];
   String get currencySymbol => (json['currency'] as Map)['symbol'] as String? ?? '';
   bool get currencyBefore => (json['currency'] as Map)['position'] != 'after';
   int get currencyDecimals => (json['currency'] as Map)['decimals'] as int? ?? 2;
@@ -266,7 +277,62 @@ const noOrderReasons = <String, String>{
   'other': 'Other',
 };
 
-const paymentMethods = <String, String>{'cash': 'Cash', 'cheque': 'Cheque', 'upi': 'UPI'};
+/// A way a rep can receive money, as set up in Odoo: a payment method of a cash
+/// or bank journal.
+class PaymentMethod {
+  const PaymentMethod({
+    this.id,
+    required this.name,
+    required this.kind,
+    this.reference = 'none',
+    this.handIn = false,
+    this.legacyCode,
+  });
+
+  /// The Odoo payment method line; null for the old fixed list.
+  final int? id;
+  final String name;
+
+  /// `cash`, `cheque` or `bank`: how the day-end close counts it.
+  final String kind;
+
+  /// What the rep enters: `none`, `reference` (optional transaction ID) or `cheque`.
+  final String reference;
+
+  /// Cash and cheques are handed in at the office; bank payments are already banked.
+  final bool handIn;
+
+  /// `cash`, `cheque` or `upi`, for servers from before payment methods came from Odoo.
+  final String? legacyCode;
+
+  static PaymentMethod fromJson(Map<String, dynamic> j) => PaymentMethod(
+        id: j['id'] as int,
+        name: j['name'] as String,
+        kind: j['kind'] as String,
+        reference: (j['reference'] as String?) ?? 'none',
+        handIn: j['hand_in'] == true,
+      );
+
+  static const legacy = [
+    PaymentMethod(name: 'Cash', kind: 'cash', handIn: true, legacyCode: 'cash'),
+    PaymentMethod(name: 'UPI', kind: 'bank', reference: 'reference', legacyCode: 'upi'),
+    PaymentMethod(name: 'Cheque', kind: 'cheque', reference: 'cheque', handIn: true, legacyCode: 'cheque'),
+  ];
+}
+
+/// How the day-end close groups collections.
+const collectionKinds = <String, String>{'cash': 'Cash', 'cheque': 'Cheque', 'bank': 'Bank and UPI'};
+
+/// The name of the method a payment record was taken with.
+String paymentMethodName(Map<String, dynamic> data) =>
+    (data['methodName'] as String?) ??
+    const {'cash': 'Cash', 'cheque': 'Cheque', 'upi': 'UPI'}[data['method']] ??
+    'Payment';
+
+/// `cash`, `cheque` or `bank` for a payment record, including ones made before
+/// payment methods came from Odoo.
+String paymentKind(Map<String, dynamic> data) =>
+    (data['kind'] as String?) ?? (data['method'] == 'upi' ? 'bank' : (data['method'] as String? ?? 'bank'));
 
 /// One line in the cart.
 class CartLine {

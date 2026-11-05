@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'support/fake_odoo.dart';
@@ -137,6 +138,7 @@ void main() {
     await tester.tap(find.text('UPI'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'UPI transaction ID (optional)'), '430912345678');
+    expect(find.text('Cheque'), findsOneWidget, reason: 'payment methods come from Odoo');
     await screen('payment');
     expect(find.text('Record ₹1,200.00 by UPI'), findsOneWidget);
     await tester.tap(find.text('Record ₹1,200.00 by UPI'));
@@ -159,9 +161,9 @@ void main() {
     expect((orderVals['order_line'] as List).length, 2);
     final paymentVals = odoo.uploaded['account.payment']!.single;
     expect(paymentVals['amount'], 1200.0);
-    expect(paymentVals['beatpro_method'], 'upi');
+    expect(paymentVals['payment_method_line_id'], 32, reason: "the UPI method set up in Odoo");
     expect(paymentVals['invoice_ids'], [77]);
-    expect(paymentVals['beatpro_upi_reference'], '430912345678');
+    expect(paymentVals['beatpro_reference'], '430912345678');
 
     // Close the day.
     container.read(routerProvider).push('/day-close');
@@ -178,6 +180,66 @@ void main() {
     container.read(routerProvider).go('/orders');
     await screen('orders');
     expect(find.text('Confirmed'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('customer pays an invoice online with a QR code', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo();
+    final db = (await tester.runAsync(() => LocalDb.open(
+          factory: databaseFactoryFfiNoIsolate,
+          path: '${Directory.systemTemp.createTempSync().path}/online.db',
+        )))!;
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(GeoPoint(19.1136, 72.8697))),
+      httpClientProvider.overrideWithValue(odoo.client),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    container.read(routerProvider).push('/payment/new?customer=srv%3A8');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pay online'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose an invoice'), findsOneWidget);
+    await tester.tap(find.text('INV/2026/00042'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show QR code'));
+    await tester.pumpAndSettle();
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.text('Pay with Razorpay'), findsOneWidget);
+    await tester.ensureVisible(find.text('Check payment'));
+    await tester.pumpAndSettle();
+    expect(odoo.calls, contains('account.payment.beatpro_payment_link'));
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/14-pay-online.png'));
+    }
+
+    await tester.tap(find.text('Check payment'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Not paid yet'), findsOneWidget);
+    odoo.onlinePaid = true;
+    await tester.ensureVisible(find.text('Check payment'));
+    await tester.tap(find.text('Check payment'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Paid online'), findsOneWidget);
+    // Nothing was recorded on the phone: the provider's payment is in Odoo.
+    expect(odoo.uploaded['account.payment'], isNull);
 
     await tester.pumpWidget(const SizedBox());
     await db.close();

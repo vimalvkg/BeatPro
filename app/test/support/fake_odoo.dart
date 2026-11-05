@@ -9,6 +9,7 @@ class FakeOdoo {
   final calls = <String>[];
   final uploaded = <String, List<Map<String, dynamic>>>{};
   bool offline = false;
+  bool onlinePaid = false;
   int _nextId = 1000;
 
   static const shops = [
@@ -57,6 +58,12 @@ class FakeOdoo {
           'is_rep': true,
           'is_supervisor': false,
           'discount_limit': 5.0,
+          'payment_methods': [
+            {'id': 31, 'name': 'Cash', 'journal': 'Field Cash', 'kind': 'cash', 'reference': 'none', 'hand_in': true},
+            {'id': 32, 'name': 'UPI', 'journal': 'Bank', 'kind': 'bank', 'reference': 'reference', 'hand_in': false},
+            {'id': 33, 'name': 'Cheque', 'journal': 'Cheques', 'kind': 'cheque', 'reference': 'cheque', 'hand_in': true},
+          ],
+          'online_providers': ['Razorpay'],
           'warehouse_id': 1,
           'server_time': '2026-10-29 06:00:00',
         };
@@ -135,6 +142,18 @@ class FakeOdoo {
         };
       case 'beatpro.day.close.action_close':
         return true;
+      case 'account.payment.beatpro_payment_link':
+        return {
+          'link': 'https://mumbai.example.com/my/invoices/${body['invoice_id']}?access_token=abc123',
+          'amount': body['amount'] ?? 1200.0,
+          'invoice': 'INV/2026/00042',
+          'providers': ['Razorpay'],
+          'warning': false,
+        };
+      case 'account.payment.beatpro_invoice_status':
+        return {
+          for (final id in (body['invoice_ids'] as List)) '$id': {'name': 'INV/2026/00042', 'payment_state': 'paid', 'amount_due': 0.0, 'paid': onlinePaid},
+        };
     }
     throw StateError('FakeOdoo has no answer for $model.$method');
   }

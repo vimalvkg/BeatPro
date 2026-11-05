@@ -36,6 +36,7 @@ void main() {
     expect(plan, isNotEmpty, reason: 'the rep needs a route for today');
     final products = await db.products();
     expect(products, isNotEmpty);
+    expect(context.paymentMethods, isNotEmpty, reason: 'payment methods come from Odoo');
 
     // Visit the first shop: order, collect against its invoices, check out.
     final stop = plan.first;
@@ -55,8 +56,8 @@ void main() {
         customerKey: stop.customer.key,
         visitUuid: visit.uuid,
         amount: due,
-        method: 'upi',
-        upiReference: 'UPI-TEST-1',
+        method: context.paymentMethods.firstWhere((m) => m.kind == 'bank'),
+        reference: 'UPI-TEST-1',
         invoiceIds: invoices.map((i) => i.id).toList(),
       );
       expect(await repo.amountDue(stop.customer.key), 0, reason: 'invoices show as settled on the phone');
@@ -108,6 +109,16 @@ void main() {
       ],
     });
     expect(orderCount, 1);
+
+    // Paid with the method chosen in the app.
+    if (payment != null) {
+      final serverPayment = (await client.searchRead('account.payment', domain: [
+        ['id', '=', (await db.record(payment.uuid))!.serverId],
+      ], fields: ['payment_method_line_id', 'beatpro_reference'])).single;
+      expect((serverPayment['payment_method_line_id'] as List).first,
+          context.paymentMethods.firstWhere((m) => m.kind == 'bank').id);
+      expect(serverPayment['beatpro_reference'], 'UPI-TEST-1');
+    }
 
     // The new shop came back from Odoo as a customer.
     expect((await db.customers(search: 'Test Shop')).any((c) => c.serverId != null), isTrue);

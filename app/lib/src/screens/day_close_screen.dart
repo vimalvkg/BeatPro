@@ -56,7 +56,7 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
     final today = (ref.watch(recordsProvider).value ?? const <LocalRecord>[])
         .where((r) => !r.createdAt.toLocal().isBefore(repo.startOfToday))
         .toList();
-    final cheques = today.where((r) => r.kind == RecordKind.payment && r.data['method'] == 'cheque').length;
+    final cheques = today.where((r) => r.kind == RecordKind.payment && paymentKind(r.data) == 'cheque').length;
     final visits = today.where((r) => r.kind == RecordKind.visit && r.data['state'] == 'done').toList().reversed.toList();
 
     return Scaffold(
@@ -72,7 +72,7 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
         builder: (s) {
           final cash = s.collected['cash'] ?? 0;
           final cheque = s.collected['cheque'] ?? 0;
-          final upi = s.collected['upi'] ?? 0;
+          final bank = s.collected['bank'] ?? 0;
           return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 140), children: [
             if (closed != null)
               Padding(
@@ -100,7 +100,7 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Expanded(child: _HandInPart(label: 'Cash', amount: money(cash))),
                   Expanded(child: _HandInPart(label: 'Cheque', amount: money(cheque), note: '$cheques ${cheques == 1 ? 'cheque' : 'cheques'}')),
-                  Expanded(child: _HandInPart(label: 'UPI', amount: money(upi), note: 'already in bank')),
+                  Expanded(child: _HandInPart(label: 'Bank and UPI', amount: money(bank), note: 'already in bank')),
                 ]),
               ]),
             ),
@@ -208,7 +208,7 @@ class _VisitRecap extends ConsumerWidget {
     final parts = <String>[
       if (result == 'order') 'Order' else if (result == 'closed') 'Shop closed' else 'No order',
       if (result == 'no_order' && visit.data['noOrderReason'] != null) noOrderReasons[visit.data['noOrderReason']]!.toLowerCase(),
-      for (final p in payments) '${paymentMethods[p.data['method']]!.toLowerCase()} ${money((p.data['amount'] as num).toDouble())}',
+      for (final p in payments) '${paymentMethodName(p.data)} ${money((p.data['amount'] as num).toDouble())}',
     ];
     return ListTile(
       leading: Container(

@@ -21,11 +21,16 @@ does is saved on the phone and sent to Odoo when there's signal.
 - **Order**: catalogue with the customer's price-list prices and stock, quantity steppers,
   discounts, repeat last order, tax estimate. Discounts above the rep's limit go to a
   supervisor for approval in Odoo.
-- **Collect payment**: cash, cheque (number and date) or UPI (transaction ID) against the
-  customer's open invoices.
+- **Collect payment**, two ways:
+  - **Received now**: the payment methods your company set up in Odoo for reps (for example Cash,
+    UPI, Cheque, Bank transfer), with a transaction ID or cheque details where Odoo asks for them,
+    against the customer's open invoices. Works offline.
+  - **Pay online**, when an online payment provider (Razorpay, Stripe…) is enabled in Odoo: a QR
+    code and shareable link for one invoice; the customer pays on their phone and **Check payment**
+    confirms Odoo marked the invoice paid. Needs signal.
 - **New customer** with a GPS pin.
 - **My orders** with Odoo's status (confirmed, waiting for approval).
-- **Close the day**: the cash and cheques to hand in, UPI already in the bank, visits and orders, a recap
+- **Close the day**: the cash and cheques to hand in, bank and UPI payments already in the bank, visits and orders, a recap
   of each shop and the distance travelled.
 - **Sync** screen: what's waiting, what failed and why.
 
