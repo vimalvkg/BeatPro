@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="web.WebClient" t-inherit-mode="extension">
+        <xpath expr="//NavBar" position="before">
+            <BeatproSidebar/>
+        </xpath>
+    </t>
+
+    <t t-name="beatpro_theme.Sidebar">
+        <nav t-if="!ui.isSmall and state.data" aria-label="BeatPro"
+             t-att-class="'bp-sidebar d-print-none' + (state.collapsed ? ' bp-collapsed' : '')">
+            <div class="bp-sidebar-brand">
+                <img src="/beatpro_theme/static/img/logo_light.svg" alt="" width="34" height="34"/>
+                <div class="bp-sidebar-name" t-if="!state.collapsed">
+                    <span t-esc="state.data.brand"/>
+                    <small t-esc="state.data.tagline"/>
+                </div>
+            </div>
+            <div class="bp-sidebar-items">
+                <t t-foreach="state.data.items" t-as="item" t-key="item.key">
+                    <a href="#" t-att-class="'bp-sidebar-item' + (state.active === item.key ? ' active' : '')"
+                       t-att-aria-current="state.active === item.key ? 'page' : false"
+                       t-att-title="state.collapsed ? item.label : false"
+                       t-att-data-key="item.key"
+                       t-on-click.prevent="() => this.open(item)">
+                        <i t-att-class="'fa fa-fw ' + item.icon" aria-hidden="true"/>
+                        <span t-if="!state.collapsed" t-esc="item.label"/>
+                    </a>
+                </t>
+            </div>
+            <div class="bp-sidebar-foot" t-if="!state.collapsed">
+                <span class="bp-sidebar-slogan">Sales on the move</span>
+                <span class="bp-sidebar-company" t-esc="state.data.company"/>
+                <img class="bp-sidebar-van" src="/beatpro_theme/static/img/van.svg" alt=""/>
+            </div>
+            <button type="button" class="bp-sidebar-toggle" t-on-click="toggle"
+                    t-att-aria-label="state.collapsed ? 'Expand menu' : 'Collapse menu'"
+                    t-att-aria-expanded="state.collapsed ? 'false' : 'true'">
+                <i t-att-class="'fa ' + (state.collapsed ? 'fa-angle-double-right' : 'fa-angle-double-left')" aria-hidden="true"/>
+            </button>
+        </nav>
+    </t>
+</templates>

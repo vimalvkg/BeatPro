@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_theme.SalesDashboard">
+        <div class="o_action o_beatpro bp-page bp-sales-dash">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-dash">
+                <div class="bp-dash-bar">
+                    <div>
+                        <span class="bp-dash-welcome">Welcome back,</span>
+                        <span class="bp-dash-user" t-esc="d.greeting_name"/>
+                    </div>
+                    <label class="bp-dash-select">
+                        <span class="visually-hidden">Route</span>
+                        <select t-on-change="setRoute" aria-label="Route">
+                            <option value="" t-att-selected="!d.route_id">All routes</option>
+                            <t t-foreach="d.routes" t-as="r" t-key="r.id">
+                                <option t-att-value="r.id" t-att-selected="d.route_id === r.id" t-esc="r.name"/>
+                            </t>
+                        </select>
+                    </label>
+                </div>
+
+                <section class="bp-dash-hero">
+                    <div class="bp-dash-hero-copy">
+                        <h1>Van Sales Dashboard</h1>
+                        <p>Track sales, vans and collections across every route.</p>
+                    </div>
+                    <div class="bp-dash-hero-art" aria-hidden="true">
+                        <img src="/beatpro_theme/static/img/van.svg" alt=""/>
+                        <span>Sales on<br/>the move</span>
+                    </div>
+                </section>
+
+                <section class="bp-dash-kpis" aria-label="Key figures">
+                    <t t-foreach="d.kpis" t-as="k" t-key="k.key">
+                        <t t-set="sp" t-value="spark(k.spark)"/>
+                        <div class="bp-dash-kpi">
+                            <span class="bp-dash-kpi-icon"><i t-att-class="'fa ' + k.icon" aria-hidden="true"/></span>
+                            <div class="bp-dash-kpi-text">
+                                <span class="bp-dash-kpi-label" t-esc="k.label"/>
+                                <span class="bp-dash-kpi-value" t-esc="k.value"/>
+                                <span t-if="k.trend !== null" t-att-class="'bp-dash-trend ' + (k.trend >= 0 ? 'up' : 'down')">
+                                    <t t-if="k.trend >= 0">↑</t><t t-else="">↓</t> <t t-esc="Math.abs(k.trend)"/>% vs last period
+                                </span>
+                                <span t-else="" class="bp-dash-trend">No earlier figures</span>
+                            </div>
+                            <svg class="bp-dash-spark" viewBox="0 0 160 44" preserveAspectRatio="none" aria-hidden="true">
+                                <polygon t-att-points="sp.area"/>
+                                <polyline t-att-points="sp.line"/>
+                            </svg>
+                        </div>
+                    </t>
+                </section>
+
+                <div class="bp-dash-row bp-dash-row-1">
+                    <section class="bp-dash-card" aria-labelledby="bp-sales-h">
+                        <div class="bp-dash-card-head">
+                            <h2 id="bp-sales-h">Sales overview</h2>
+                            <div class="bp-dash-tabs" role="group" aria-label="Period">
+                                <t t-foreach="periods" t-as="p" t-key="p.value">
+                                    <button type="button" t-att-class="{active: state.period === p.value}"
+                                            t-att-aria-pressed="state.period === p.value ? 'true' : 'false'"
+                                            t-on-click="() => this.setPeriod(p.value)" t-esc="p.label"/>
+                                </t>
+                            </div>
+                        </div>
+                        <div class="bp-dash-legend">
+                            <span><i class="bp-dot bp-dot-maroon"/>Sales</span>
+                            <span><i class="bp-dot bp-dot-rose"/>Orders</span>
+                        </div>
+                        <div class="bp-dash-chart">
+                            <div class="bp-dash-bars">
+                                <t t-foreach="d.chart" t-as="c" t-key="c_index">
+                                    <div class="bp-dash-bar-col">
+                                        <div class="bp-dash-bar-fill" t-att-style="barHeight(c.amount)"
+                                             t-att-title="c.label + ': ' + c.count + ' orders'"/>
+                                    </div>
+                                </t>
+                            </div>
+                            <svg class="bp-dash-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                                <polyline t-att-points="orderLine" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                            <t t-foreach="dots()" t-as="dot" t-key="dot.key">
+                                <span class="bp-dash-line-dot" t-att-style="'left: ' + dot.left + '; top: ' + dot.top"/>
+                            </t>
+                        </div>
+                        <div class="bp-dash-labels">
+                            <t t-foreach="d.chart" t-as="c" t-key="c_index"><span t-esc="c.label"/></t>
+                        </div>
+                    </section>
+
+                    <section class="bp-dash-card" aria-labelledby="bp-cat-h">
+                        <h2 id="bp-cat-h">Sales by category</h2>
+                        <div class="bp-dash-donut-row">
+                            <div class="bp-dash-donut" t-att-style="donut">
+                                <div><strong t-esc="d.sales_total"/><small>this period</small></div>
+                            </div>
+                            <ul class="bp-dash-list">
+                                <t t-foreach="d.categories" t-as="c" t-key="c_index">
+                                    <li><i class="bp-dot" t-att-style="'background:' + colors[c_index % colors.length]"/><span t-esc="c.name"/><b><t t-esc="c.share"/>%</b></li>
+                                </t>
+                                <li t-if="!d.categories.length" class="bp-muted">No sales yet</li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <section class="bp-dash-card" aria-labelledby="bp-top-h">
+                        <div class="bp-dash-card-head">
+                            <h2 id="bp-top-h">Top shops</h2>
+                            <a href="#" t-on-click.prevent="() => this.open('account.res_partner_action_customer')">View all →</a>
+                        </div>
+                        <ol class="bp-dash-top">
+                            <t t-foreach="d.top_shops" t-as="s" t-key="s.id">
+                                <li><span class="bp-dash-rank" t-esc="s_index + 1"/>
+                                    <a href="#" t-on-click.prevent="() => this.openShop(s.id)" t-esc="s.name"/>
+                                    <b t-esc="s.amount"/></li>
+                            </t>
+                            <li t-if="!d.top_shops.length" class="bp-muted">No orders yet</li>
+                        </ol>
+                    </section>
+                </div>
+
+                <div class="bp-dash-row bp-dash-row-2">
+                    <section class="bp-dash-card" aria-labelledby="bp-route-h">
+                        <div class="bp-dash-card-head">
+                            <h2 id="bp-route-h">Sales by route</h2>
+                            <a href="#" t-on-click.prevent="() => this.open('beatpro_field_sales.action_beatpro_route')">View routes →</a>
+                        </div>
+                        <t t-foreach="d.routes_sales" t-as="r" t-key="r_index">
+                            <div class="bp-dash-route">
+                                <span t-esc="r.name"/>
+                                <span class="bp-dash-route-bar"><span t-att-style="'width:' + r.pct + '%'"/></span>
+                                <b t-esc="r.amount"/>
+                            </div>
+                        </t>
+                        <p t-if="!d.routes_sales.length" class="bp-muted mb-0">No orders yet</p>
+                    </section>
+
+                    <section class="bp-dash-card" aria-labelledby="bp-coll-h">
+                        <h2 id="bp-coll-h">Collections</h2>
+                        <div class="bp-dash-donut-row">
+                            <div class="bp-dash-donut bp-dash-donut-sm" t-att-style="collectDonut">
+                                <div><strong><t t-esc="d.collected_pct"/>%</strong><small>collected</small></div>
+                            </div>
+                            <ul class="bp-dash-list">
+                                <li><i class="bp-dot bp-dot-green"/><span>Collected</span><b t-esc="d.collected"/></li>
+                                <li><i class="bp-dot bp-dot-amber"/><span>Still due</span><b t-esc="d.due"/></li>
+                                <li class="bp-dash-total"><span>Total</span><b t-esc="d.collect_total"/></li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <section class="bp-dash-card" aria-labelledby="bp-act-h">
+                        <h2 id="bp-act-h">Recent activity</h2>
+                        <ul class="bp-dash-activity">
+                            <t t-foreach="d.activity" t-as="a" t-key="a_index">
+                                <li><i t-att-class="'bp-dot bp-act-' + a.kind"/><span t-esc="a.text"/><time t-esc="a.time"/></li>
+                            </t>
+                            <li t-if="!d.activity.length" class="bp-muted">Nothing yet</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+            </div>
+        </div>
+    </t>
+</templates>

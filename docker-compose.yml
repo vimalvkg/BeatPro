@@ -1,6 +1,6 @@
 # Odoo 19 Community with the BeatPro module, for local development.
 #   docker compose up -d
-#   open http://localhost:8069 and create a database, then install "BeatPro Field Sales"
+#   open http://localhost:8069 and create a database, then install "BeatPro Field Sales" and "BeatPro Theme"
 services:
   db:
     image: postgres:16

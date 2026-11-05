@@ -1,0 +1,237 @@
+// BeatPro Van Sales look for every backend screen.
+// Colours come from primary_variables.scss; this file shapes the layout and details.
+
+$bp-maroon: #7B1C24;
+$bp-maroon-deep: #5A1018;
+$bp-red: #B3262E;
+$bp-rose: #FBEDEE;
+$bp-ground: #F8F3F3;
+$bp-line: #EADCDD;
+$bp-line-soft: #F3E8E9;
+$bp-ink: #2A1215;
+$bp-muted: #6E5A5C;
+$bp-on-maroon: #F1D9DB;
+$bp-sidebar-w: 232px;
+$bp-sidebar-w-collapsed: 68px;
+
+body.o_web_client {
+    font-family: "Manrope", "Segoe UI", Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+    background-color: $bp-ground;
+}
+
+// BeatPro pages (My Day, Overview, My Van, Vans) take the same colours.
+body.o_web_client .o_beatpro {
+    --bp-navy: #{$bp-maroon};
+    --bp-ink: #{$bp-ink};
+    --bp-ground: #{$bp-ground};
+    --bp-line: #{$bp-line};
+    --bp-line-soft: #{$bp-line-soft};
+    --bp-muted: #{$bp-muted};
+    --bp-blue-soft: #{$bp-rose};
+    --bp-on-navy: #{$bp-on-maroon};
+    .bp-btn.bp-primary:hover { background: $bp-maroon-deep; }
+}
+
+// -- Side menu ---------------------------------------------------------------
+
+body.o_web_client:has(> .bp-sidebar) {
+    padding-left: $bp-sidebar-w;
+    transition: padding-left 0.15s ease;
+    &:has(> .bp-sidebar.bp-collapsed) { padding-left: $bp-sidebar-w-collapsed; }
+}
+
+.bp-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: $bp-sidebar-w;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px 14px;
+    overflow: hidden auto;
+    color: #FFFFFF;
+    background: linear-gradient(180deg, $bp-maroon-deep 0%, $bp-maroon 55%, #9A2530 100%);
+    &.bp-collapsed { width: $bp-sidebar-w-collapsed; padding: 16px 10px; }
+
+    .bp-sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px 18px; }
+    .bp-sidebar-name { display: flex; flex-direction: column; line-height: 1.1;
+        span { font-size: 18px; font-weight: 800; }
+        small { font-size: 12px; font-weight: 600; color: $bp-on-maroon; } }
+    .bp-sidebar-items { display: flex; flex-direction: column; gap: 4px; }
+    .bp-sidebar-item {
+        display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 14px;
+        border-radius: 10px; font-size: 14px; font-weight: 600; color: $bp-on-maroon; text-decoration: none;
+        .fa { font-size: 16px; width: 20px; text-align: center; }
+        &:hover { color: #FFFFFF; background: rgba(255, 255, 255, 0.08); }
+        &:focus-visible { outline: 3px solid #F2B84B; outline-offset: 1px; }
+        &.active { color: #FFFFFF; font-weight: 800; background: linear-gradient(90deg, $bp-red, #8E1F28); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); }
+    }
+    &.bp-collapsed .bp-sidebar-item { justify-content: center; padding: 0; }
+    .bp-sidebar-foot { margin-top: auto; padding: 18px 6px 4px; display: flex; flex-direction: column; }
+    .bp-sidebar-slogan { font-size: 17px; font-weight: 800; }
+    .bp-sidebar-company { font-size: 12px; color: $bp-on-maroon; margin-bottom: 8px; }
+    .bp-sidebar-van { width: 100%; max-width: 200px; height: auto; }
+    .bp-sidebar-toggle {
+        margin-top: 8px; align-self: flex-end; width: 32px; height: 32px; border-radius: 8px; border: 0;
+        color: $bp-on-maroon; background: rgba(255, 255, 255, 0.08);
+        &:hover { color: #FFFFFF; background: rgba(255, 255, 255, 0.16); }
+    }
+    &.bp-collapsed .bp-sidebar-toggle { align-self: center; margin-top: auto; }
+    @media (max-height: 700px) { .bp-sidebar-van { display: none; } }
+}
+
+// -- Top bar -------------------------------------------------------------------
+
+.o_main_navbar {
+    box-shadow: none;
+    .o_menu_brand { font-weight: 800; color: $bp-ink; }
+    .o_menu_sections .dropdown-toggle, .o_menu_sections > .o_nav_entry { font-weight: 600; }
+}
+
+// -- Control panel, buttons, badges ----------------------------------------------
+
+.o_control_panel { background-color: #FFFFFF; border-bottom: 1px solid $bp-line; }
+.o_control_panel .breadcrumb-item.active, .o_control_panel .o_last_breadcrumb_item { font-weight: 800; color: $bp-ink; }
+.o_web_client .btn { border-radius: 10px; font-weight: 700; }
+.o_web_client .btn-primary { background: $bp-maroon; border-color: $bp-maroon;
+    &:hover, &:focus { background: $bp-maroon-deep; border-color: $bp-maroon-deep; } }
+.o_web_client .btn-secondary { background: #FFFFFF; border-color: $bp-line; color: $bp-maroon;
+    &:hover { background: $bp-rose; border-color: $bp-line; color: $bp-maroon-deep; } }
+.o_web_client .o_searchview { border-radius: 10px; border-color: $bp-line; }
+.o_web_client .o_searchview_facet { border-radius: 6px; }
+.o_web_client .badge.rounded-pill, .o_web_client .o_field_badge .badge { font-weight: 700; }
+
+// -- Lists ------------------------------------------------------------------------
+
+.o_list_renderer {
+    .o_list_table {
+        thead th, thead tr {
+            background-color: $bp-maroon !important;
+            color: #FFFFFF;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border-color: $bp-maroon;
+            .o_list_sortable_caret, .fa, .o_resize { color: $bp-on-maroon; }
+        }
+        thead th:hover { background-color: $bp-maroon-deep !important; }
+        tbody > tr.o_data_row:nth-child(even) > td { background-color: #FDFAFA; }
+        tbody > tr.o_data_row:hover > td { background-color: $bp-rose; }
+        tfoot { background-color: #FBF6F6; font-weight: 800; }
+    }
+}
+.o_list_view .o_list_renderer { border-radius: 16px; }
+
+// -- Forms --------------------------------------------------------------------------
+
+.o_form_view {
+    .o_form_sheet_bg { background-color: $bp-ground; }
+    .o_form_sheet_bg > .o_form_sheet {
+        border: 1px solid $bp-line;
+        border-radius: 16px;
+        box-shadow: 0 6px 18px rgba(74, 14, 20, 0.05);
+    }
+    .oe_title h1 { font-weight: 800; }
+    .o_form_label { color: $bp-muted; font-weight: 700; }
+    .o_notebook .nav-tabs .nav-link.active { color: $bp-maroon; font-weight: 800; border-bottom: 3px solid $bp-red; }
+    .oe_subtotal_footer .oe_subtotal_footer_separator { border-top: 2px solid $bp-maroon; }
+}
+.o_form_statusbar .o_statusbar_status .o_arrow_button_current {
+    background-color: $bp-maroon !important;
+    color: #FFFFFF !important;
+    &::after, &::before { border-left-color: $bp-maroon !important; }
+}
+
+// -- Kanban --------------------------------------------------------------------------
+
+.o_kanban_renderer .o_kanban_record { border-radius: 12px; }
+
+// -- Van Sales Dashboard ----------------------------------------------------------------
+
+.o_beatpro.bp-sales-dash {
+    .bp-dash { max-width: 1440px; margin: 0 auto; padding: 20px 28px 36px; display: flex; flex-direction: column; gap: 20px; color: $bp-ink; }
+    .bp-muted { color: $bp-muted; }
+    .bp-dash-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        > div { display: flex; flex-direction: column; } }
+    .bp-dash-welcome { font-size: 12px; font-weight: 700; color: $bp-muted; }
+    .bp-dash-user { font-size: 15px; font-weight: 800; }
+    .bp-dash-select { margin-left: auto;
+        select { font: inherit; font-size: 13px; font-weight: 700; color: $bp-ink; border: 1px solid $bp-line; border-radius: 999px; padding: 7px 14px; background: #FFFFFF; } }
+
+    .bp-dash-hero {
+        position: relative; overflow: hidden; border-radius: 18px; padding: 24px 30px; border: 1px solid $bp-line;
+        display: flex; align-items: center; flex-wrap: wrap; gap: 16px;
+        background: linear-gradient(110deg, #FFFFFF 0%, #FFFFFF 46%, #F6DADC 70%, $bp-red 100%);
+        h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.01em; }
+        p { margin: 4px 0 0; font-size: 15px; font-weight: 600; color: $bp-muted; }
+    }
+    .bp-dash-hero-art { margin-left: auto; display: flex; align-items: center; gap: 18px;
+        img { width: 240px; height: auto; }
+        span { font-size: 22px; font-weight: 800; color: #FFFFFF; font-style: italic; line-height: 1.2; } }
+
+    .bp-dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .bp-dash-kpi {
+        position: relative; overflow: hidden; display: flex; gap: 14px; padding: 18px 18px 26px;
+        background: #FFFFFF; border: 1px solid $bp-line; border-left: 4px solid $bp-maroon; border-radius: 16px;
+        box-shadow: 0 6px 18px rgba(74, 14, 20, 0.06);
+    }
+    .bp-dash-kpi-icon { width: 48px; height: 48px; flex: none; border-radius: 50%; display: grid; place-items: center; background: $bp-maroon; color: #FFFFFF; font-size: 20px; }
+    .bp-dash-kpi-text { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .bp-dash-kpi-label { font-size: 13px; font-weight: 700; color: $bp-muted; }
+    .bp-dash-kpi-value { font-size: 26px; font-weight: 800; line-height: 1.15; }
+    .bp-dash-trend { font-size: 12px; font-weight: 700; color: $bp-muted; &.up { color: #1F7A4D; } &.down { color: $bp-red; } }
+    .bp-dash-spark { position: absolute; right: 0; bottom: 0; width: 60%; height: 44px;
+        polyline { fill: none; stroke: $bp-red; stroke-width: 2.4; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+        polygon { fill: $bp-red; fill-opacity: 0.10; } }
+
+    .bp-dash-row { display: grid; gap: 16px; }
+    .bp-dash-row-1 { grid-template-columns: 1.55fr 1fr 1fr; }
+    .bp-dash-row-2 { grid-template-columns: 1.2fr 1fr 1fr; }
+    @media (max-width: 1200px) { .bp-dash-row-1, .bp-dash-row-2 { grid-template-columns: 1fr; } }
+    .bp-dash-card { background: #FFFFFF; border: 1px solid $bp-line; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0;
+        h2 { margin: 0; font-size: 17px; font-weight: 800; color: $bp-ink; } }
+    .bp-dash-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        a { margin-left: auto; font-size: 13px; font-weight: 700; color: $bp-maroon; text-decoration: none; } }
+    .bp-dash-tabs { margin-left: auto; display: flex; gap: 2px; background: $bp-ground; border-radius: 999px; padding: 3px;
+        button { font: inherit; font-size: 12px; font-weight: 700; border: 0; border-radius: 999px; padding: 5px 12px; background: transparent; color: $bp-muted;
+            &.active { background: $bp-maroon; color: #FFFFFF; } } }
+    .bp-dash-legend { display: flex; gap: 16px; font-size: 12px; font-weight: 700; color: $bp-muted;
+        span { display: flex; align-items: center; gap: 6px; } }
+    .bp-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+    .bp-dot-maroon { background: $bp-maroon; } .bp-dot-rose { background: #D9707A; }
+    .bp-dot-green { background: #2E8B57; } .bp-dot-amber { background: #E0A12F; }
+    .bp-act-order { background: $bp-red; } .bp-act-payment { background: #2E8B57; } .bp-act-alert { background: #E0A12F; } .bp-act-van { background: $bp-maroon; }
+    .bp-dash-chart { position: relative; height: 200px; border-bottom: 1px solid $bp-line; }
+    .bp-dash-bars { position: absolute; inset: 0; display: flex; gap: 8px; align-items: flex-end; }
+    .bp-dash-bar-col { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+    .bp-dash-bar-fill { width: #{"min(34px, 70%)"}; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, $bp-red, $bp-maroon-deep); }
+    .bp-dash-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+        polyline { fill: none; stroke: #D9707A; stroke-width: 2; } }
+    .bp-dash-line-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #FFFFFF; border: 2px solid #D9707A; pointer-events: none; }
+    .bp-dash-labels { display: flex; gap: 8px; span { flex: 1; text-align: center; font-size: 12px; font-weight: 700; color: $bp-muted; } }
+
+    .bp-dash-donut-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .bp-dash-donut { width: 140px; height: 140px; border-radius: 50%; display: grid; place-items: center; flex: none;
+        > div { width: 92px; height: 92px; border-radius: 50%; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.15; }
+        strong { font-size: 15px; font-weight: 800; } small { font-size: 11px; font-weight: 700; color: $bp-muted; } }
+    .bp-dash-donut-sm { width: 120px; height: 120px; > div { width: 84px; height: 84px; } strong { font-size: 22px; } }
+    .bp-dash-list { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 9px; font-size: 13px; font-weight: 700;
+        li { display: flex; align-items: center; gap: 8px; } b { margin-left: auto; } }
+    .bp-dash-total { border-top: 1px solid $bp-line; padding-top: 8px; }
+    .bp-dash-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; font-weight: 700;
+        li { display: flex; align-items: center; gap: 10px; } a { color: $bp-ink; text-decoration: none; &:hover { color: $bp-maroon; } } b { margin-left: auto; } }
+    .bp-dash-rank { width: 24px; height: 24px; border-radius: 50%; background: $bp-rose; color: $bp-maroon; display: grid; place-items: center; font-size: 12px; font-weight: 800; flex: none; }
+    .bp-dash-route { display: grid; grid-template-columns: 120px 1fr 100px; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; b { text-align: right; } }
+    .bp-dash-route-bar { height: 12px; border-radius: 6px; background: $bp-rose; overflow: hidden;
+        span { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, $bp-maroon, $bp-red); } }
+    .bp-dash-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px;
+        li { display: flex; gap: 10px; align-items: flex-start; } .bp-dot { margin-top: 4px; } span { flex: 1; font-weight: 600; }
+        time { color: $bp-muted; font-size: 12px; white-space: nowrap; } }
+    @media (max-width: 767px) {
+        .bp-dash { padding: 16px; }
+        .bp-dash-hero-art { display: none; }
+    }
+}

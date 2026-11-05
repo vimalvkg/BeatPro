@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Name of the app when the web client is installed on a phone or desktop. -->
+    <record id="param_web_app_name" model="ir.config_parameter">
+        <field name="key">web.web_app_name</field>
+        <field name="value">BeatPro</field>
+    </record>
+</odoo>

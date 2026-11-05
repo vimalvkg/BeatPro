@@ -11,6 +11,7 @@ Reps can work either way, on the same data:
 | Branch | Folder | What it is |
 | --- | --- | --- |
 | `beatproodoo` | `odoo/beatpro_field_sales` | Odoo 19 Community module (server side and web screens) |
+| `beatproodoo` | `odoo/beatpro_theme` | BeatPro Van Sales look for all of Odoo: maroon theme, side menu, sales dashboard, no Odoo branding |
 | `beatproapp` | `app/` | Flutter mobile app (Android and iOS) |
 
 See each folder's README for setup and details.

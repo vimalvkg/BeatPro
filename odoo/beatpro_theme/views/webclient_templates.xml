@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Browser tab title and icon -->
+    <template id="layout_brand" inherit_id="web.layout" name="BeatPro: title and icon">
+        <xpath expr="//title" position="replace">
+            <title t-esc="title or 'BeatPro'"/>
+        </xpath>
+        <xpath expr="//link[@rel='shortcut icon']" position="replace">
+            <link type="image/png" rel="shortcut icon" t-att-href="x_icon or '/beatpro_theme/static/img/favicon.png'"/>
+        </xpath>
+    </template>
+
+    <!-- No "Powered by Odoo" on the website, portal and documents shared with customers -->
+    <template id="brand_promotion_message" inherit_id="web.brand_promotion_message" name="BeatPro: no Odoo promotion">
+        <xpath expr="//t[@t-out]" position="replace"/>
+    </template>
+    <template id="portal_record_sidebar" inherit_id="portal.portal_record_sidebar" name="BeatPro: portal sidebar">
+        <xpath expr="//div[hasclass('d-lg-block')][hasclass('small')]" position="replace"/>
+    </template>
+
+    <!-- Emails: keep the unsubscribe link, drop "Powered by Odoo" -->
+    <template id="mail_notification_layout" inherit_id="mail.mail_notification_layout" name="BeatPro: email layout">
+        <xpath expr="//div[@t-if='show_footer'][span[@id='mail_unfollow']]" position="replace">
+            <div t-if="show_footer and show_unfollow" style="color: #555555; font-size:11px;">
+                <span id="mail_unfollow"><a href="/mail/unfollow" style="text-decoration:none; color:#555555;">Unfollow</a></span>
+            </div>
+        </xpath>
+    </template>
+    <template id="mail_notification_light" inherit_id="mail.mail_notification_light" name="BeatPro: light email layout">
+        <xpath expr="//span[@id='mail_unfollow']/.." position="replace">
+            <td align="center" style="min-width: 590px;">
+                <span t-if="show_unfollow" id="mail_unfollow"><a href="/mail/unfollow" style="text-decoration:none; color:#555555;">Unfollow</a></span>
+            </td>
+        </xpath>
+    </template>
+
+    <!-- Sign-in, sign-up and password reset pages -->
+    <template id="login_layout" inherit_id="web.login_layout" name="BeatPro: sign-in page">
+        <xpath expr="//div[hasclass('container')]" position="replace">
+            <div class="bp-login">
+                <section class="bp-login-hero" aria-hidden="true">
+                    <div class="bp-login-brand">
+                        <img src="/beatpro_theme/static/img/logo.svg" alt="" width="36" height="36"/>
+                        <span>BeatPro <span class="bp-login-tag">Van Sales</span></span>
+                    </div>
+                    <div class="bp-login-copy">
+                        <h1>Drive sales.<br/>Grow your business.</h1>
+                        <p>Routes, vans, orders and collections for FMCG distributors, in one place.</p>
+                    </div>
+                    <img class="bp-login-van" src="/beatpro_theme/static/img/van.svg" alt=""/>
+                </section>
+                <section class="bp-login-main">
+                    <div t-attf-class="bp-login-card {{login_card_classes}} o_database_list">
+                        <div class="bp-login-head">
+                            <img t-attf-src="/web/binary/company_logo{{ '?dbname='+db if db else '' }}" alt="Company logo" class="bp-login-logo"/>
+                        </div>
+                        <t t-out="0"/>
+                        <div class="bp-login-foot" t-if="not disable_footer and not disable_database_manager">
+                            <a href="/web/database/manager">Manage databases</a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </xpath>
+    </template>
+</odoo>

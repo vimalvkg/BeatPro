@@ -1,0 +1,46 @@
+// BeatPro sign-in, sign-up and password reset pages.
+@font-face { font-family: "Manrope"; font-weight: 700; src: url("/beatpro_field_sales/static/src/fonts/Manrope-Bold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Manrope"; font-weight: 800; src: url("/beatpro_field_sales/static/src/fonts/Manrope-ExtraBold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "Manrope"; font-weight: 500; src: url("/beatpro_field_sales/static/src/fonts/Manrope-Medium.ttf") format("truetype"); font-display: swap; }
+
+.bp-login {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    background: #F8F3F3;
+    color: #2A1215;
+    font-family: "Manrope", "Segoe UI", Roboto, sans-serif;
+
+    .bp-login-hero {
+        position: relative; overflow: hidden; padding: 48px; display: flex; flex-direction: column; color: #FFFFFF;
+        background: linear-gradient(160deg, #4A0E14 0%, #7B1C24 55%, #B3262E 100%);
+    }
+    .bp-login-brand { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 800; }
+    .bp-login-tag { font-weight: 500; color: #F1D9DB; }
+    .bp-login-copy { margin-top: auto;
+        h1 { margin: 0; font-size: 44px; font-weight: 800; line-height: 1.1; color: #FFFFFF; }
+        p { margin: 12px 0 0; font-size: 17px; color: #F1D9DB; max-width: 440px; } }
+    .bp-login-van { margin-top: 32px; width: #{"min(420px, 80%)"}; height: auto; }
+
+    .bp-login-main { display: grid; place-items: center; padding: 48px 16px; }
+    .bp-login-card {
+        width: 100%; max-width: 400px; background: #FFFFFF; border: 1px solid #EADCDD; border-radius: 20px;
+        padding: 32px; box-shadow: 0 12px 32px rgba(74, 14, 20, 0.08);
+        label { font-weight: 700; font-size: 13px; }
+        .form-control { min-height: 46px; border-radius: 10px; border-color: #EADCDD;
+            &:focus { border-color: #7B1C24; box-shadow: 0 0 0 3px rgba(123, 28, 36, 0.15); } }
+        .btn-primary { min-height: 50px; border: 0; border-radius: 12px; font-weight: 800; font-size: 16px;
+            background: linear-gradient(90deg, #7B1C24, #B3262E);
+            &:hover, &:focus { background: #5A1018; } }
+        a { color: #7B1C24; font-weight: 700; }
+    }
+    .bp-login-head { text-align: center; padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #F3E8E9; }
+    .bp-login-logo { max-height: 72px; max-width: 100%; width: auto; }
+    .bp-login-foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid #F3E8E9; text-align: center; font-size: 13px; }
+
+    @media (max-width: 767px) {
+        grid-template-columns: 1fr;
+        .bp-login-hero { padding: 24px; min-height: auto;
+            .bp-login-copy h1 { font-size: 28px; } .bp-login-van, .bp-login-copy p { display: none; } }
+    }
+}
