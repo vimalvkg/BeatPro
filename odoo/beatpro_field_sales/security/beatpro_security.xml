@@ -50,6 +50,31 @@
             <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
         </record>
 
+        <record id="rule_beatpro_van_transfer_rep" model="ir.rule">
+            <field name="name">BeatPro Van Load/Unload: own</field>
+            <field name="model_id" ref="model_beatpro_van_transfer"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_shop_return_rep" model="ir.rule">
+            <field name="name">BeatPro Shop Return: own</field>
+            <field name="model_id" ref="model_beatpro_shop_return"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_van_transfer_stock" model="ir.rule">
+            <field name="name">BeatPro Van Load/Unload: storekeepers see all</field>
+            <field name="model_id" ref="model_beatpro_van_transfer"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('stock.group_stock_user'))]"/>
+        </record>
+        <record id="rule_beatpro_shop_return_stock" model="ir.rule">
+            <field name="name">BeatPro Shop Return: storekeepers see all</field>
+            <field name="model_id" ref="model_beatpro_shop_return"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('stock.group_stock_user'))]"/>
+        </record>
+
         <!-- Supervisors: everything -->
         <record id="rule_beatpro_route_supervisor" model="ir.rule">
             <field name="name">BeatPro Route: all routes</field>
@@ -72,6 +97,19 @@
         <record id="rule_beatpro_day_close_supervisor" model="ir.rule">
             <field name="name">BeatPro Day Close: all days</field>
             <field name="model_id" ref="model_beatpro_day_close"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+
+        <record id="rule_beatpro_van_transfer_supervisor" model="ir.rule">
+            <field name="name">BeatPro Van Load/Unload: all</field>
+            <field name="model_id" ref="model_beatpro_van_transfer"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+        <record id="rule_beatpro_shop_return_supervisor" model="ir.rule">
+            <field name="name">BeatPro Shop Return: all</field>
+            <field name="model_id" ref="model_beatpro_shop_return"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
         </record>
@@ -107,6 +145,16 @@
         <record id="rule_beatpro_visit_company" model="ir.rule">
             <field name="name">BeatPro Visit: multi-company</field>
             <field name="model_id" ref="model_beatpro_visit"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_beatpro_van_transfer_company" model="ir.rule">
+            <field name="name">BeatPro Van Load/Unload: multi-company</field>
+            <field name="model_id" ref="model_beatpro_van_transfer"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_beatpro_shop_return_company" model="ir.rule">
+            <field name="name">BeatPro Shop Return: multi-company</field>
+            <field name="model_id" ref="model_beatpro_shop_return"/>
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
         <record id="rule_beatpro_day_close_company" model="ir.rule">

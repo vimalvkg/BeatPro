@@ -48,6 +48,10 @@
                         <span class="bp-tile-icon bp-warm"><i class="fa fa-money" aria-hidden="true"/></span>
                         Collect payment
                     </button>
+                    <button t-if="d.state === 'in_progress'" type="button" class="bp-tile" t-on-click="() => this.openAction('action_take_back')">
+                        <span class="bp-tile-icon"><i class="fa fa-undo" aria-hidden="true"/></span>
+                        Take back goods
+                    </button>
                 </div>
 
                 <!-- Customer at a glance -->

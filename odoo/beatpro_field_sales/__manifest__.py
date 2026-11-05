@@ -1,6 +1,6 @@
 {
     'name': 'BeatPro Field Sales',
-    'version': '19.0.1.3.0',
+    'version': '19.0.1.4.0',
     'category': 'Sales/Sales',
     'summary': 'Routes, shop visits and day-end close for field sales reps using the BeatPro mobile app',
     'description': """
@@ -10,6 +10,8 @@ Server side of the BeatPro mobile app for Odoo Community.
 
 * Routes (beat plans): which customers each rep visits, and on which weekday
 * Visits: check-in and check-out with GPS, visit result and reason
+* Van sales: morning van load, deliveries from the van or the main warehouse,
+  goods taken back from shops with a reason, day-end unload with counted stock
 * Day-end close: each rep's orders and collections for the day
 * Idempotent sync: every record made on the phone carries a mobile UUID,
   so a retried upload never creates a duplicate
@@ -33,6 +35,8 @@ Server side of the BeatPro mobile app for Odoo Community.
         'views/account_payment_method_views.xml',
         'views/res_config_settings_views.xml',
         'wizard/beatpro_payment_wizard_views.xml',
+        'views/beatpro_van_views.xml',
+        'views/beatpro_shop_return_views.xml',
         'views/beatpro_menus.xml',
     ],
     'assets': {

@@ -11,6 +11,7 @@
                         <group>
                             <field name="beatpro_discount_limit"/>
                             <field name="beatpro_van_warehouse_id"/>
+                            <field name="beatpro_self_load" invisible="not beatpro_van_warehouse_id"/>
                         </group>
                     </group>
                     <field name="beatpro_route_ids" readonly="1">

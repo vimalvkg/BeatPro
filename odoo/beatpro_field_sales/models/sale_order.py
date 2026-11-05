@@ -1,5 +1,15 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
+from odoo.fields import Command
+from odoo.tools import float_compare
+
+from .beatpro_van_transfer import location_quantities, validate
+
+DELIVERY_MODES = [
+    ('van', "Deliver now from the van"),
+    ('split', "Van now, the rest from the warehouse"),
+    ('warehouse', "Main warehouse delivers"),
+]
 
 
 class SaleOrder(models.Model):
@@ -14,6 +24,64 @@ class SaleOrder(models.Model):
         ('approved', "Approved"),
     ], string="Discount Approval", copy=False, tracking=True,
         help="Set when a rep's discount is above their limit and a supervisor must confirm the order.")
+    beatpro_delivery_mode = fields.Selection(
+        DELIVERY_MODES, string="Delivery", copy=False,
+        default=lambda self: self._beatpro_default_delivery_mode(),
+        help="How a rep with a van delivers this order. The order counts as the rep's sale "
+             "whichever way it is delivered.")
+    beatpro_has_van = fields.Boolean(compute='_compute_beatpro_has_van')
+
+    @api.model
+    def _beatpro_default_delivery_mode(self):
+        return 'van' if self.env.user.beatpro_van_warehouse_id else False
+
+    @api.depends('user_id')
+    def _compute_beatpro_has_van(self):
+        for order in self:
+            order.beatpro_has_van = bool((order.user_id or self.env.user).beatpro_van_warehouse_id)
+
+    def _beatpro_storable_lines(self):
+        return self.order_line.filtered(lambda l: not l.display_type and l.product_id.is_storable)
+
+    def _beatpro_prepare_delivery(self):
+        """Point each line at the van or the main warehouse, following the delivery choice."""
+        for order in self.filtered('beatpro_delivery_mode'):
+            van = order.user_id.beatpro_van_warehouse_id
+            main = self.env['stock.warehouse']._beatpro_main(order.company_id)
+            if order.beatpro_delivery_mode == 'warehouse' or not van:
+                order.warehouse_id = main
+                continue
+            order.warehouse_id = van
+            available = location_quantities(self.env, van.lot_stock_id)
+            for line in order._beatpro_storable_lines():
+                product = line.product_id
+                need = line.product_uom_id._compute_quantity(line.product_uom_qty, product.uom_id)
+                enough = float_compare(available.get(product, 0.0), need, precision_rounding=product.uom_id.rounding) >= 0
+                if enough:
+                    available[product] = available.get(product, 0.0) - need
+                elif order.beatpro_delivery_mode == 'split':
+                    line.route_ids = [Command.set(main.delivery_route_id.ids)]
+                elif not (self.env.context.get('beatpro_from_app') or order.mobile_uuid):
+                    raise UserError(self.env._(
+                        "The van has only %(left)s of %(product)s, and this order needs %(need)s. "
+                        "Choose \"Van now, the rest from the warehouse\" or \"Main warehouse delivers\".",
+                        left=available.get(product, 0.0), product=product.display_name, need=need))
+                # From the app the rep has already handed the goods over: deliver from the van anyway.
+
+    def _beatpro_deliver_from_van(self):
+        """The rep hands the goods over at the shop: validate the van's deliveries."""
+        for order in self.filtered(lambda o: o.beatpro_delivery_mode in ('van', 'split')):
+            van = order.user_id.beatpro_van_warehouse_id
+            pickings = order.sudo().picking_ids.filtered(
+                lambda p: p.picking_type_id.warehouse_id == van and p.state not in ('done', 'cancel'))
+            if pickings:
+                validate(pickings)
+
+    def action_confirm(self):
+        self._beatpro_prepare_delivery()
+        result = super().action_confirm()
+        self._beatpro_deliver_from_van()
+        return result
 
     def _beatpro_over_discount_limit(self):
         """True when the current user is a BeatPro rep (not a supervisor) and a line
@@ -61,6 +129,7 @@ class SaleOrder(models.Model):
 
         :return: ``{mobile_uuid: {'id', 'name', 'state', 'approval', 'amount_total'}}``
         """
+        self = self.with_context(beatpro_from_app=True)
         ids_by_uuid = self.beatpro_upsert(vals_list)
         orders = self.browse([order_id for order_id in ids_by_uuid.values()])
         for order in orders:
@@ -77,5 +146,7 @@ class SaleOrder(models.Model):
                 'state': order.state,
                 'approval': order.beatpro_approval_state or False,
                 'amount_total': order.amount_total,
+                'delivery_mode': order.beatpro_delivery_mode or False,
+                'delivered_now': order.beatpro_delivery_mode in ('van', 'split') and order.state == 'sale',
             } for order in orders.sudo()
         }

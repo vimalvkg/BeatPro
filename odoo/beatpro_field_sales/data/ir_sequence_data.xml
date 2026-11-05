@@ -7,4 +7,25 @@
         <field name="padding">5</field>
         <field name="company_id" eval="False"/>
     </record>
+    <record id="seq_beatpro_van_load" model="ir.sequence">
+        <field name="name">BeatPro Van Load</field>
+        <field name="code">beatpro.van.load</field>
+        <field name="prefix">LOAD/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_beatpro_van_unload" model="ir.sequence">
+        <field name="name">BeatPro Van Unload</field>
+        <field name="code">beatpro.van.unload</field>
+        <field name="prefix">UNLOAD/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+    <record id="seq_beatpro_shop_return" model="ir.sequence">
+        <field name="name">BeatPro Shop Return</field>
+        <field name="code">beatpro.shop.return</field>
+        <field name="prefix">RET/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

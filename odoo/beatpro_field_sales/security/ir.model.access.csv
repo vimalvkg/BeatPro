@@ -9,4 +9,14 @@ access_beatpro_day_close_rep,beatpro.day.close rep,model_beatpro_day_close,group
 access_beatpro_day_close_supervisor,beatpro.day.close supervisor,model_beatpro_day_close,group_beatpro_supervisor,1,1,1,1
 access_beatpro_payment_wizard_rep,beatpro.payment.wizard rep,model_beatpro_payment_wizard,group_beatpro_rep,1,1,1,1
 access_beatpro_payment_wizard_line_rep,beatpro.payment.wizard.line rep,model_beatpro_payment_wizard_line,group_beatpro_rep,1,1,1,1
+access_beatpro_van_transfer_rep,beatpro.van.transfer rep,model_beatpro_van_transfer,group_beatpro_rep,1,1,1,0
+access_beatpro_van_transfer_stock,beatpro.van.transfer storekeeper,model_beatpro_van_transfer,stock.group_stock_user,1,1,1,0
+access_beatpro_van_transfer_supervisor,beatpro.van.transfer supervisor,model_beatpro_van_transfer,group_beatpro_supervisor,1,1,1,1
+access_beatpro_van_transfer_line_rep,beatpro.van.transfer.line rep,model_beatpro_van_transfer_line,group_beatpro_rep,1,1,1,1
+access_beatpro_van_transfer_line_stock,beatpro.van.transfer.line storekeeper,model_beatpro_van_transfer_line,stock.group_stock_user,1,1,1,1
+access_beatpro_shop_return_rep,beatpro.shop.return rep,model_beatpro_shop_return,group_beatpro_rep,1,1,1,0
+access_beatpro_shop_return_supervisor,beatpro.shop.return supervisor,model_beatpro_shop_return,group_beatpro_supervisor,1,1,1,1
+access_beatpro_shop_return_stock,beatpro.shop.return storekeeper,model_beatpro_shop_return,stock.group_stock_user,1,0,0,0
+access_beatpro_shop_return_line_rep,beatpro.shop.return.line rep,model_beatpro_shop_return_line,group_beatpro_rep,1,1,1,1
+access_beatpro_shop_return_line_stock,beatpro.shop.return.line storekeeper,model_beatpro_shop_return_line,stock.group_stock_user,1,0,0,0
 access_account_payment_beatpro_rep,account.payment beatpro rep,account.model_account_payment,group_beatpro_rep,1,0,0,0

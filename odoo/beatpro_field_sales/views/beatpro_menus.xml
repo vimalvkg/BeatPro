@@ -9,10 +9,14 @@
               groups="beatpro_field_sales.group_beatpro_supervisor"/>
     <menuitem id="menu_beatpro_my_day" name="My Day" parent="menu_beatpro_root"
               action="action_beatpro_my_day_screen" sequence="5"/>
+    <menuitem id="menu_beatpro_my_van" name="My Van" parent="menu_beatpro_root"
+              action="action_beatpro_my_van" sequence="7"/>
     <menuitem id="menu_beatpro_visits" name="Visits" parent="menu_beatpro_root"
               action="action_beatpro_visit" sequence="10"/>
     <menuitem id="menu_beatpro_orders" name="Orders" parent="menu_beatpro_root"
               action="action_beatpro_orders" sequence="15"/>
+    <menuitem id="menu_beatpro_returns" name="Goods Taken Back" parent="menu_beatpro_root"
+              action="action_beatpro_shop_return" sequence="17"/>
     <menuitem id="menu_beatpro_day_close" name="Day-End Closes" parent="menu_beatpro_root"
               action="action_beatpro_day_close" sequence="20"/>
     <menuitem id="menu_beatpro_routes" name="Routes" parent="menu_beatpro_root"
@@ -24,6 +28,18 @@
               action="action_beatpro_orders_approval" sequence="10"/>
     <menuitem id="menu_beatpro_visit_analysis" name="Visit Analysis" parent="menu_beatpro_supervisor"
               action="action_beatpro_visit_analysis" sequence="20"/>
+    <menuitem id="menu_beatpro_van_desk" name="Vans" parent="menu_beatpro_supervisor"
+              action="action_beatpro_van_desk" sequence="5"/>
+    <menuitem id="menu_beatpro_van_transfers" name="Van Loads and Unloads" parent="menu_beatpro_supervisor"
+              action="action_beatpro_van_transfer" sequence="25"/>
+    <menuitem id="menu_beatpro_return_reasons" name="Return Reasons" parent="menu_beatpro_supervisor"
+              action="action_beatpro_return_reasons" sequence="30"/>
+    <menuitem id="menu_beatpro_vans_setup" name="Van Setup" parent="menu_beatpro_supervisor"
+              action="action_beatpro_vans_setup" sequence="70"
+              groups="stock.group_stock_manager"/>
+    <menuitem id="menu_stock_beatpro_van_desk" name="Vans" parent="stock.menu_stock_transfers"
+              action="action_beatpro_van_desk" sequence="1"
+              groups="stock.group_stock_user"/>
     <menuitem id="menu_beatpro_payment_methods" name="Payment Methods" parent="menu_beatpro_supervisor"
               action="action_beatpro_payment_methods" sequence="80"
               groups="account.group_account_manager"/>

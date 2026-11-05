@@ -2,6 +2,9 @@ from . import beatpro_mobile_mixin
 from . import beatpro_route
 from . import beatpro_visit
 from . import beatpro_day_close
+from . import stock_warehouse
+from . import beatpro_van_transfer
+from . import beatpro_shop_return
 from . import res_users
 from . import res_partner
 from . import sale_order

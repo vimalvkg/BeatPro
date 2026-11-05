@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beatpro_shop_return_form" model="ir.ui.view">
+        <field name="name">beatpro.shop.return.form</field>
+        <field name="model">beatpro.shop.return</field>
+        <field name="arch" type="xml">
+            <form string="Take Back Goods">
+                <header>
+                    <button name="action_confirm" type="object" string="Take Back Goods" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_cancel" type="object" string="Cancel" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_credit_note" type="object" class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not credit_note_id" groups="account.group_account_invoice">
+                            <span>Credit Note</span>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id" readonly="state != 'draft'"/>
+                            <field name="visit_id" readonly="1" invisible="not visit_id"/>
+                        </group>
+                        <group>
+                            <field name="user_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="credit_note_id" readonly="1" invisible="not credit_note_id"/>
+                        </group>
+                    </group>
+                    <field name="line_ids" readonly="state != 'draft'">
+                        <list editable="bottom">
+                            <field name="product_id" options="{'no_create': True}"/>
+                            <field name="qty"/>
+                            <field name="reason"/>
+                            <field name="resellable" string="Back into the van"/>
+                            <field name="price_unit"/>
+                            <field name="subtotal" sum="Credit"/>
+                        </list>
+                    </field>
+                    <group class="oe_subtotal_footer">
+                        <field name="amount_total" string="Credit for the shop"/>
+                    </group>
+                    <p class="text-muted">
+                        Goods that can be sold again go back into the rep's van. Damaged and expired goods go
+                        to the damaged stock area. The shop gets a credit note, which accounting checks before it counts.
+                    </p>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_shop_return_list" model="ir.ui.view">
+        <field name="name">beatpro.shop.return.list</field>
+        <field name="model">beatpro.shop.return</field>
+        <field name="arch" type="xml">
+            <list string="Goods Taken Back" decoration-muted="state == 'cancel'">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="amount_total" sum="Total"/>
+                <field name="credit_note_id"/>
+                <field name="state" widget="badge" decoration-success="state == 'done'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_shop_return_line_pivot" model="ir.ui.view">
+        <field name="name">beatpro.shop.return.line.list</field>
+        <field name="model">beatpro.shop.return.line</field>
+        <field name="arch" type="xml">
+            <list string="Return Reasons">
+                <field name="return_id"/>
+                <field name="product_id"/>
+                <field name="reason"/>
+                <field name="qty" sum="Total"/>
+                <field name="subtotal" sum="Total"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_shop_return_search" model="ir.ui.view">
+        <field name="name">beatpro.shop.return.search</field>
+        <field name="model">beatpro.shop.return</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <filter name="my" string="Mine" domain="[('user_id', '=', uid)]"/>
+                <filter name="today" string="Today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter name="group_user" string="Rep" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_partner" string="Shop" context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_shop_return" model="ir.actions.act_window">
+        <field name="name">Goods Taken Back</field>
+        <field name="res_model">beatpro.shop.return</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No goods taken back yet</p>
+            <p>During a visit, use "Take back goods" to record what a shop returns and why.</p>
+        </field>
+    </record>
+
+    <record id="action_beatpro_return_reasons" model="ir.actions.act_window">
+        <field name="name">Return Reasons</field>
+        <field name="res_model">beatpro.shop.return.line</field>
+        <field name="view_mode">list</field>
+        <field name="domain">[('return_id.state', '=', 'done')]</field>
+        <field name="context">{'group_by': ['reason']}</field>
+    </record>
+</odoo>

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.MyVan">
+        <div class="o_action o_beatpro bp-page bp-van">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap-narrow pt-3">
+                <div>
+                    <p class="bp-eyebrow mb-1" t-if="d.has_van"><t t-esc="d.van_name"/><t t-if="d.vehicle"> · <t t-esc="d.vehicle"/></t></p>
+                    <h1 class="bp-title mb-0">Stock</h1>
+                </div>
+
+                <div class="bp-segmented" role="group" aria-label="Whose stock">
+                    <button type="button" t-att-class="{active: state.tab === 'van'}" t-att-aria-pressed="state.tab === 'van' ? 'true' : 'false'"
+                            t-on-click="() => this.state.tab = 'van'" t-if="d.has_van">My van</button>
+                    <button type="button" t-att-class="{active: state.tab === 'main' or !d.has_van}" t-att-aria-pressed="state.tab === 'main' ? 'true' : 'false'"
+                            t-on-click="() => this.state.tab = 'main'" t-esc="d.main_name"/>
+                </div>
+
+                <t t-if="!d.has_van">
+                    <div class="bp-card bp-card-pad bp-muted">You have no van. Ask your supervisor to set one up if you sell from a van.</div>
+                </t>
+                <t t-elif="state.tab === 'van'">
+                    <div class="bp-van-hero">
+                        <span class="bp-van-hero-label">In the van now</span>
+                        <span class="bp-van-hero-value"><t t-esc="fmt(d.in_van)"/> cases · <t t-esc="d.in_van_value"/></span>
+                        <div class="bp-van-hero-grid">
+                            <div><span>Loaded</span><strong t-esc="fmt(d.loaded)"/></div>
+                            <div><span>Delivered</span><strong t-esc="fmt(d.sold)"/></div>
+                            <div><span>Returned in</span><strong t-esc="fmt(d.returned)"/></div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button t-if="d.open_load" type="button" class="bp-btn bp-quiet flex-fill" t-on-click="() => this.open(d.open_load.id)">
+                            <t t-if="d.open_load.state === 'sent'">Load request sent: <t t-esc="d.open_load.name"/></t>
+                            <t t-else="">Finish load request <t t-esc="d.open_load.name"/></t>
+                        </button>
+                        <button t-else="" type="button" class="bp-btn bp-primary flex-fill" t-on-click="() => this.start('load')"><t t-if="d.loaded">Load more</t><t t-else="">Load the van</t></button>
+                        <button t-if="d.unload" type="button" class="bp-btn bp-quiet flex-fill" t-on-click="() => this.open(d.unload.id)">
+                            Unload <t t-esc="d.unload.name"/>
+                        </button>
+                        <button t-elif="d.in_van" type="button" class="bp-btn bp-outline flex-fill" t-on-click="() => this.start('unload')">Unload the van</button>
+                    </div>
+                </t>
+
+                <t t-if="d.has_van or state.tab === 'main'">
+                    <input class="form-control bp-search" placeholder="Search products" aria-label="Search products"
+                           t-model="state.search"/>
+                    <div class="bp-card bp-van-list">
+                        <t t-foreach="items" t-as="i" t-key="i.product_id">
+                            <div class="bp-van-row">
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold" t-esc="i.name"/>
+                                    <div class="bp-small bp-muted" t-if="state.tab === 'van'">
+                                        Loaded <t t-esc="fmt(i.loaded)"/> · delivered <t t-esc="fmt(i.sold)"/> · returned <t t-esc="fmt(i.returned)"/>
+                                    </div>
+                                    <div class="bp-small bp-muted" t-else="">Delivered by <t t-esc="d.main_name"/></div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="bp-van-qty" t-esc="fmt(state.tab === 'van' ? i.left : i.main_qty)"/>
+                                    <t t-if="state.tab === 'van'" t-set="tg" t-value="tag(i)"/>
+                                    <span t-if="tg" t-att-class="'bp-pill ' + tg.cls" t-esc="tg.label"/>
+                                </div>
+                            </div>
+                        </t>
+                        <div t-if="!items.length" class="bp-van-row bp-muted">Nothing here.</div>
+                    </div>
+                </t>
+            </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="beatpro_field_sales.VanDesk">
+        <div class="o_action o_beatpro bp-page bp-dashboard bp-desk">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap">
+                <div>
+                    <p class="bp-eyebrow mb-1"><t t-esc="d.warehouse"/> · <t t-esc="d.date_label"/></p>
+                    <h1 class="bp-title">Vans</h1>
+                </div>
+
+                <section class="bp-kpis" aria-label="Today">
+                    <div t-att-class="'bp-card bp-kpi' + (d.loads.length ? ' bp-kpi-alert' : '')">
+                        <span class="bp-kpi-label">Load requests waiting</span><span class="bp-kpi-value" t-esc="d.loads.length"/>
+                    </div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Vans on the road</span><span class="bp-kpi-value" t-esc="d.vans.length"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Unloads to receive</span><span class="bp-kpi-value" t-esc="d.unloads.length"/></div>
+                    <div t-att-class="'bp-card bp-kpi' + (d.difference_qty ? ' bp-kpi-danger' : '')">
+                        <span class="bp-kpi-label">Stock differences</span><span class="bp-kpi-value"><t t-esc="fmt(d.difference_qty)"/> <small>cases</small></span>
+                    </div>
+                </section>
+
+                <div class="bp-columns">
+                    <section class="bp-card bp-card-pad bp-desk-col" aria-labelledby="bp-loads-h">
+                        <h2 id="bp-loads-h" class="bp-h2">Load requests</h2>
+                        <t t-foreach="d.loads" t-as="c" t-key="c.id">
+                            <div class="bp-approval flex-wrap">
+                                <span class="bp-avatar" t-esc="c.initials"/>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold"><t t-esc="c.rep"/> · <t t-esc="c.van"/></div>
+                                    <div class="bp-small bp-muted"><t t-esc="fmt(c.qty)"/> cases · <t t-esc="c.products"/> products · <t t-esc="c.value"/><t t-if="c.sent"> · sent <t t-esc="c.sent"/></t></div>
+                                </div>
+                                <button type="button" class="bp-btn bp-link" t-on-click="() => this.open(c)">Check items</button>
+                                <button type="button" class="bp-btn bp-primary" t-att-disabled="state.busy === c.id" t-on-click="() => this.loadVan(c)">Load van</button>
+                            </div>
+                        </t>
+                        <p t-if="!d.loads.length" class="bp-muted mb-0">No load requests waiting.</p>
+                    </section>
+
+                    <section class="bp-card bp-card-pad bp-desk-col" aria-labelledby="bp-unloads-h">
+                        <h2 id="bp-unloads-h" class="bp-h2">Unloads to receive</h2>
+                        <t t-foreach="d.unloads" t-as="c" t-key="c.id">
+                            <div class="bp-approval flex-column align-items-stretch">
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="bp-avatar" t-esc="c.initials"/>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="fw-bold"><t t-esc="c.rep"/> · <t t-esc="c.van"/></div>
+                                        <div class="bp-small bp-muted"><t t-esc="fmt(c.qty)"/> cases counted of <t t-esc="fmt(c.expected)"/> expected<t t-if="c.damaged"> · <t t-esc="fmt(c.damaged)"/> damaged returns</t></div>
+                                    </div>
+                                </div>
+                                <div t-if="c.differences.length" class="bp-desk-diff">
+                                    <t t-foreach="c.differences" t-as="x" t-key="x_index"><t t-esc="differenceText(x)"/>. </t>
+                                    <t t-if="c.note">Rep's note: "<t t-esc="c.note"/>"</t>
+                                </div>
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <button type="button" class="bp-btn bp-quiet" t-on-click="() => this.open(c)">Recount</button>
+                                    <button type="button" class="bp-btn bp-primary" t-att-disabled="state.busy === c.id" t-on-click="() => this.receive(c)">
+                                        <t t-if="c.differences.length">Receive · difference to supervisor</t><t t-else="">Receive</t>
+                                    </button>
+                                </div>
+                            </div>
+                        </t>
+                        <p t-if="!d.unloads.length" class="bp-muted mb-0">No vans waiting to be received.</p>
+                    </section>
+                </div>
+
+                <section t-if="d.to_approve.length" class="bp-card bp-card-pad" aria-labelledby="bp-approve-h">
+                    <h2 id="bp-approve-h" class="bp-h2">Differences waiting for a supervisor</h2>
+                    <t t-foreach="d.to_approve" t-as="c" t-key="c.id">
+                        <div class="bp-approval flex-wrap">
+                            <span class="bp-avatar" t-esc="c.initials"/>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-bold"><t t-esc="c.rep"/> · <t t-esc="c.name"/></div>
+                                <div class="bp-small bp-alert-text">
+                                    <t t-foreach="c.differences" t-as="x" t-key="x_index"><t t-esc="differenceText(x)"/>. </t>
+                                    <t t-if="c.note">"<t t-esc="c.note"/>"</t>
+                                </div>
+                            </div>
+                            <button type="button" class="bp-btn bp-link" t-on-click="() => this.open(c)">Details</button>
+                            <button t-if="d.is_supervisor" type="button" class="bp-btn bp-primary" t-att-disabled="state.busy === c.id" t-on-click="() => this.approve(c)">Approve write-off</button>
+                        </div>
+                    </t>
+                </section>
+
+                <section class="bp-card bp-main" aria-labelledby="bp-road-h">
+                    <h2 id="bp-road-h" class="bp-h2" style="padding: 18px 20px 8px">Vans on the road</h2>
+                    <div class="bp-table">
+                        <div class="bp-row bp-head bp-road-row" role="row">
+                            <span>Rep</span><span>Van</span><span class="bp-num-cell">Loaded</span><span class="bp-num-cell">Delivered</span><span class="bp-num-cell">In van</span><span class="bp-num-cell">Stock value</span>
+                        </div>
+                        <t t-foreach="d.vans" t-as="v" t-key="v.id">
+                            <div class="bp-row bp-road-row" role="row">
+                                <span class="fw-bold" t-esc="v.rep"/><span class="bp-muted" t-esc="v.van"/>
+                                <span class="bp-num-cell" t-esc="fmt(v.loaded)"/><span class="bp-num-cell" t-esc="fmt(v.sold)"/>
+                                <span class="bp-num-cell" t-esc="fmt(v.left)"/><span class="bp-num-cell" t-esc="v.value"/>
+                            </div>
+                        </t>
+                        <div t-if="!d.vans.length" class="bp-row bp-road-row bp-muted">No vans out with stock.</div>
+                    </div>
+                </section>
+            </div>
+            </div>
+        </div>
+    </t>
+</templates>

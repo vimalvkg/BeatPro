@@ -241,3 +241,34 @@
     .bp-rate-good { color: #1F6B45; font-weight: 700; }
     .bp-rate-mid { color: #7A4F00; font-weight: 700; }
 }
+
+// -- Vans: rep's stock page and storekeeper's desk ------------------------------
+
+.o_beatpro.bp-van, .o_beatpro.bp-desk {
+    .bp-btn.bp-link { background: transparent; color: var(--bp-navy); padding: 0 8px; &:hover { color: var(--bp-ink); text-decoration: underline; } }
+}
+
+.o_beatpro.bp-van {
+    .bp-segmented { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); background: var(--bp-surface); border: 1px solid var(--bp-line); border-radius: 12px; padding: 3px;
+        button { font: inherit; font-size: 14px; font-weight: 600; min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--bp-muted); cursor: pointer;
+            &.active { background: var(--bp-blue-soft); color: var(--bp-navy); font-weight: 800; } } }
+    .bp-van-hero { background: var(--bp-ink); color: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+    .bp-van-hero-label { font-size: 13px; font-weight: 700; color: var(--bp-on-navy); }
+    .bp-van-hero-value { font-size: 28px; font-weight: 800; line-height: 1.15; }
+    .bp-van-hero-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; border-top: 1px solid rgba(255, 255, 255, 0.16); padding-top: 12px; margin-top: 8px;
+        span { display: block; font-size: 12px; font-weight: 700; color: var(--bp-on-navy); } strong { font-size: 18px; font-weight: 800; } }
+    .bp-search { min-height: 46px; border-radius: 12px; border-color: var(--bp-line); }
+    .bp-van-list { overflow: hidden; }
+    .bp-van-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--bp-line-soft); &:last-child { border-bottom: 0; } }
+    .bp-van-qty { font-size: 20px; font-weight: 800; }
+}
+
+.o_beatpro.bp-desk {
+    .bp-approval > .flex-grow-1 { flex: 1 1 200px; }
+    .bp-road-row .fw-bold { font-weight: 700; }
+    .bp-desk-col { flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+    .bp-kpi-danger { background: var(--bp-red-soft); border-color: #F1C3BD; .bp-kpi-label { color: var(--bp-red); } }
+    .bp-desk-diff { background: var(--bp-red-soft); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--bp-red); }
+    .bp-alert-text { color: var(--bp-red); }
+    .bp-road-row { grid-template-columns: minmax(180px, 2fr) minmax(130px, 1.2fr) repeat(4, minmax(80px, 1fr)); }
+}

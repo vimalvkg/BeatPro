@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Van loads and unloads -->
+    <record id="view_beatpro_van_transfer_form" model="ir.ui.view">
+        <field name="name">beatpro.van.transfer.form</field>
+        <field name="model">beatpro.van.transfer</field>
+        <field name="arch" type="xml">
+            <form string="Van Load or Unload" class="o_beatpro_van_form">
+                <header>
+                    <button name="action_send" type="object" string="Send Load Request" class="btn-primary"
+                            invisible="state != 'draft' or kind != 'load'"/>
+                    <button name="action_send" type="object" string="Send Unload" class="btn-primary"
+                            invisible="state != 'draft' or kind != 'unload'"/>
+                    <button name="action_load" type="object" string="Load Van" class="btn-primary"
+                            invisible="state != 'sent' or kind != 'load'"
+                            groups="stock.group_stock_user,beatpro_field_sales.group_beatpro_supervisor"/>
+                    <button name="action_receive" type="object" string="Receive Van" class="btn-primary"
+                            invisible="state != 'sent' or kind != 'unload'"
+                            groups="stock.group_stock_user,beatpro_field_sales.group_beatpro_supervisor"/>
+                    <button name="action_approve_difference" type="object" string="Approve Write-off" class="btn-primary"
+                            invisible="state != 'to_approve'"
+                            groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <button name="action_reset_draft" type="object" string="Back to Draft"
+                            invisible="state not in ('sent', 'cancel')"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state in ('done', 'to_approve', 'cancel')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,sent,done"/>
+                </header>
+                <div class="alert alert-warning mb-0" role="alert" invisible="state != 'to_approve'">
+                    The van was received with a difference. A supervisor must approve the write-off.
+                </div>
+                <div class="alert alert-info mb-0" role="status" invisible="state != 'sent' or kind != 'load'">
+                    Waiting for the storekeeper. Stock moves into the van when they confirm the load.
+                </div>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="kind"/>
+                            <field name="user_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="van_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="vehicle" invisible="not vehicle"/>
+                        </group>
+                        <group>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="main_warehouse_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="total_value" string="Value at sale price"/>
+                            <field name="picking_id" invisible="not picking_id"/>
+                            <field name="done_by_id" invisible="not done_by_id"/>
+                            <field name="approved_by_id" invisible="not approved_by_id"/>
+                        </group>
+                    </group>
+                    <field name="can_edit_lines" invisible="1"/>
+                    <field name="line_ids" readonly="not can_edit_lines">
+                        <list editable="bottom" decoration-danger="has_difference">
+                            <field name="kind" column_invisible="1"/>
+                            <field name="has_difference" column_invisible="1"/>
+                            <field name="product_id" options="{'no_create': True}"/>
+                            <field name="qty_expected" column_invisible="parent.kind != 'unload'"/>
+                            <field name="qty" string="Counted" column_invisible="parent.kind != 'unload'"/>
+                            <field name="qty" string="To Load" column_invisible="parent.kind == 'unload'"/>
+                            <field name="qty_difference" column_invisible="parent.kind != 'unload'"/>
+                            <field name="uom_id" groups="uom.group_uom"/>
+                        </list>
+                    </field>
+                    <group invisible="kind != 'unload'">
+                        <field name="has_difference" invisible="1"/>
+                        <field name="note" placeholder="Why does the count differ? For example: one box torn, given to the shop as a free sample."
+                               required="has_difference and state == 'draft'" readonly="state != 'draft'"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_van_transfer_list" model="ir.ui.view">
+        <field name="name">beatpro.van.transfer.list</field>
+        <field name="model">beatpro.van.transfer</field>
+        <field name="arch" type="xml">
+            <list string="Van Loads and Unloads" decoration-warning="state == 'to_approve'" decoration-muted="state == 'cancel'">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="kind"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="van_id"/>
+                <field name="total_qty" string="Cases" sum="Total"/>
+                <field name="total_difference" string="Difference"/>
+                <field name="total_value" sum="Total"/>
+                <field name="state" widget="badge" decoration-info="state == 'sent'" decoration-warning="state == 'to_approve'" decoration-success="state == 'done'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_van_transfer_search" model="ir.ui.view">
+        <field name="name">beatpro.van.transfer.search</field>
+        <field name="model">beatpro.van.transfer</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="van_id"/>
+                <filter name="loads" string="Loads" domain="[('kind', '=', 'load')]"/>
+                <filter name="unloads" string="Unloads" domain="[('kind', '=', 'unload')]"/>
+                <separator/>
+                <filter name="waiting" string="Waiting for Storekeeper" domain="[('state', '=', 'sent')]"/>
+                <filter name="to_approve" string="Difference to Approve" domain="[('state', '=', 'to_approve')]"/>
+                <separator/>
+                <filter name="today" string="Today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter name="group_user" string="Rep" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_date" string="Date" context="{'group_by': 'date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_van_transfer" model="ir.actions.act_window">
+        <field name="name">Van Loads and Unloads</field>
+        <field name="res_model">beatpro.van.transfer</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No van loads yet</p>
+            <p>Each morning a rep asks for stock for the van, and each evening counts what is left and brings it back.</p>
+        </field>
+    </record>
+
+    <record id="action_beatpro_van_differences" model="ir.actions.act_window">
+        <field name="name">Stock Differences</field>
+        <field name="res_model">beatpro.van.transfer</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', '=', 'to_approve')]</field>
+    </record>
+
+    <!-- Screens -->
+    <record id="action_beatpro_my_van" model="ir.actions.client">
+        <field name="name">My Van</field>
+        <field name="tag">beatpro.my_van</field>
+    </record>
+
+    <record id="action_beatpro_van_desk" model="ir.actions.client">
+        <field name="name">Vans</field>
+        <field name="tag">beatpro.van_desk</field>
+    </record>
+
+    <!-- Warehouses: mark vans -->
+    <record id="view_warehouse_form_beatpro" model="ir.ui.view">
+        <field name="name">stock.warehouse.form.beatpro</field>
+        <field name="model">stock.warehouse</field>
+        <field name="inherit_id" ref="stock.view_warehouse"/>
+        <field name="arch" type="xml">
+            <field name="partner_id" position="after">
+                <field name="beatpro_is_van"/>
+                <field name="beatpro_vehicle" invisible="not beatpro_is_van"/>
+                <field name="beatpro_rep_ids" widget="many2many_tags" invisible="not beatpro_is_van" readonly="1"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="action_beatpro_vans_setup" model="ir.actions.act_window">
+        <field name="name">Vans</field>
+        <field name="res_model">stock.warehouse</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('beatpro_is_van', '=', True)]</field>
+        <field name="context">{'default_beatpro_is_van': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Set up a van</p>
+            <p>Each rep's van is a small warehouse. Create one per vehicle, then pick it on the rep's user (BeatPro tab).</p>
+        </field>
+    </record>
+
+    <!-- Orders: how the rep delivers -->
+    <record id="view_order_form_beatpro_van" model="ir.ui.view">
+        <field name="name">sale.order.form.beatpro.van</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='order_details']" position="inside">
+                <field name="beatpro_has_van" invisible="1"/>
+                <field name="beatpro_delivery_mode" widget="radio"
+                       invisible="not beatpro_has_van" readonly="state not in ('draft', 'sent')"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

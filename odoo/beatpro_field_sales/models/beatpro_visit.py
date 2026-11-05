@@ -58,6 +58,7 @@ class BeatproVisit(models.Model):
     sale_order_count = fields.Integer(compute='_compute_sale_totals')
     amount_ordered = fields.Monetary(compute='_compute_sale_totals')
     payment_ids = fields.One2many('account.payment', 'beatpro_visit_id', string="Payments")
+    shop_return_ids = fields.One2many('beatpro.shop.return', 'visit_id', string="Goods Taken Back")
     amount_collected = fields.Monetary(compute='_compute_amount_collected')
 
     @api.depends('check_in', 'check_out')
@@ -183,6 +184,8 @@ class BeatproVisit(models.Model):
                 'sub': self.env._("Settles %s", ', '.join(settles)) if settles else self.env._("Advance on account"),
                 'amount': money(self.env, payment.amount),
             })
+        for ret in self.shop_return_ids.filtered(lambda r: r.state == 'done'):
+            items.append(ret._beatpro_panel_item())
         return {
             'state': self.state,
             'check_in': fields.Datetime.to_string(self.check_in) if self.check_in else False,
@@ -222,6 +225,23 @@ class BeatproVisit(models.Model):
                 'default_partner_id': self.partner_id.id,
                 'default_user_id': self.user_id.id,
                 'default_beatpro_visit_id': self.id,
+            },
+        }
+
+    def action_take_back(self):
+        """Open a new shop return for this visit's customer."""
+        self.ensure_one()
+        if self.state != 'in_progress':
+            raise UserError(self.env._("Check in to the visit before taking goods back."))
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'beatpro.shop.return',
+            'views': [(False, 'form')],
+            'target': 'current',
+            'context': {
+                'default_partner_id': self.partner_id.id,
+                'default_user_id': self.user_id.id,
+                'default_visit_id': self.id,
             },
         }
 

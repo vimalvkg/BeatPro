@@ -6,7 +6,7 @@ same records:
 - **In the Odoo web client** (desktop or a phone browser), with no app needed.
 - **In the BeatPro mobile app**, which works offline and syncs through Odoo's JSON-2 API.
 
-Only standard Community modules are needed (`sale_stock`, `account`).
+Only standard Community modules are needed (`sale_stock`, `account`, `account_payment`).
 
 ## Working in the Odoo web client
 
@@ -16,14 +16,21 @@ Menu **BeatPro**:
 | --- | --- | --- |
 | Overview | Supervisors | Today's, this week's or this month's visits, order value, collections by method, every rep's progress, discounts to approve in one click and why shops didn't order |
 | My Day | Reps | Progress ring with the day's orders and collections, the next shop with Start visit, directions and call, and the route with each shop's status |
+| My Van | Reps with a van | What is in the van now (loaded, delivered, taken back, left), the main warehouse's stock, **Load the van** (today's suggestion from the route's last orders) and **Unload the van** (count what is left) |
 | Visits | Reps | The visit panel: **Check in** and **Check out** record the browser's GPS position and show the distance from the shop pin; a live timer; **Take order** and **Collect payment** tiles; the customer's amount due, last and usual order; everything done during the visit. Check-out asks for the result, the no-order reason and a note. |
-| Orders | Reps | Orders taken during visits or sent from the app |
+| Orders | Reps | Orders taken during visits or sent from the app. Reps with a van choose the **Delivery**: from the van now, the van now and the rest from the main warehouse, or all from the main warehouse. The order is the rep's sale every way. |
+| Goods Taken Back | Reps | Goods a shop returns, with a reason: resellable goods go back into the van, damaged and expired goods to the damaged stock area, and the shop gets a draft credit note |
 | Day-End Closes | Reps | The cash and cheques to hand in, UPI already in the bank, visits and orders, and a list of the day's visits; closing locks the day |
 | Routes | Supervisors (reps read only) | A board of routes by weekday, with each route's rep, shops and how often its visits end with an order |
+| Supervisor > Vans | Supervisors | The storekeeper's Vans page, plus approving stock differences |
+| Supervisor > Van Loads and Unloads, Return Reasons, Van Setup | Supervisors | History, why shops return goods, and the van warehouses |
 | Supervisor > Discount Approvals | Supervisors | Orders whose discount is above the rep's limit |
 | Supervisor > Visit Analysis | Supervisors | Visits by rep and result |
 | Supervisor > Payment Methods | Accounting managers | Which payment methods reps see, their names and what reps enter |
 | Supervisor > Settings | Admins | Links to payment methods and online payment providers |
+
+**Inventory > Operations > Vans** is the storekeeper's page (Inventory / User): load requests to
+load, unloads to receive (or recount), stock differences waiting for a supervisor, and vans on the road.
 
 A rep whose discount is above their limit can't confirm the order; they click **Request
 Approval** and a supervisor clicks **Approve Discount**.
@@ -40,7 +47,23 @@ Under **Settings > Users > BeatPro Field Sales**:
   Reps can add customers and record collections without accounting rights.
 - **Supervisor** manages routes, sees every rep's records, approves discounts and reopens closed days.
 
-Set each rep's discount limit and van warehouse on the **BeatPro** tab of their user.
+Storekeepers need **Inventory / User**.
+
+Set each rep's discount limit, van warehouse and *Loads Own Van* on the **BeatPro** tab of their user.
+
+## Van sales
+
+1. Set up a van: **BeatPro > Supervisor > Van Setup** (a small warehouse marked *Sales Van*, with
+   its vehicle number), then pick it as the **Van Warehouse** on the rep's user.
+2. **Morning load.** The rep sends a load request. The storekeeper checks it, loads the van and
+   clicks **Load van**: stock moves from the main warehouse into the van. Reps marked **Loads Own
+   Van** on their user skip the storekeeper.
+3. **Orders.** Delivered from the van, the delivery is done at once. A split order is one order
+   with two deliveries. A main-warehouse order is a normal delivery from the main warehouse.
+4. **Goods taken back** go into the van (sellable) or the damaged stock area, with a draft credit note.
+5. **Day-end unload.** The rep counts what is left; a difference needs a note. The storekeeper
+   receives the counted stock into the main warehouse. A difference waits for a supervisor to
+   **Approve Write-off**, which empties the van.
 
 ## Field collections
 
@@ -79,6 +102,11 @@ and calls `POST /json/2/<model>/<method>` with `Authorization: bearer <key>`.
 | `account.payment` / `beatpro_payment_link(invoice_id, amount)` | Link for the customer to pay an invoice online |
 | `account.payment` / `beatpro_invoice_status(invoice_ids)` | Whether invoices are paid, to follow an online payment |
 | `beatpro.day.close` / `action_close` | Totals and locks the day |
+| `beatpro.van.transfer` / `beatpro_load_suggestion` | Today's suggested van load |
+| `beatpro.van.transfer` / `beatpro_van_stock` | The van and main warehouse stock screen |
+| `beatpro.van.transfer` / `beatpro_submit_transfers(vals_list)` | Sends loads and day-end unloads (`kind`, `line_ids`, `note`) |
+| `beatpro.shop.return` / `beatpro_return_candidates(partner_id)` | What the shop bought lately, with price |
+| `beatpro.shop.return` / `beatpro_submit_returns(vals_list)` | Takes goods back and makes the credit note |
 
 Standard `search_read` is used to download customers, products and stock.
 
