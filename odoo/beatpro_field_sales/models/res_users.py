@@ -42,6 +42,8 @@ class ResUsers(models.Model):
             'is_rep': user.has_group('beatpro_field_sales.group_beatpro_rep'),
             'is_supervisor': user.has_group('beatpro_field_sales.group_beatpro_supervisor'),
             'discount_limit': user.beatpro_discount_limit,
+            'payment_methods': company._beatpro_payment_methods()._beatpro_as_dict(),
+            'online_providers': company._beatpro_online_providers().mapped('name'),
             'warehouse_id': (user.beatpro_van_warehouse_id or self.env['stock.warehouse'].search(
                 [('company_id', '=', company.id)], limit=1)).id,
             'server_time': fields.Datetime.to_string(fields.Datetime.now()),

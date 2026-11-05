@@ -48,7 +48,7 @@
                             <div><span class="bp-split-label d-block">Cash</span><field name="cash_amount"/></div>
                             <div><span class="bp-split-label d-block">Cheque</span><field name="cheque_amount"/>
                                 <span class="bp-split-sub d-block"><field name="cheque_count" class="d-inline" style="font-size: 12px; font-weight: 700; color: #C9D8E8"/> cheques</span></div>
-                            <div><span class="bp-split-label d-block">UPI</span><field name="upi_amount"/>
+                            <div><span class="bp-split-label d-block">Bank and UPI</span><field name="bank_amount"/>
                                 <span class="bp-split-sub d-block">already in the bank</span></div>
                         </div>
                     </div>

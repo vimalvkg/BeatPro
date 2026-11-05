@@ -20,9 +20,10 @@
                 </div>
                 <group>
                     <group>
-                        <field name="upi_reference" invisible="method != 'upi'" placeholder="Optional"/>
-                        <field name="cheque_number" invisible="method != 'cheque'" required="method == 'cheque'"/>
-                        <field name="cheque_date" invisible="method != 'cheque'"/>
+                        <field name="method_reference" invisible="1"/>
+                        <field name="reference" invisible="method_reference != 'reference'" placeholder="Optional"/>
+                        <field name="cheque_number" invisible="method_reference != 'cheque'" required="method_reference == 'cheque'"/>
+                        <field name="cheque_date" invisible="method_reference != 'cheque'"/>
                     </group>
                     <group>
                         <field name="date"/>
@@ -42,8 +43,22 @@
                     </list>
                 </field>
                 <p class="text-muted small mb-0">With no invoice selected, the payment stays on the customer's account as an advance.</p>
+                <field name="online_enabled" invisible="1"/>
+                <div class="bp-online mt-3" invisible="not online_link">
+                    <div class="bp-label">Pay online</div>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <field name="online_qr" widget="image" readonly="1" nolabel="1" options="{'size': [180, 180]}"/>
+                        <div class="flex-grow-1" style="min-width: 0">
+                            <div class="fw-bold"><field name="online_invoice" nolabel="1"/></div>
+                            <div class="text-muted small mb-2">The customer scans the code or opens the link to pay. The invoice is marked paid when the payment comes through.</div>
+                            <field name="online_link" widget="CopyClipboardChar" nolabel="1"/>
+                        </div>
+                    </div>
+                </div>
                 <footer>
                     <button name="action_confirm" type="object" string="Record payment" class="btn-primary" data-hotkey="q"/>
+                    <button name="action_payment_link" type="object" string="Pay online" icon="fa-qrcode"
+                            invisible="not online_enabled" class="btn-secondary"/>
                     <button string="Discard" special="cancel" data-hotkey="x"/>
                 </footer>
             </form>

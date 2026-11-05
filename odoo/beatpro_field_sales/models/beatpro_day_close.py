@@ -33,7 +33,8 @@ class BeatproDayClose(models.Model):
     order_amount = fields.Monetary(string="Order Value", readonly=True)
     cash_amount = fields.Monetary(string="Cash", readonly=True)
     cheque_amount = fields.Monetary(string="Cheque", readonly=True)
-    upi_amount = fields.Monetary(string="UPI", readonly=True)
+    bank_amount = fields.Monetary(string="Bank and UPI", readonly=True,
+                                  help="Payments that went straight to the bank: UPI, transfers.")
     total_collected = fields.Monetary(compute='_compute_total_collected', store=True)
     handover_amount = fields.Monetary(
         string="Hand In", compute='_compute_total_collected', store=True,
@@ -52,10 +53,10 @@ class BeatproDayClose(models.Model):
         for close in self:
             close.name = f"{close.user_id.name or ''} {close.date or ''}".strip()
 
-    @api.depends('cash_amount', 'cheque_amount', 'upi_amount')
+    @api.depends('cash_amount', 'cheque_amount', 'bank_amount')
     def _compute_total_collected(self):
         for close in self:
-            close.total_collected = close.cash_amount + close.cheque_amount + close.upi_amount
+            close.total_collected = close.cash_amount + close.cheque_amount + close.bank_amount
             close.handover_amount = close.cash_amount + close.cheque_amount
 
     @api.depends('user_id', 'date', 'company_id')
@@ -142,7 +143,7 @@ class BeatproDayClose(models.Model):
                 ('state', 'not in', ('canceled', 'rejected')),
                 ('date', '=', close.date),
             ])
-            amounts = {'cash': 0.0, 'cheque': 0.0, 'upi': 0.0}
+            amounts = {'cash': 0.0, 'cheque': 0.0, 'bank': 0.0}
             for payment in payments:
                 amounts[payment.beatpro_method] += payment.amount
             close.write({
@@ -153,7 +154,7 @@ class BeatproDayClose(models.Model):
                 'order_amount': sum(orders.mapped('amount_total')),
                 'cash_amount': amounts['cash'],
                 'cheque_amount': amounts['cheque'],
-                'upi_amount': amounts['upi'],
+                'bank_amount': amounts['bank'],
                 'cheque_count': len(payments.filtered(lambda p: p.beatpro_method == 'cheque')),
             })
         return True

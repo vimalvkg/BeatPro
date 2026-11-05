@@ -24,6 +24,9 @@
               action="action_beatpro_orders_approval" sequence="10"/>
     <menuitem id="menu_beatpro_visit_analysis" name="Visit Analysis" parent="menu_beatpro_supervisor"
               action="action_beatpro_visit_analysis" sequence="20"/>
+    <menuitem id="menu_beatpro_payment_methods" name="Payment Methods" parent="menu_beatpro_supervisor"
+              action="action_beatpro_payment_methods" sequence="80"
+              groups="account.group_account_manager"/>
     <menuitem id="menu_beatpro_settings" name="Settings" parent="menu_beatpro_supervisor"
               action="action_beatpro_config_settings" sequence="90"
               groups="base.group_system"/>

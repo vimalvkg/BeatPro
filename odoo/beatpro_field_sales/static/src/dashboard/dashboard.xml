@@ -39,7 +39,7 @@
                         <span class="bp-kpi-value" t-esc="d.collected"/>
                         <div class="bp-split" aria-hidden="true">
                             <t t-foreach="d.collected_split" t-as="part" t-key="part.key">
-                                <span t-if="part.share" t-att-class="'bp-' + part.key" t-att-style="'flex: ' + part.share"/>
+                                <span t-if="part.share" t-att-class="'bp-c' + part.color" t-att-style="'flex: ' + part.share"/>
                             </t>
                         </div>
                         <span class="bp-small bp-muted">

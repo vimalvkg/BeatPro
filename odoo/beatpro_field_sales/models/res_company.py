@@ -1,38 +1,50 @@
-from odoo import fields, models
+from odoo import models
 from odoo.exceptions import UserError
 
 
 class ResCompany(models.Model):
     _inherit = 'res.company'
 
-    beatpro_cash_journal_id = fields.Many2one(
-        'account.journal', string="BeatPro Cash Journal", domain="[('type', '=', 'cash'), ('company_id', '=', id)]",
-        help="Journal for cash collected by reps. Defaults to the first cash journal.")
-    beatpro_bank_journal_id = fields.Many2one(
-        'account.journal', string="BeatPro Bank Journal", domain="[('type', '=', 'bank'), ('company_id', '=', id)]",
-        help="Journal for cheque and UPI payments collected by reps. Defaults to the first bank journal.")
-
-    def _beatpro_journal_for(self, method):
-        """The journal a field collection made with ``method`` is recorded in."""
+    def _beatpro_payment_methods(self):
+        """Payment methods reps can record money with: the incoming payment methods of
+        the company's cash and bank journals marked "Show to BeatPro Reps", cash first."""
         self.ensure_one()
-        journal_type = 'cash' if method == 'cash' else 'bank'
-        journal = self.beatpro_cash_journal_id if journal_type == 'cash' else self.beatpro_bank_journal_id
-        if not journal:
-            journal = self.env['account.journal'].sudo().search([
-                *self.env['account.journal']._check_company_domain(self),
-                ('type', '=', journal_type),
-            ], limit=1)
-        if not journal and journal_type == 'cash' and self.chart_template:
+        Journal = self.env['account.journal'].sudo()
+        company_domain = Journal._check_company_domain(self)
+        if self.chart_template and not Journal.search_count([*company_domain, ('type', '=', 'cash')], limit=1):
             # Odoo 19 charts don't always include a cash journal; reps need one.
-            journal = self.env['account.journal'].sudo().create({
-                'name': self.env._("Field Cash"),
-                'code': 'FCSH',
-                'type': 'cash',
-                'company_id': self.id,
-            })
-            self.sudo().beatpro_cash_journal_id = journal
-        if not journal:
+            Journal.create({'name': self.env._("Field Cash"), 'code': 'FCSH', 'type': 'cash', 'company_id': self.id})
+        lines = self.env['account.payment.method.line'].sudo().search([
+            ('journal_id.company_id', '=', self.id),
+            ('journal_id.type', 'in', ('cash', 'bank')),
+            ('journal_id.active', '=', True),
+            ('payment_type', '=', 'inbound'),
+            ('beatpro_show', '=', True),
+        ])
+        return lines.sorted(lambda l: (l.journal_id.type != 'cash', l.journal_id.sequence, l.journal_id.id, l.sequence, l.id))
+
+    def _beatpro_method_line_for(self, legacy_method):
+        """The payment method for the older app's fixed choices: cash, cheque or upi."""
+        self.ensure_one()
+        lines = self._beatpro_payment_methods()
+        if legacy_method == 'cash':
+            match = lines.filtered(lambda l: l.journal_id.type == 'cash')
+        elif legacy_method == 'cheque':
+            match = lines.filtered(lambda l: l.beatpro_reference == 'cheque') or \
+                lines.filtered(lambda l: l.journal_id.type == 'bank')
+        else:
+            match = lines.filtered(lambda l: l.journal_id.type == 'bank' and l.beatpro_reference != 'cheque') or \
+                lines.filtered(lambda l: l.journal_id.type == 'bank')
+        if not match:
             raise UserError(self.env._(
-                "Set up a %(type)s journal in Accounting before recording field collections.",
-                type=journal_type))
-        return journal
+                "No payment method for reps matches \"%s\". Set one up under BeatPro > Supervisor > Payment Methods.",
+                legacy_method))
+        return match[0]
+
+    def _beatpro_online_providers(self):
+        """Online payment providers customers can pay invoices with, by link or QR code."""
+        self.ensure_one()
+        return self.env['payment.provider'].sudo().search([
+            ('state', 'in', ('enabled', 'test')),
+            ('company_id', '=', self.id),
+        ])

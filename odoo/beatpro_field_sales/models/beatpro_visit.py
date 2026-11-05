@@ -175,12 +175,11 @@ class BeatproVisit(models.Model):
                 'sub': self.env._("%(count)s products · %(state)s", count=products, state=state),
                 'amount': money(self.env, order.amount_total),
             })
-        method_names = dict(self.env['account.payment']._fields['beatpro_method'].selection)
         for payment in self.sudo().payment_ids.filtered(lambda p: p.state not in ('canceled', 'rejected')):
             settles = payment.reconciled_invoice_ids.mapped('name')
             items.append({
                 'kind': 'payment', 'res_model': False, 'res_id': payment.id,
-                'title': self.env._("%s payment", method_names.get(payment.beatpro_method, '')),
+                'title': self.env._("%s payment", payment.payment_method_line_id.beatpro_display_name or payment.journal_id.name),
                 'sub': self.env._("Settles %s", ', '.join(settles)) if settles else self.env._("Advance on account"),
                 'amount': money(self.env, payment.amount),
             })

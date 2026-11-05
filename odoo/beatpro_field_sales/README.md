@@ -22,7 +22,8 @@ Menu **BeatPro**:
 | Routes | Supervisors (reps read only) | A board of routes by weekday, with each route's rep, shops and how often its visits end with an order |
 | Supervisor > Discount Approvals | Supervisors | Orders whose discount is above the rep's limit |
 | Supervisor > Visit Analysis | Supervisors | Visits by rep and result |
-| Supervisor > Settings | Admins | Cash and bank journals for field collections |
+| Supervisor > Payment Methods | Accounting managers | Which payment methods reps see, their names and what reps enter |
+| Supervisor > Settings | Admins | Links to payment methods and online payment providers |
 
 A rep whose discount is above their limit can't confirm the order; they click **Request
 Approval** and a supervisor clicks **Approve Discount**.
@@ -43,10 +44,23 @@ Set each rep's discount limit and van warehouse on the **BeatPro** tab of their 
 
 ## Field collections
 
-Cash goes to the cash journal and cheque or UPI to the bank journal set in BeatPro settings.
-If none is set, the first journal of that type is used. When a company has no cash journal
-(Odoo 19's Indian chart, for example), a **Field Cash** journal is created on the first cash collection.
-Payments are posted and matched with the invoices the rep selected.
+**Money received in hand.** Reps choose from the incoming payment methods of your cash and bank
+journals that are turned on under **BeatPro > Supervisor > Payment Methods** (or on each
+journal's Payment Methods tab). For each one you set:
+
+- **Show to BeatPro Reps**: whether it appears on the Collect Payment screen.
+- **Name for Reps**: e.g. "UPI", "Bank transfer". Cash journals show as "Cash".
+- **Reps Enter**: nothing, an optional transaction reference (UPI ID) or cheque number and date.
+
+The payment is posted to that journal and matched with the invoices the rep selected. The
+day-end close counts cash journals and cheque methods as money to hand in, and other bank
+methods as already in the bank. When a company has no cash journal (Odoo 19's Indian chart, for
+example), a **Field Cash** journal is created.
+
+**Online payment.** When an online payment provider (Razorpay, Stripe, PayPal and others) is
+enabled under Accounting > Configuration > Payment Providers, reps get **Pay online**: a QR code
+and link for one invoice. The customer pays on Odoo's invoice page and the provider marks the
+invoice paid. Online payments need the server's portal payments setting turned on.
 
 ## Mobile app API
 
@@ -55,13 +69,15 @@ and calls `POST /json/2/<model>/<method>` with `Authorization: bearer <key>`.
 
 | Model / method | Returns |
 | --- | --- |
-| `res.users` / `beatpro_app_context` | Rep, company, currency, discount limit, warehouse |
+| `res.users` / `beatpro_app_context` | Rep, company, currency, discount limit, warehouse, payment methods for reps, enabled online providers |
 | `beatpro.route` / `beatpro_today_plan` | Today's customers in visit order |
 | `product.pricelist` / `beatpro_prices(pricelist_ids, product_ids)` | `{pricelist: {product: unit price}}` for offline pricing |
 | `res.partner` / `beatpro_open_invoices(partner_ids)` | Unpaid invoices to collect against |
 | `<model>` / `beatpro_upsert(vals_list)` | `{mobile_uuid: id}`; records already received aren't created again (`res.partner`, `beatpro.visit`, `beatpro.day.close`) |
 | `sale.order` / `beatpro_submit_orders(vals_list)` | Creates and confirms orders, or leaves them waiting for discount approval |
-| `account.payment` / `beatpro_register_payment(vals_list)` | Records, posts and matches collections |
+| `account.payment` / `beatpro_register_payment(vals_list)` | Records, posts and matches collections on a `payment_method_line_id` from the app context |
+| `account.payment` / `beatpro_payment_link(invoice_id, amount)` | Link for the customer to pay an invoice online |
+| `account.payment` / `beatpro_invoice_status(invoice_ids)` | Whether invoices are paid, to follow an online payment |
 | `beatpro.day.close` / `action_close` | Totals and locks the day |
 
 Standard `search_read` is used to download customers, products and stock.

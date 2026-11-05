@@ -9,7 +9,7 @@
                 <field name="beatpro_method"/>
                 <field name="beatpro_cheque_number" invisible="beatpro_method != 'cheque'" required="beatpro_method == 'cheque'"/>
                 <field name="beatpro_cheque_date" invisible="beatpro_method != 'cheque'"/>
-                <field name="beatpro_upi_reference" invisible="beatpro_method != 'upi'"/>
+                <field name="beatpro_reference" invisible="not beatpro_reference"/>
                 <field name="beatpro_visit_id" readonly="1" invisible="not beatpro_visit_id"/>
             </field>
         </field>

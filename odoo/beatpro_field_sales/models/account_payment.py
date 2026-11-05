@@ -15,18 +15,28 @@ class AccountPayment(models.Model):
     beatpro_method = fields.Selection([
         ('cash', "Cash"),
         ('cheque', "Cheque"),
-        ('upi', "UPI"),
+        ('bank', "Bank"),
     ], string="Collected As", copy=False,
-        help="How the rep collected this payment in the field.")
+        help="How the day-end close counts this field collection: cash and cheques are handed in, "
+             "bank payments (UPI, transfers) are already in the bank.")
     beatpro_cheque_number = fields.Char(string="Cheque Number", copy=False)
     beatpro_cheque_date = fields.Date(string="Cheque Date", copy=False)
-    beatpro_upi_reference = fields.Char(string="UPI Reference", copy=False)
+    beatpro_reference = fields.Char(string="Transaction Reference", copy=False,
+                                    help="UPI transaction ID or other reference the rep entered.")
 
-    @api.constrains('beatpro_method', 'beatpro_cheque_number')
+    @api.constrains('payment_method_line_id', 'beatpro_user_id', 'beatpro_cheque_number')
     def _check_beatpro_cheque_number(self):
         for payment in self:
-            if payment.beatpro_method == 'cheque' and not payment.beatpro_cheque_number:
+            if (
+                payment.beatpro_user_id
+                and payment.payment_method_line_id.beatpro_reference == 'cheque'
+                and not payment.beatpro_cheque_number
+            ):
                 raise ValidationError(self.env._("Enter the cheque number for a cheque payment."))
+
+    def _beatpro_check_rep(self):
+        if not self.env.user.has_group('beatpro_field_sales.group_beatpro_rep'):
+            raise AccessError(self.env._("Only BeatPro reps and supervisors can record field collections."))
 
     @api.model
     def beatpro_register_payment(self, vals_list):
@@ -36,15 +46,15 @@ class AccountPayment(models.Model):
         accounting rights: the payment is created as superuser, limited to incoming
         customer payments, and stamped with the rep as collector.
 
-        Each dict in ``vals_list`` holds ``mobile_uuid``, ``partner_id``, ``amount``,
-        ``beatpro_method`` and optionally ``invoice_ids``, ``date``, ``beatpro_visit_id``,
-        ``memo``, cheque and UPI details.
+        Each dict in ``vals_list`` holds ``mobile_uuid``, ``partner_id``, ``amount`` and
+        ``payment_method_line_id`` (one of the company's payment methods for reps), and
+        optionally ``invoice_ids``, ``date``, ``beatpro_visit_id``, ``memo``,
+        ``beatpro_reference`` and cheque details. Apps from before payment methods came
+        from Odoo send ``beatpro_method`` (cash, cheque or upi) instead.
 
         :return: ``{mobile_uuid: payment id}``
         """
-        user = self.env.user
-        if not user.has_group('beatpro_field_sales.group_beatpro_rep'):
-            raise AccessError(self.env._("Only BeatPro reps and supervisors can record field collections."))
+        self._beatpro_check_rep()
         uuids = [vals.get('mobile_uuid') for vals in vals_list]
         if not all(uuids):
             raise UserError(self.env._("Every payment sent by the app needs a mobile ID."))
@@ -52,14 +62,20 @@ class AccountPayment(models.Model):
         Payment = self.sudo().with_context(active_test=False)
         result = {p.mobile_uuid: p.id for p in Payment.search([('mobile_uuid', 'in', uuids)])}
         company = self.env.company
+        allowed = company._beatpro_payment_methods()
         for vals in vals_list:
             if vals['mobile_uuid'] in result:
                 continue
             if vals.get('amount', 0.0) <= 0:
                 raise UserError(self.env._("The amount collected must be more than zero."))
-            method = vals.get('beatpro_method')
-            if method not in ('cash', 'cheque', 'upi'):
-                raise UserError(self.env._("Choose how the payment was collected: cash, cheque or UPI."))
+            if vals.get('payment_method_line_id'):
+                line = allowed.filtered(lambda l: l.id == vals['payment_method_line_id'])
+                if not line:
+                    raise UserError(self.env._("This payment method isn't available to reps any more. Sync and choose another."))
+            elif vals.get('beatpro_method'):
+                line = company._beatpro_method_line_for(vals['beatpro_method'])
+            else:
+                raise UserError(self.env._("Choose how the payment was collected."))
             partner = self.env['res.partner'].browse(vals['partner_id'])
             partner.check_access('read')
             if vals.get('beatpro_visit_id'):
@@ -69,7 +85,6 @@ class AccountPayment(models.Model):
             if any(inv.commercial_partner_id != commercial or inv.move_type != 'out_invoice' for inv in invoices):
                 raise UserError(self.env._("Payments can only settle this customer's invoices."))
 
-            journal = company._beatpro_journal_for(method)
             payment = Payment.create({
                 'mobile_uuid': vals['mobile_uuid'],
                 'payment_type': 'inbound',
@@ -77,15 +92,16 @@ class AccountPayment(models.Model):
                 'partner_id': partner.id,
                 'amount': vals['amount'],
                 'date': vals.get('date') or fields.Date.context_today(self),
-                'journal_id': journal.id,
+                'journal_id': line.journal_id.id,
+                'payment_method_line_id': line.id,
                 'company_id': company.id,
                 'memo': vals.get('memo') or ', '.join(invoices.mapped('name')) or False,
-                'beatpro_method': method,
-                'beatpro_user_id': user.id,
+                'beatpro_method': line._beatpro_kind(),
+                'beatpro_user_id': self.env.uid,
                 'beatpro_visit_id': vals.get('beatpro_visit_id') or False,
                 'beatpro_cheque_number': vals.get('beatpro_cheque_number') or False,
                 'beatpro_cheque_date': vals.get('beatpro_cheque_date') or False,
-                'beatpro_upi_reference': vals.get('beatpro_upi_reference') or False,
+                'beatpro_reference': vals.get('beatpro_reference') or vals.get('beatpro_upi_reference') or False,
             })
             payment.action_post()
             if invoices:
@@ -101,3 +117,54 @@ class AccountPayment(models.Model):
         lines |= invoices.filtered(lambda m: m.state == 'posted').line_ids.filtered_domain(domain)
         for account in lines.account_id:
             lines.filtered(lambda l: l.account_id == account).reconcile()
+
+    # -- Online payment ----------------------------------------------------------
+
+    def _beatpro_rep_invoice(self, invoice_id):
+        self._beatpro_check_rep()
+        invoice = self.env['account.move'].sudo().browse(invoice_id).exists()
+        if not invoice or invoice.move_type != 'out_invoice' or invoice.state != 'posted':
+            raise UserError(self.env._("This invoice can't be paid online."))
+        invoice.commercial_partner_id.with_user(self.env.user).check_access('read')
+        return invoice
+
+    @api.model
+    def beatpro_payment_link(self, invoice_id, amount=None):
+        """A link the customer opens to pay an invoice online with the company's payment
+        providers (Razorpay, Stripe and so on). The app shows it as a QR code.
+
+        :return: ``{'link', 'amount', 'invoice', 'providers', 'warning'}``
+        """
+        invoice = self._beatpro_rep_invoice(invoice_id)
+        if invoice.payment_state in ('paid', 'in_payment'):
+            raise UserError(self.env._("Invoice %s is already paid.", invoice.name))
+        providers = invoice.company_id._beatpro_online_providers()
+        if not providers:
+            raise UserError(self.env._("No online payment provider is enabled. An admin can enable one in Accounting settings."))
+        values = {'amount': amount} if amount else {}
+        wizard = self.env['payment.link.wizard'].sudo().with_context(
+            active_id=invoice.id, active_model='account.move').create(values)
+        return {
+            'link': wizard.link,
+            'amount': wizard.amount,
+            'invoice': invoice.name,
+            'providers': providers.mapped('name'),
+            'warning': wizard.warning_message or False,
+        }
+
+    @api.model
+    def beatpro_invoice_status(self, invoice_ids):
+        """Whether invoices have been paid, to check on an online payment.
+
+        :return: ``{invoice id (str): {'name', 'payment_state', 'amount_due', 'paid'}}``
+        """
+        result = {}
+        for invoice_id in invoice_ids:
+            invoice = self._beatpro_rep_invoice(invoice_id)
+            result[str(invoice.id)] = {
+                'name': invoice.name,
+                'payment_state': invoice.payment_state,
+                'amount_due': invoice.amount_residual,
+                'paid': invoice.payment_state in ('paid', 'in_payment'),
+            }
+        return result

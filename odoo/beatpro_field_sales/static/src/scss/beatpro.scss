@@ -88,7 +88,7 @@
         > span { display: block; height: 100%; border-radius: 4px; background: var(--bp-navy); } }
     .bp-bar-thin { height: 6px; }
     .bp-split { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden;
-        .bp-cash { background: var(--bp-navy); } .bp-upi { background: #4F86C6; } .bp-cheque { background: var(--bp-amber); } }
+        .bp-c0 { background: var(--bp-navy); } .bp-c1 { background: #4F86C6; } .bp-c2 { background: var(--bp-amber); } .bp-c3 { background: #8A99A8; } }
 
     .bp-avatar {
         width: 36px; height: 36px; border-radius: 50%; flex: none;

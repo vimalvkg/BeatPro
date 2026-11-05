@@ -26,6 +26,17 @@ class TestBeatpro(AccountTestInvoicingCommon):
         cls.product = cls.env['product.product'].create({
             'name': 'Biscuits Box', 'type': 'consu', 'list_price': 100.0, 'taxes_id': False,
         })
+        # Payment methods for reps: Cash, UPI (with a reference) and Cheques.
+        cls.cash_line = cls.company_data['default_journal_cash'].inbound_payment_method_line_ids[:1]
+        cls.upi_line = cls.company_data['default_journal_bank'].inbound_payment_method_line_ids[:1]
+        cls.upi_line.write({'beatpro_label': 'UPI', 'beatpro_reference': 'reference'})
+        cheques = cls.env['account.journal'].create({'name': 'Cheques', 'code': 'CHQ', 'type': 'bank'})
+        cls.cheque_line = cheques.inbound_payment_method_line_ids[:1]
+        cls.cheque_line.write({'beatpro_label': 'Cheque', 'beatpro_reference': 'cheque'})
+        (cls.env['account.payment.method.line'].search([
+            ('journal_id.company_id', '=', cls.env.company.id), ('payment_type', '=', 'inbound'),
+        ]) - cls.cash_line - cls.upi_line - cls.cheque_line).beatpro_show = False
+
         cls.route = cls.env['beatpro.route'].with_user(cls.supervisor).create({
             'name': 'Andheri East',
             'user_id': cls.rep.id,
@@ -133,7 +144,7 @@ class TestBeatpro(AccountTestInvoicingCommon):
         Payment = self.env['account.payment'].with_user(self.rep)
         vals = {
             'mobile_uuid': 'pay-1', 'partner_id': self.shop.id, 'amount': 500.0,
-            'beatpro_method': 'cash', 'beatpro_visit_id': visit.id, 'invoice_ids': invoice.ids,
+            'payment_method_line_id': self.cash_line.id, 'beatpro_visit_id': visit.id, 'invoice_ids': invoice.ids,
         }
         result = Payment.beatpro_register_payment([vals])
         self.assertEqual(Payment.beatpro_register_payment([vals]), result)
@@ -148,11 +159,11 @@ class TestBeatpro(AccountTestInvoicingCommon):
 
         with self.assertRaises(UserError):
             Payment.beatpro_register_payment([{
-                'mobile_uuid': 'pay-2', 'partner_id': self.shop.id, 'amount': 10.0, 'beatpro_method': 'card',
+                'mobile_uuid': 'pay-2', 'partner_id': self.shop.id, 'amount': 10.0, 'payment_method_line_id': 999999,
             }])
         with self.assertRaises(ValidationError):
             Payment.beatpro_register_payment([{
-                'mobile_uuid': 'pay-3', 'partner_id': self.shop.id, 'amount': 10.0, 'beatpro_method': 'cheque',
+                'mobile_uuid': 'pay-3', 'partner_id': self.shop.id, 'amount': 10.0, 'payment_method_line_id': self.cheque_line.id,
             }])
 
     def test_open_invoices(self):
@@ -211,7 +222,9 @@ class TestBeatpro(AccountTestInvoicingCommon):
             visit.with_user(self.rep).action_collect_payment()['res_id']).with_user(self.rep)
         self.assertEqual(wizard.amount_due, 400.0)
         wizard.line_ids.selected = True
-        wizard.write({'amount': 400.0, 'method': 'upi', 'upi_reference': 'UPI-98765'})
+        self.assertEqual([label for _value, label in wizard._selection_method()], ['Cash', 'UPI', 'Cheque'])
+        wizard.write({'amount': 400.0, 'method': str(self.upi_line.id), 'reference': 'UPI-98765'})
+        self.assertEqual(wizard.method_reference, 'reference')
         wizard.action_confirm()
         self.assertEqual(invoice.payment_state, 'paid')
 
@@ -223,7 +236,7 @@ class TestBeatpro(AccountTestInvoicingCommon):
         close = self.env['beatpro.day.close'].with_user(self.rep).create({})
         close.action_close()
         self.assertEqual((close.visit_count, close.order_count, close.order_amount), (1, 1, 400.0))
-        self.assertEqual((close.upi_amount, close.total_collected), (400.0, 400.0))
+        self.assertEqual((close.bank_amount, close.handover_amount, close.total_collected), (400.0, 0.0, 400.0))
 
     def test_reps_see_only_their_own_records(self):
         mine = self._visit(self.rep)
@@ -281,7 +294,7 @@ class TestBeatpro(AccountTestInvoicingCommon):
         visit.action_check_in(latitude=19.1137, longitude=72.8697)
         self.env['account.payment'].with_user(self.rep).beatpro_register_payment([{
             'mobile_uuid': 'panel-pay', 'partner_id': self.shop.id, 'amount': 120.0,
-            'beatpro_method': 'cash', 'beatpro_visit_id': visit.id,
+            'payment_method_line_id': self.cash_line.id, 'beatpro_visit_id': visit.id,
         }])
         data = visit.beatpro_panel_data()
         self.assertEqual(data['state'], 'in_progress')
@@ -327,4 +340,71 @@ class TestBeatpro(AccountTestInvoicingCommon):
         # Close the day from My Day opens today's close, not a second one.
         action = self.env['beatpro.day.close'].with_user(self.rep).action_open_today()
         self.assertEqual(action['res_id'], close.id)
+
+    # ------------------------------------------------------------------
+    # Payment methods from Odoo and online payment
+    # ------------------------------------------------------------------
+
+    def test_app_gets_payment_methods_from_odoo(self):
+        context = self.env['res.users'].with_user(self.rep).beatpro_app_context()
+        methods = context['payment_methods']
+        self.assertEqual([m['name'] for m in methods], ['Cash', 'UPI', 'Cheque'])
+        self.assertEqual([m['kind'] for m in methods], ['cash', 'bank', 'cheque'])
+        self.assertEqual([m['reference'] for m in methods], ['none', 'reference', 'cheque'])
+        self.assertEqual([m['hand_in'] for m in methods], [True, False, True])
+
+        self.upi_line.beatpro_show = False
+        names = [m['name'] for m in self.env['res.users'].with_user(self.rep).beatpro_app_context()['payment_methods']]
+        self.assertNotIn('UPI', names)
+        # A method hidden from reps can't be used, even by an app that still shows it.
+        with self.assertRaises(UserError):
+            self.env['account.payment'].with_user(self.rep).beatpro_register_payment([{
+                'mobile_uuid': 'hidden', 'partner_id': self.shop.id, 'amount': 5.0,
+                'payment_method_line_id': self.upi_line.id,
+            }])
+
+    def test_payment_recorded_on_chosen_method(self):
+        result = self.env['account.payment'].with_user(self.rep).beatpro_register_payment([{
+            'mobile_uuid': 'upi-1', 'partner_id': self.shop.id, 'amount': 75.0,
+            'payment_method_line_id': self.upi_line.id, 'beatpro_reference': '430912345678',
+        }])
+        payment = self.env['account.payment'].browse(result['upi-1'])
+        self.assertEqual(payment.payment_method_line_id, self.upi_line)
+        self.assertEqual(payment.journal_id, self.upi_line.journal_id)
+        self.assertEqual((payment.beatpro_method, payment.beatpro_reference), ('bank', '430912345678'))
+        panel = self._visit(self.rep)
+        self.assertEqual(self.upi_line.beatpro_display_name, 'UPI')
+        self.assertTrue(panel)
+
+    def test_online_payment_link(self):
+        invoice = self._invoice(640.0)
+        Payment = self.env['account.payment'].with_user(self.rep)
+        self.env['payment.provider'].search([('company_id', '=', self.env.company.id)]).state = 'disabled'
+        with self.assertRaises(UserError):
+            Payment.beatpro_payment_link(invoice.id)
+        self.assertFalse(self.env['res.users'].with_user(self.rep).beatpro_app_context()['online_providers'])
+
+        provider = self.env['payment.provider'].create({'name': 'Test Gateway', 'state': 'test', 'company_id': self.env.company.id})
+        self.assertEqual(self.env['res.users'].with_user(self.rep).beatpro_app_context()['online_providers'], ['Test Gateway'])
+        info = Payment.beatpro_payment_link(invoice.id)
+        self.assertIn('/my/invoices/', info['link'])
+        self.assertIn('access_token=', info['link'])
+        self.assertEqual((info['amount'], info['invoice'], info['providers']), (640.0, invoice.name, [provider.name]))
+        self.assertEqual(Payment.beatpro_payment_link(invoice.id, amount=200.0)['amount'], 200.0)
+        status = Payment.beatpro_invoice_status([invoice.id])[str(invoice.id)]
+        self.assertFalse(status['paid'])
+        self.assertEqual(status['amount_due'], 640.0)
+
+        # The same from the Odoo web form.
+        visit = self._visit(self.rep)
+        visit.action_check_in()
+        wizard = self.env['beatpro.payment.wizard'].browse(
+            visit.with_user(self.rep).action_collect_payment()['res_id']).with_user(self.rep)
+        self.assertTrue(wizard.online_enabled)
+        with self.assertRaises(UserError):
+            wizard.action_payment_link()  # no invoice selected
+        wizard.line_ids.filtered(lambda l: l.invoice_id == invoice.id).selected = True
+        wizard.action_payment_link()
+        self.assertIn('access_token=', wizard.online_link)
+        self.assertTrue(wizard.online_qr)
 

@@ -9,15 +9,11 @@
                 <app data-string="BeatPro" string="BeatPro" name="beatpro_field_sales"
                      groups="beatpro_field_sales.group_beatpro_supervisor">
                     <block title="Field Collections" name="beatpro_collections">
-                        <setting string="Journals" help="Where cash, cheque and UPI payments collected by reps are recorded">
-                            <div class="row mt-2">
-                                <label for="beatpro_cash_journal_id" string="Cash" class="col-lg-4 o_light_label"/>
-                                <field name="beatpro_cash_journal_id" class="col-lg-8"/>
-                            </div>
-                            <div class="row">
-                                <label for="beatpro_bank_journal_id" string="Cheque and UPI" class="col-lg-4 o_light_label"/>
-                                <field name="beatpro_bank_journal_id" class="col-lg-8"/>
-                            </div>
+                        <setting string="Payment methods for reps" help="Choose which incoming payment methods of your cash and bank journals reps can record, what they're called, and whether reps enter a reference or cheque details.">
+                            <button name="%(beatpro_field_sales.action_beatpro_payment_methods)d" type="action" string="Payment Methods" icon="oi-arrow-right" class="btn-link"/>
+                        </setting>
+                        <setting string="Online payments" help="Reps can show customers a QR code or share a link to pay an invoice online with the payment providers enabled here.">
+                            <button name="%(payment.action_payment_provider)d" type="action" string="Payment Providers" icon="oi-arrow-right" class="btn-link"/>
                         </setting>
                     </block>
                     <block title="Reps" name="beatpro_reps">

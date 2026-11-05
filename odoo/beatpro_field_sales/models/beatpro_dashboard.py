@@ -59,9 +59,11 @@ class BeatproDashboard(models.AbstractModel):
             ('company_id', '=', company.id), ('date', '=', today), ('state', '=', 'closed'),
         ])
 
-        by_method = {'cash': 0.0, 'upi': 0.0, 'cheque': 0.0}
+        # Split by the payment methods reps used, as named for them.
+        by_method = {}
         for payment in payments:
-            by_method[payment.beatpro_method] += payment.amount
+            label = payment.payment_method_line_id.beatpro_display_name or payment.journal_id.name
+            by_method[label] = by_method.get(label, 0.0) + payment.amount
         collected = sum(by_method.values())
         with_order = len(visits.filtered(lambda v: v.result == 'order'))
 
@@ -124,9 +126,9 @@ class BeatproDashboard(models.AbstractModel):
             'strike_rate': round(100 * with_order / len(visits)) if visits else 0,
             'collected': money(env, collected),
             'collected_split': [
-                {'key': key, 'label': label, 'amount': money(env, by_method[key]),
-                 'share': round(100 * by_method[key] / collected) if collected else 0}
-                for key, label in (('cash', self.env._("Cash")), ('upi', self.env._("UPI")), ('cheque', self.env._("Cheque")))
+                {'key': f'm{index}', 'color': index % 4, 'label': label, 'amount': money(env, amount),
+                 'share': round(100 * amount / collected) if collected else 0}
+                for index, (label, amount) in enumerate(sorted(by_method.items(), key=lambda kv: -kv[1]))
             ],
             'approval_count': len(waiting),
             'approval_value': money(env, sum(waiting.mapped('amount_total'))),

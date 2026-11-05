@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Payment methods reps can record money with -->
+    <record id="view_payment_method_line_beatpro_list" model="ir.ui.view">
+        <field name="name">account.payment.method.line.beatpro.list</field>
+        <field name="model">account.payment.method.line</field>
+        <field name="priority">30</field>
+        <field name="arch" type="xml">
+            <list string="Payment Methods for Reps" editable="bottom" create="0" delete="0">
+                <field name="journal_id" readonly="1"/>
+                <field name="name" readonly="1" string="Payment Method"/>
+                <field name="beatpro_show" widget="boolean_toggle"/>
+                <field name="beatpro_label" placeholder="e.g. UPI"/>
+                <field name="beatpro_reference"/>
+                <field name="beatpro_hand_in" string="Handed In"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_beatpro_payment_methods" model="ir.actions.act_window">
+        <field name="name">Payment Methods for Reps</field>
+        <field name="res_model">account.payment.method.line</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_payment_method_line_beatpro_list"/>
+        <field name="domain">[('payment_type', '=', 'inbound'), ('journal_id.type', 'in', ('cash', 'bank'))]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No incoming payment methods yet</p>
+            <p>Add payment methods to your cash and bank journals in Accounting. Each one you turn on here appears on the reps' Collect Payment screen.</p>
+        </field>
+    </record>
+
+    <record id="view_account_journal_form_beatpro" model="ir.ui.view">
+        <field name="name">account.journal.form.beatpro</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="account.view_account_journal_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='inbound_payment_method_line_ids']/list/field[@name='name']" position="after">
+                <field name="beatpro_show" string="BeatPro" widget="boolean_toggle" optional="show"/>
+                <field name="beatpro_label" optional="show"/>
+                <field name="beatpro_reference" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
