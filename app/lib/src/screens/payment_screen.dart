@@ -231,7 +231,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             }),
           if (method?.reference == 'reference') ...[
             const SizedBox(height: 16),
-            TextField(controller: _reference, decoration: InputDecoration(labelText: '${method!.name} transaction ID (optional)')),
+            TextField(controller: _reference, decoration: InputDecoration(labelText: '${method!.name} reference (optional)')),
           ],
           if (method?.reference == 'cheque') ...[
             const SizedBox(height: 16),

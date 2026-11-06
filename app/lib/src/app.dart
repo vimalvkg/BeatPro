@@ -9,10 +9,12 @@ import 'screens/customers_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/day_close_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/invoice_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/order_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/payment_screen.dart';
+import 'screens/printer_screen.dart';
 import 'screens/return_screen.dart';
 import 'screens/route_screen.dart';
 import 'screens/sign_in_screen.dart';
@@ -89,6 +91,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/van/load', builder: (_, _) => const VanLoadScreen()),
       GoRoute(path: '/van/unload', builder: (_, _) => const VanUnloadScreen()),
       GoRoute(path: '/dashboard', builder: (_, _) => const DashboardScreen()),
+      GoRoute(
+        path: '/invoice/:uuid',
+        builder: (_, state) => InvoiceScreen(
+          orderUuid: state.pathParameters['uuid']!,
+          justPlaced: state.uri.queryParameters['placed'] == '1',
+        ),
+      ),
+      GoRoute(path: '/printer', builder: (_, _) => const PrinterScreen()),
       GoRoute(path: '/sync', builder: (_, _) => const SyncScreen()),
       GoRoute(path: '/day-close', builder: (_, _) => const DayCloseScreen()),
     ],

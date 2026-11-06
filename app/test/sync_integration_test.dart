@@ -196,6 +196,17 @@ void main() {
     expect((serverOrder['picking_ids'] as List).length, 2, reason: 'one delivery from the van, one from the warehouse');
     expect((serverOrder['user_id'] as List).first, context.userId);
 
+    // With invoicing at the shop on, Odoo posted the van part with the number the phone printed.
+    final localInvoice = (await repo.invoiceFor(order.uuid));
+    if (context.vanInvoice != null) {
+      expect(localInvoice, isNotNull, reason: 'the van handed something over');
+      final serverInvoice = (await client.searchRead('account.move', domain: [
+        ['name', '=', localInvoice!.name],
+      ], fields: ['state', 'amount_total', 'beatpro_van_id'])).single;
+      expect(serverInvoice['state'], 'posted');
+      expect((serverInvoice['amount_total'] as num).toDouble(), closeTo(localInvoice.total, 0.05));
+    }
+
     final serverReturn = (await client.searchRead('beatpro.shop.return', domain: [
       ['id', '=', (await db.record(ret.uuid))!.serverId],
     ], fields: ['state', 'amount_total', 'credit_note_id'])).single;

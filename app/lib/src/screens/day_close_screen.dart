@@ -100,7 +100,7 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Expanded(child: _HandInPart(label: 'Cash', amount: money(cash))),
                   Expanded(child: _HandInPart(label: 'Cheque', amount: money(cheque), note: '$cheques ${cheques == 1 ? 'cheque' : 'cheques'}')),
-                  Expanded(child: _HandInPart(label: 'Bank and UPI', amount: money(bank), note: 'already in bank')),
+                  Expanded(child: _HandInPart(label: 'Bank and card', amount: money(bank), note: 'already in bank')),
                 ]),
               ]),
             ),

@@ -41,6 +41,14 @@ class MoreScreen extends ConsumerWidget {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push('/van'),
         ),
+        if (ref.watch(printerServiceProvider).available)
+          ListTile(
+            leading: const Icon(Icons.print_outlined),
+            title: const Text('Printer'),
+            subtitle: const Text('Bluetooth thermal printer for invoices'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/printer'),
+          ),
         ListTile(
           leading: const Icon(Icons.nightlight_outlined),
           title: const Text('Close the day'),

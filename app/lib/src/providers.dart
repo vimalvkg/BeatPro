@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'core/local_db.dart';
 import 'core/models.dart';
 import 'core/odoo_client.dart';
+import 'core/printer.dart';
 import 'core/repository.dart';
 import 'core/services.dart';
 import 'core/sync_service.dart';
@@ -18,6 +19,9 @@ final locationProvider = Provider<LocationService>((ref) => const GpsLocationSer
 
 /// The HTTP client used to reach Odoo; tests swap in a fake server.
 final httpClientProvider = Provider<http.Client?>((ref) => null);
+
+/// The Bluetooth thermal printer; tests swap in a fake.
+final printerServiceProvider = Provider<PrinterService>((ref) => const BluetoothPrinterService());
 
 final repositoryProvider = Provider<Repository>((ref) => Repository(ref.watch(localDbProvider)));
 

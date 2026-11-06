@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
+import 'invoice.dart';
 import 'local_db.dart';
 import 'models.dart';
 
@@ -91,6 +92,40 @@ class VanStockView {
     if (local != null && local.state != SyncState.synced) return local.data['selfLoad'] != true;
     return serverLoad?['state'] == 'sent';
   }
+}
+
+/// The rep's thermal printer, kept on the phone.
+class PrinterSettings {
+  PrinterSettings({this.address, this.name, this.paper = '80', this.autoPrint = false, this.copies = 1});
+
+  final String? address;
+  final String? name;
+
+  /// '80' or '58' mm.
+  final String paper;
+  final bool autoPrint;
+  final int copies;
+
+  bool get ready => address != null;
+
+  PrinterSettings copyWith({String? address, String? name, String? paper, bool? autoPrint, int? copies}) => PrinterSettings(
+        address: address ?? this.address,
+        name: name ?? this.name,
+        paper: paper ?? this.paper,
+        autoPrint: autoPrint ?? this.autoPrint,
+        copies: copies ?? this.copies,
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'address': address, 'name': name, 'paper': paper, 'autoPrint': autoPrint, 'copies': copies};
+
+  static PrinterSettings fromJson(Map<String, dynamic> j) => PrinterSettings(
+        address: j['address'] as String?,
+        name: j['name'] as String?,
+        paper: j['paper'] as String? ?? '80',
+        autoPrint: j['autoPrint'] == true,
+        copies: j['copies'] as int? ?? 1,
+      );
 }
 
 /// One line of goods a shop gives back.
@@ -259,6 +294,7 @@ class Repository {
         ],
         'deliveryMode': delivery?.code,
         'vanLines': {for (final e in vanLines.entries) '${e.key}': e.value},
+        'invoice': await _invoiceFor(customerKey, lines, vanLines),
         'untaxed': totals.untaxed,
         'tax': totals.tax,
         'total': totals.total,
@@ -465,6 +501,93 @@ class Repository {
     }
     return result;
   }
+
+  // -- Invoices made at the shop ------------------------------------------------
+
+  /// The tax invoice for what the van hands over, numbered in the van's own
+  /// series so it can be printed without signal. Null when the van hands over
+  /// nothing or invoicing at the shop is off.
+  Future<Map<String, dynamic>?> _invoiceFor(String customerKey, List<CartLine> lines, Map<int, double> vanLines) async {
+    final context = await appContext();
+    final series = context?.vanInvoice;
+    if (series == null || vanLines.isEmpty) return null;
+    final customer = await db.customer(customerKey);
+    final left = Map.of(vanLines);
+    final items = <Map<String, dynamic>>[];
+    var untaxed = 0.0;
+    var tax = 0.0;
+    for (final l in lines) {
+      final qty = (left[l.product.id] ?? 0) < l.qty ? (left[l.product.id] ?? 0) : l.qty;
+      if (qty <= 0) continue;
+      left[l.product.id] = (left[l.product.id] ?? 0) - qty;
+      final amount = ShopInvoice.round2(qty * l.unitPrice * (1 - l.discount / 100));
+      final vat = ShopInvoice.round2(amount * l.product.taxPercent / 100);
+      untaxed += amount;
+      tax += vat;
+      items.add({
+        'name': l.product.name,
+        'qty': qty,
+        'price': l.unitPrice,
+        'discount': l.discount,
+        'vat': l.product.taxPercent,
+        'amount': amount,
+      });
+    }
+    if (items.isEmpty) return null;
+    final previous = (await db.invoices(customerKey: customerKey)).fold<double>(0, (s, i) => s + i.amountDue);
+    final name = await _nextInvoiceName(series);
+    final van = context?.van;
+    return {
+      'name': name,
+      'date': todayIso,
+      'time': '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+      'simplified': (customer?.vat ?? '').isEmpty,
+      'currency': context?.currencyCode ?? 'AED',
+      'company': series.company,
+      'customer': {'name': customer?.name ?? '', 'city': customer?.city, 'trn': customer?.vat},
+      'van': [van?.vehicle, context?.userName].whereType<String>().join(' / '),
+      'lines': items,
+      'untaxed': ShopInvoice.round2(untaxed),
+      'tax': ShopInvoice.round2(tax),
+      'total': ShopInvoice.round2(untaxed + tax),
+      'previous': ShopInvoice.round2(previous),
+    };
+  }
+
+  /// The van series' next number: Odoo's next number, or further on if this
+  /// phone has already used numbers Odoo hasn't seen yet.
+  Future<String> _nextInvoiceName(VanInvoiceSeries series) async {
+    final year = startOfToday.year;
+    final key = 'inv_next:${series.journal}/$year';
+    final stored = int.tryParse(await db.getValue(key) ?? '') ?? 1;
+    final serverNext = series.year == year ? series.next : 1;
+    final number = stored > serverNext ? stored : serverNext;
+    await db.setValue(key, '${number + 1}');
+    return series.nameFor(year, number);
+  }
+
+  /// Odoo's next number after a sync: never go back to a number already used here.
+  Future<void> rememberInvoiceSeries(VanInvoiceSeries series) async {
+    final key = 'inv_next:${series.journal}/${series.year}';
+    final stored = int.tryParse(await db.getValue(key) ?? '') ?? 1;
+    if (series.next > stored) await db.setValue(key, '${series.next}');
+  }
+
+  Future<ShopInvoice?> invoiceFor(String orderUuid) async {
+    final order = await db.record(orderUuid);
+    final raw = order?.data['invoice'];
+    return raw is Map ? ShopInvoice(raw.cast<String, dynamic>()) : null;
+  }
+
+  // -- Printer settings ------------------------------------------------------------
+
+  Future<PrinterSettings> printerSettings() async {
+    final raw = await db.getValue('printer');
+    final paper = (await appContext())?.vanInvoice?.paper ?? '80';
+    return raw == null ? PrinterSettings(paper: paper) : PrinterSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+  }
+
+  Future<void> savePrinterSettings(PrinterSettings settings) => db.setValue('printer', jsonEncode(settings.toJson()));
 
   // -- Payments -------------------------------------------------------------
 

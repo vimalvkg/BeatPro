@@ -129,7 +129,9 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           );
       ref.read(dataVersionProvider.notifier).bump();
       if (widget.visitUuid == null) unawaited(ref.read(syncControllerProvider.notifier).run());
-      if (mounted) context.pushReplacement('/orders/${order.uuid}');
+      if (!mounted) return;
+      // A van delivery comes with its tax invoice: show it, to print or share.
+      context.pushReplacement(order.data['invoice'] is Map ? '/invoice/${order.uuid}?placed=1' : '/orders/${order.uuid}');
     } catch (e) {
       if (mounted) showMessage(context, describeError(e), error: true);
     } finally {
@@ -186,9 +188,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                     final have = inVan ?? p.qtyAvailable;
                     return ListTile(
                       title: Text(p.name),
-                      subtitle: Row(children: [
+                      subtitle: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                         Text(money(_priceOf(p)), style: const TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 8),
                         StatusChip(
                           have > 0
                               ? '${formatQty(have)} ${inVan != null ? 'in van' : 'in stock'}'

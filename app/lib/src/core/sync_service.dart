@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'local_db.dart';
 import 'models.dart';
 import 'odoo_client.dart';
+import 'repository.dart';
 
 /// What a sync did, for the Sync screen.
 class SyncReport {
@@ -60,7 +61,7 @@ class SyncService {
         ['beatpro_route_line_ids.route_id.user_id', '=', app.userId],
         ['create_uid', '=', app.userId],
       ],
-      fields: ['name', 'phone', 'street', 'city', 'partner_latitude', 'partner_longitude', 'property_product_pricelist'],
+      fields: ['name', 'phone', 'street', 'city', 'vat', 'partner_latitude', 'partner_longitude', 'property_product_pricelist'],
       order: 'name',
     );
     final customers = customerRows.map(Customer.fromOdoo).toList();
@@ -141,6 +142,7 @@ class SyncService {
     await db.setValue('load_suggestion', loadSuggestion == null ? null : jsonEncode(loadSuggestion));
     await db.setValue('return_candidates', jsonEncode(candidates));
     await db.setValue('context', jsonEncode(context));
+    if (app.vanInvoice != null) await Repository(db).rememberInvoiceSeries(app.vanInvoice!);
     await db.replaceDownloaded(
       customers: customers,
       products: products,
@@ -246,6 +248,10 @@ class SyncService {
               'beatpro_visit_id': visitId ?? false,
               'note': r.data['note'] ?? false,
               if (r.data['deliveryMode'] != null) 'beatpro_delivery_mode': r.data['deliveryMode'],
+              if (r.data['invoice'] is Map) ...{
+                'beatpro_van_invoice_name': (r.data['invoice'] as Map)['name'],
+                'beatpro_van_invoice_date': (r.data['invoice'] as Map)['date'],
+              },
               'order_line': [
                 for (final l in (r.data['lines'] as List).cast<Map<String, dynamic>>())
                   [
@@ -267,6 +273,14 @@ class SyncService {
             'odooState': info['state'],
             'approval': info['approval'] == false ? null : info['approval'],
             'amountTotal': info['amount_total'],
+            if (r.data['invoice'] is Map && info['invoice'] is Map)
+              'invoice': {
+                ...(r.data['invoice'] as Map).cast<String, dynamic>(),
+                'name': (info['invoice'] as Map)['name'],
+                'synced': true,
+                if ((info['invoice'] as Map)['name'] != (r.data['invoice'] as Map)['name'])
+                  'renumberedFrom': (r.data['invoice'] as Map)['name'],
+              },
           },
         ));
         return true;

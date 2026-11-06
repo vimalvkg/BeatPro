@@ -20,6 +20,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:beatpro/src/widgets/scanner.dart';
 
 import 'support/fake_odoo.dart';
+import 'support/fake_printer.dart';
 import 'support/fake_scanner.dart';
 
 Future<void> _loadFonts() async {
@@ -43,6 +44,11 @@ Future<void> _loadFonts() async {
     manrope.addFont(Future.value(ByteData.sublistView(File('assets/fonts/Manrope-$w.ttf').readAsBytesSync())));
   }
   await manrope.load();
+  final arabic = FontLoader('NotoNaskhArabic');
+  for (final w in ['Regular', 'Bold']) {
+    arabic.addFont(Future.value(ByteData.sublistView(File('assets/fonts/NotoNaskhArabic-$w.ttf').readAsBytesSync())));
+  }
+  await arabic.load();
 }
 
 Future<void> _loadImages(WidgetTester tester) async {
@@ -97,7 +103,7 @@ void main() {
 
     // Sign in.
     expect(find.text("Sign in to your company's Odoo"), findsOneWidget);
-    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
     await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await screen('sign-in');
@@ -139,7 +145,7 @@ void main() {
     // Take an order: 2 cases of Maggi at the customer's price, 1 box of Parle-G.
     await tester.tap(find.text('Take order'));
     await tester.pumpAndSettle();
-    expect(find.text('₹560.00'), findsOneWidget, reason: "Maggi at the customer's price list price");
+    expect(find.text('AED 560.00'), findsOneWidget, reason: "Maggi at the customer's price list price");
     Finder addButtonFor(String product) => find.descendant(
         of: find.widgetWithText(ListTile, product), matching: find.widgetWithText(OutlinedButton, 'Add'));
     await tester.tap(addButtonFor('Maggi Noodles (Case of 48)'));
@@ -150,28 +156,28 @@ void main() {
     await tester.tap(find.textContaining('Review'));
     await screen('cart');
     // 2 × 560 + 240 = 1,360 before tax; 18% GST = 244.80.
-    expect(find.text('₹1,360.00'), findsOneWidget);
-    expect(find.text('₹244.80'), findsOneWidget);
+    expect(find.text('AED 1,360.00'), findsOneWidget);
+    expect(find.text('AED 244.80'), findsOneWidget);
     await tester.tap(find.textContaining('Place order'));
     await screen('order');
     expect(find.text('Waiting to sync'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // Collect the overdue invoice by UPI.
+    // Collect the overdue invoice by bank transfer.
     await tester.tap(find.text('Collect payment'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('INV/2026/00042'));
-    await tester.tap(find.text('UPI'));
+    await tester.tap(find.text('Bank transfer'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextField, 'UPI transaction ID (optional)'), '430912345678');
+    await tester.enterText(find.widgetWithText(TextField, 'Bank transfer reference (optional)'), '430912345678');
     expect(find.text('Cheque'), findsOneWidget, reason: 'payment methods come from Odoo');
     await screen('payment');
-    expect(find.text('Record ₹1,200.00 by UPI'), findsOneWidget);
-    await tester.tap(find.text('Record ₹1,200.00 by UPI'));
+    expect(find.text('Record AED 1,200.00 by Bank transfer'), findsOneWidget);
+    await tester.tap(find.text('Record AED 1,200.00 by Bank transfer'));
     await tester.pumpAndSettle();
     expect(find.text('IN THIS VISIT'), findsOneWidget);
-    expect(find.text('UPI payment'), findsOneWidget);
+    expect(find.text('Bank transfer payment'), findsOneWidget);
     await screen('visit-with-order');
 
     // Check out: the visit, order and payment go to Odoo.
@@ -188,7 +194,7 @@ void main() {
     expect((orderVals['order_line'] as List).length, 2);
     final paymentVals = odoo.uploaded['account.payment']!.single;
     expect(paymentVals['amount'], 1200.0);
-    expect(paymentVals['payment_method_line_id'], 32, reason: "the UPI method set up in Odoo");
+    expect(paymentVals['payment_method_line_id'], 32, reason: 'the bank transfer method set up in Odoo');
     expect(paymentVals['invoice_ids'], [77]);
     expect(paymentVals['beatpro_reference'], '430912345678');
 
@@ -234,7 +240,7 @@ void main() {
       child: const RepaintBoundary(key: appKey, child: BeatproApp()),
     ));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
     // Users with two-step sign-in paste an API key instead.
     await tester.tap(find.text('Two-step sign-in? Use an API key'));
     await tester.pumpAndSettle();
@@ -303,7 +309,7 @@ void main() {
       await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/$name.png'));
     }
 
-    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
     await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
@@ -330,7 +336,7 @@ void main() {
     router.push('/van');
     await tester.pumpAndSettle();
     expect(find.text('36 cases'), findsOneWidget);
-    expect(find.text('₹15,920.00 at sale price'), findsOneWidget);
+    expect(find.text('AED 15,920.00 at sale price'), findsOneWidget);
     await screen('16-van-stock');
 
     // At Patel Kirana: 6 Parle-G from the van, 1 Surf Excel the van doesn't carry.
@@ -383,7 +389,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Goes back into the van, can be sold again'), findsOneWidget);
     await screen('18-shop-return');
-    await tester.tap(find.text('Take back 5 items · ₹1,680.00 credit'));
+    await tester.tap(find.text('Take back 5 items · AED 1,680.00 credit'));
     await tester.pumpAndSettle();
 
     await repo.checkOut(visit.uuid, result: VisitResult.order);
@@ -444,18 +450,18 @@ void main() {
       child: const RepaintBoundary(key: appKey, child: BeatproApp()),
     ));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
-    await tester.enterText(find.widgetWithText(TextFormField, 'Database (optional)'), 'mumbai');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Database (optional)'), 'gulffoods');
     await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
-    expect(odoo.signIns.last['header_db'], 'mumbai', reason: 'Odoo picks the database from this header');
+    expect(odoo.signIns.last['header_db'], 'gulffoods', reason: 'Odoo picks the database from this header');
     expect(find.text('Van Sales Dashboard', skipOffstage: false), findsOneWidget, reason: 'a card on My Day');
     container.read(routerProvider).push('/dashboard');
     await tester.pumpAndSettle();
-    expect(find.text('₹75,484.00'), findsWidgets);
+    expect(find.text('AED 75,484.00'), findsWidgets);
     expect(find.text('↑ 12.5% vs last period'), findsOneWidget);
     expect(find.text('↓ 2.0% vs last period'), findsOneWidget);
     if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
@@ -494,7 +500,7 @@ void main() {
       child: const RepaintBoundary(key: appKey, child: BeatproApp()),
     ));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
     await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
@@ -549,8 +555,8 @@ void main() {
     await tester.tap(find.byTooltip('Scan barcodes'));
     await tester.pumpAndSettle();
     expect(scanner.feedback.last.message, 'Amul Butter 100g (Pack of 20) · 2 taken back');
-    expect(find.text('Take back 2 items · ₹960.00 credit'), findsOneWidget);
-    await tester.tap(find.text('Take back 2 items · ₹960.00 credit'));
+    expect(find.text('Take back 2 items · AED 960.00 credit'), findsOneWidget);
+    await tester.tap(find.text('Take back 2 items · AED 960.00 credit'));
     await tester.pumpAndSettle();
     await repo.checkOut(visit.uuid, result: VisitResult.order);
     await container.read(syncControllerProvider.notifier).run();
@@ -574,6 +580,122 @@ void main() {
     await db.close();
   });
 
+  testWidgets('a van delivery is invoiced and printed at the shop', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..withVan = true;
+    final printer = FakePrinter();
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+      printerServiceProvider.overrideWithValue(printer),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+    final year = DateTime.now().year;
+
+    // Load the van.
+    await repo.requestLoad({for (final p in await repo.db.products()) p: 10});
+    await container.read(syncControllerProvider.notifier).run();
+    odoo.storekeeperLoads();
+    await container.read(syncControllerProvider.notifier).run();
+
+    // Patel Kirana has a TRN: a full tax invoice, numbered from the van's series without signal.
+    odoo.offline = true;
+    final visit = await repo.startVisit('srv:9');
+    router.push('/order/new?customer=srv%3A9&visit=${visit.uuid}');
+    await tester.pumpAndSettle();
+    Finder inTile(String product, Finder f) => find.descendant(of: find.widgetWithText(ListTile, product), matching: f);
+    await tester.tap(inTile('Parle-G Biscuits (Box of 24)', find.widgetWithText(OutlinedButton, 'Add')));
+    await tester.pump();
+    await tester.tap(inTile('Parle-G Biscuits (Box of 24)', find.byTooltip('More')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Review'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Deliver now ·'));
+    await tester.pumpAndSettle();
+
+    final number = 'VAN1/$year/00147';
+    expect(find.text(number), findsWidgets);
+    expect(find.text('TAX INVOICE'), findsOneWidget);
+    expect(find.text('TRN 100987654300003'), findsOneWidget);
+    expect(find.text('TRN 100234567800003'), findsOneWidget);
+    expect(find.text('VAT 18%'), findsOneWidget);
+    // 2 × 240 = 480 + 18% = 566.40.
+    expect(find.text('566.40'), findsWidgets);
+    expect(find.text('Not synced yet'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/22-invoice.png'));
+    }
+
+    // First print: choose the printer, then the slip goes to it.
+    await tester.scrollUntilVisible(find.text('Print'), 300, scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('Print'));
+    await tester.pumpAndSettle();
+    expect(find.text('Printer'), findsOneWidget);
+    await tester.tap(find.text('BT-58 Thermal'));
+    await tester.pumpAndSettle();
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/23-printer.png'));
+    }
+    // Done: back on the invoice, it prints straight away.
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Done'));
+      for (var i = 0; i < 20 && printer.jobs.isEmpty; i++) {
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Printed on BT-58 Thermal'), findsOneWidget);
+    expect(printer.jobs, hasLength(1));
+    final job = printer.jobs.single;
+    expect(job.sublist(0, 2), [0x1B, 0x40]);
+    expect(job.sublist(2, 6), [0x1D, 0x76, 0x30, 0x00], reason: 'the slip prints as an image');
+    expect(job[6] + job[7] * 256, 72, reason: '80 mm paper: 576 dots = 72 bytes a row');
+
+    // A second van delivery offline takes the next number.
+    final second = await repo.placeOrder(
+      customerKey: 'srv:9',
+      visitUuid: visit.uuid,
+      delivery: DeliveryMode.van,
+      lines: [CartLine(product: (await repo.db.products()).first, unitPrice: 240, qty: 1)],
+    );
+    expect((second.data['invoice'] as Map)['name'], 'VAN1/$year/00148');
+
+    // Back online: Odoo keeps the first number; the second was used meanwhile and gets another.
+    odoo.offline = false;
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    await container.read(syncControllerProvider.notifier).run();
+    expect(odoo.uploaded['sale.order']!.first['beatpro_van_invoice_name'], number);
+    odoo.renumberInvoices = true;
+    await repo.db.saveRecord((await repo.db.record(second.uuid))!.copyWith(state: SyncState.pending));
+    await container.read(syncControllerProvider.notifier).run();
+    final renumbered = (await repo.invoiceFor(second.uuid))!;
+    expect(renumbered.name, 'VAN1/2026/00999');
+    expect(renumbered.renumberedFrom, 'VAN1/$year/00148');
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
   testWidgets('work done offline waits on the phone, then syncs', (tester) async {
     final odoo = FakeOdoo();
     // Real file access must run outside the test's fake clock.
@@ -590,7 +712,7 @@ void main() {
     addTearDown(container.dispose);
     await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const BeatproApp()));
     await tester.pumpAndSettle();
-    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
     await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));

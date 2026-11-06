@@ -15,6 +15,9 @@ class FakeOdoo {
   /// The rep has a van (MH 02 AB 4521), loaded from the main warehouse.
   bool withVan = false;
 
+  /// Odoo gives van invoices another number than the phone's (it was used meanwhile).
+  bool renumberInvoices = false;
+
   /// The user is a supervisor with the Van Sales Dashboard.
   bool supervisor = false;
 
@@ -76,7 +79,7 @@ class FakeOdoo {
     signIns.add({...params, 'header_db': request.headers['X-Odoo-Database']});
     final ok = params['login'] == 'ravi@beatpro.test' && params['password'] == 'ravi123';
     final result = ok
-        ? {'api_key': 'k' * 40, 'database': 'mumbai', 'expires': '2027-11-06'}
+        ? {'api_key': 'k' * 40, 'database': 'gulffoods', 'expires': '2027-11-06'}
         : {'error': 'Wrong login or password.'};
     return http.Response.bytes(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': null, 'result': result})), 200,
         headers: {'content-type': 'application/json; charset=utf-8'});
@@ -89,22 +92,30 @@ class FakeOdoo {
           'user_id': 5,
           'name': 'Ravi Kumar',
           'partner_id': 6,
-          'lang': 'en_IN',
-          'tz': 'Asia/Kolkata',
+          'lang': 'en_US',
+          'tz': 'Asia/Dubai',
           'company_id': 1,
-          'company_name': 'Mumbai Distributors Pvt Ltd',
-          'currency': {'id': 20, 'name': 'INR', 'symbol': '₹', 'position': 'before', 'decimals': 2},
+          'company_name': 'Gulf Foods Distribution LLC',
+          'currency': {'id': 130, 'name': 'AED', 'symbol': 'د.إ', 'position': 'after', 'decimals': 2},
           'is_rep': true,
           'is_supervisor': false,
           'discount_limit': 5.0,
           'payment_methods': [
             {'id': 31, 'name': 'Cash', 'journal': 'Field Cash', 'kind': 'cash', 'reference': 'none', 'hand_in': true},
-            {'id': 32, 'name': 'UPI', 'journal': 'Bank', 'kind': 'bank', 'reference': 'reference', 'hand_in': false},
+            {'id': 32, 'name': 'Bank transfer', 'journal': 'Bank', 'kind': 'bank', 'reference': 'reference', 'hand_in': false},
             {'id': 33, 'name': 'Cheque', 'journal': 'Cheques', 'kind': 'cheque', 'reference': 'cheque', 'hand_in': true},
           ],
           'online_providers': ['Razorpay'],
           if (withVan) ...{
             'van': {'id': 3, 'name': 'Van 1 · Ravi Kumar', 'vehicle': 'MH 02 AB 4521', 'main_warehouse': 'Main warehouse', 'self_load': false},
+            'van_invoice': {
+              'journal': 'VAN1',
+              'year': DateTime.now().year,
+              'next': 147,
+              'padding': 5,
+              'paper': '80',
+              'company': {'name': 'Gulf Foods Distribution LLC', 'trn': '100234567800003', 'address': 'Al Quoz Industrial 3, Dubai', 'phone': '+971 4 330 1234'},
+            },
             'return_reasons': [
               {'value': 'damaged', 'label': 'Damaged', 'resellable': false},
               {'value': 'expired', 'label': 'Expired', 'resellable': false},
@@ -133,7 +144,8 @@ class FakeOdoo {
               'city': s['city'],
               'partner_latitude': s['lat'],
               'partner_longitude': s['lng'],
-              'property_product_pricelist': [1, 'Default (INR)'],
+              'property_product_pricelist': [1, 'Default (AED)'],
+              'vat': s['id'] == 9 ? '100987654300003' : false,
             },
         ];
       case 'product.product.search_read':
@@ -184,10 +196,10 @@ class FakeOdoo {
           'greeting_name': 'Meena Shah',
           'company': 'Mumbai Distributors Pvt Ltd',
           'kpis': [
-            {'key': 'sales', 'label': 'Total sales', 'value': week ? '₹75,484.00' : '₹4,86,240.00', 'trend': 12.5, 'spark': [0, 10, 8, 30, 12, 18, 24], 'icon': 'fa-line-chart'},
+            {'key': 'sales', 'label': 'Total sales', 'value': week ? 'AED 75,484.00' : 'AED 4,86,240.00', 'trend': 12.5, 'spark': [0, 10, 8, 30, 12, 18, 24], 'icon': 'fa-line-chart'},
             {'key': 'orders', 'label': 'Orders', 'value': week ? '5' : '243', 'trend': 8.7, 'spark': [0, 1, 1, 3, 0, 0, 0], 'icon': 'fa-shopping-bag'},
             {'key': 'shops', 'label': 'Active shops', 'value': '4', 'trend': -2.0, 'spark': [0, 1, 1, 3, 0, 0, 0], 'icon': 'fa-users'},
-            {'key': 'collected', 'label': 'Collected', 'value': '₹34,600.00', 'trend': null, 'spark': [0, 10, 8, 30, 12, 18, 24], 'icon': 'fa-database'},
+            {'key': 'collected', 'label': 'Collected', 'value': 'AED 34,600.00', 'trend': null, 'spark': [0, 10, 8, 30, 12, 18, 24], 'icon': 'fa-database'},
           ],
           'chart': [
             for (final (i, d) in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexed)
@@ -201,22 +213,22 @@ class FakeOdoo {
             {'name': 'Dairy', 'share': 20},
             {'name': 'Others', 'share': 15},
           ],
-          'sales_total': '₹75,484.00',
+          'sales_total': 'AED 75,484.00',
           'top_shops': [
-            {'id': 9, 'name': 'Patel Kirana', 'amount': '₹33,312.00'},
-            {'id': 8, 'name': 'Sharma General Store', 'amount': '₹20,112.00'},
+            {'id': 9, 'name': 'Patel Kirana', 'amount': 'AED 33,312.00'},
+            {'id': 8, 'name': 'Sharma General Store', 'amount': 'AED 20,112.00'},
           ],
           'routes_sales': [
-            {'name': 'Andheri East', 'amount': '₹38,612.00', 'pct': 100},
-            {'name': 'Powai', 'amount': '₹26,872.00', 'pct': 70},
+            {'name': 'Andheri East', 'amount': 'AED 38,612.00', 'pct': 100},
+            {'name': 'Powai', 'amount': 'AED 26,872.00', 'pct': 70},
           ],
-          'collected': '₹34,600.00',
-          'due': '₹13,500.00',
-          'collect_total': '₹48,100.00',
+          'collected': 'AED 34,600.00',
+          'due': 'AED 13,500.00',
+          'collect_total': 'AED 48,100.00',
           'collected_pct': 72,
           'activity': [
-            {'kind': 'order', 'text': 'Order S00243 · Patel Kirana · ₹9,824.00', 'time': '06 Nov, 04:25 PM'},
-            {'kind': 'payment', 'text': '₹1,200.00 collected · Sharma General Store', 'time': '06 Nov, 03:50 PM'},
+            {'kind': 'order', 'text': 'Order S00243 · Patel Kirana · AED 9,824.00', 'time': '06 Nov, 04:25 PM'},
+            {'kind': 'payment', 'text': 'AED 1,200.00 collected · Sharma General Store', 'time': '06 Nov, 03:50 PM'},
             {'kind': 'alert', 'text': 'Farah Khan: unload 1 short', 'time': '06 Nov, 03:30 PM'},
           ],
         };
@@ -293,7 +305,17 @@ class FakeOdoo {
                   row['left'] = row['left']! - qty;
                 }
               }
-              return {'id': _nextId++, 'name': 'S0004${_nextId % 10}', 'state': 'sale', 'approval': false, 'amount_total': 1321.6};
+              final invoiceName = v['beatpro_van_invoice_name'];
+              return {
+                'id': _nextId++,
+                'name': 'S0004${_nextId % 10}',
+                'state': 'sale',
+                'approval': false,
+                'amount_total': 1321.6,
+                'invoice': invoiceName == null
+                    ? false
+                    : {'id': _nextId++, 'name': renumberInvoices ? 'VAN1/2026/00999' : invoiceName, 'amount_total': 504.0},
+              };
             }(),
         };
       case 'account.payment.beatpro_register_payment':
@@ -311,7 +333,7 @@ class FakeOdoo {
         return true;
       case 'account.payment.beatpro_payment_link':
         return {
-          'link': 'https://mumbai.example.com/my/invoices/${body['invoice_id']}?access_token=abc123',
+          'link': 'https://gulffoods.example.com/my/invoices/${body['invoice_id']}?access_token=abc123',
           'amount': body['amount'] ?? 1200.0,
           'invoice': 'INV/2026/00042',
           'providers': ['Razorpay'],

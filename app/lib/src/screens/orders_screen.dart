@@ -95,7 +95,10 @@ class OrderDetailScreen extends ConsumerWidget {
                       context: context,
                       builder: (c) => AlertDialog(
                         title: const Text('Cancel this order?'),
-                        content: const Text("It hasn't reached Odoo yet, so it's removed from the phone."),
+                        content: Text(order.data['invoice'] is Map
+                            ? "It hasn't reached Odoo yet, so it's removed from the phone. Its invoice "
+                                '${(order.data['invoice'] as Map)['name']} is void: take back the printed slip.'
+                            : "It hasn't reached Odoo yet, so it's removed from the phone."),
                         actions: [
                           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Keep')),
                           FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Cancel order')),
@@ -140,6 +143,16 @@ class OrderDetailScreen extends ConsumerWidget {
               subtitle: Text(order.state == SyncState.synced ? 'As confirmed by Odoo' : 'Estimate until it syncs'),
               trailing: Text(money(total), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             ),
+            if (order.data['invoice'] is Map)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  onPressed: () => context.push('/invoice/$uuid'),
+                  icon: const Icon(Icons.receipt_outlined),
+                  label: Text('Invoice ${(order.data['invoice'] as Map)['name']} · print or share'),
+                ),
+              ),
             if ((order.data['note'] as String?)?.isNotEmpty ?? false)
               Section(title: 'Note', child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text(order.data['note'] as String))),
           ]),

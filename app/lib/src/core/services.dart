@@ -89,7 +89,7 @@ class FixedLocationService implements LocationService {
   Future<GeoPoint?> current() async => point;
 }
 
-/// Formats amounts in the company currency, Indian digit grouping for INR.
+/// Formats amounts in the company currency: "AED 1,200.00" for dirhams.
 class Money {
   Money(this.context);
 
@@ -100,6 +100,8 @@ class Money {
     final decimals = context?.currencyDecimals ?? 2;
     final locale = symbol == '₹' ? 'en_IN' : 'en_US';
     final number = NumberFormat.decimalPatternDigits(locale: locale, decimalDigits: decimals).format(amount);
+    // UAE reps and shops write dirhams as "AED 1,200.00", not with the Arabic sign.
+    if (context?.currencyCode == 'AED') return 'AED $number';
     if (symbol.isEmpty) return number;
     return (context?.currencyBefore ?? true) ? '$symbol$number' : '$number $symbol';
   }

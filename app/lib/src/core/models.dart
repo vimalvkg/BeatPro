@@ -24,6 +24,10 @@ class AppContext {
   /// The Van Sales Dashboard is on this server and this user may open it (supervisors).
   bool get hasSalesDashboard => json['sales_dashboard'] == true;
 
+  /// The van's invoice series, when reps invoice van deliveries at the shop.
+  VanInvoiceSeries? get vanInvoice =>
+      json['van_invoice'] is Map ? VanInvoiceSeries((json['van_invoice'] as Map).cast<String, dynamic>()) : null;
+
   /// The rep's van, or null for reps without one.
   VanInfo? get van => json['van'] is Map ? VanInfo((json['van'] as Map).cast<String, dynamic>()) : null;
 
@@ -47,6 +51,7 @@ class AppContext {
   /// Online payment providers enabled in Odoo (Razorpay, Stripe…). Empty: no online payment.
   List<String> get onlineProviders => (json['online_providers'] as List?)?.cast<String>() ?? const [];
   String get currencySymbol => (json['currency'] as Map)['symbol'] as String? ?? '';
+  String get currencyCode => (json['currency'] as Map)['name'] as String? ?? '';
   bool get currencyBefore => (json['currency'] as Map)['position'] != 'after';
   int get currencyDecimals => (json['currency'] as Map)['decimals'] as int? ?? 2;
 }
@@ -65,6 +70,7 @@ class Customer {
     this.latitude,
     this.longitude,
     this.pricelistId,
+    this.vat,
   });
 
   final String key;
@@ -78,6 +84,9 @@ class Customer {
   final double? longitude;
   final int? pricelistId;
 
+  /// The shop's tax number (UAE: TRN). Shops without one get a simplified tax invoice.
+  final String? vat;
+
   bool get isLocal => key.startsWith('loc:');
 
   static Customer fromOdoo(Map<String, dynamic> r) => Customer(
@@ -90,6 +99,7 @@ class Customer {
         latitude: _num(r['partner_latitude']) == 0 ? null : _num(r['partner_latitude']),
         longitude: _num(r['partner_longitude']) == 0 ? null : _num(r['partner_longitude']),
         pricelistId: _m2oId(r['property_product_pricelist']),
+        vat: _str(r['vat']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -103,6 +113,7 @@ class Customer {
         'latitude': latitude,
         'longitude': longitude,
         'pricelistId': pricelistId,
+        'vat': vat,
       };
 
   static Customer fromJson(Map<String, dynamic> j) => Customer(
@@ -116,6 +127,7 @@ class Customer {
         latitude: (j['latitude'] as num?)?.toDouble(),
         longitude: (j['longitude'] as num?)?.toDouble(),
         pricelistId: j['pricelistId'] as int?,
+        vat: j['vat'] as String?,
       );
 }
 
@@ -262,6 +274,25 @@ enum DeliveryMode {
 
   final String code;
   final String label;
+}
+
+/// The van's own invoice series in Odoo (for example VAN1/2026/00001), so the
+/// phone can number invoices without signal.
+class VanInvoiceSeries {
+  VanInvoiceSeries(this.json);
+
+  final Map<String, dynamic> json;
+
+  String get journal => json['journal'] as String;
+  int get year => json['year'] as int;
+  int get next => json['next'] as int;
+  int get padding => json['padding'] as int? ?? 5;
+
+  /// '80' or '58': the thermal paper width set in Odoo.
+  String get paper => json['paper'] as String? ?? '80';
+  Map<String, dynamic> get company => (json['company'] as Map?)?.cast<String, dynamic>() ?? const {};
+
+  String nameFor(int year, int number) => '$journal/$year/${number.toString().padLeft(padding, '0')}';
 }
 
 /// The rep's van, from Odoo.
@@ -454,18 +485,18 @@ class PaymentMethod {
 
   static const legacy = [
     PaymentMethod(name: 'Cash', kind: 'cash', handIn: true, legacyCode: 'cash'),
-    PaymentMethod(name: 'UPI', kind: 'bank', reference: 'reference', legacyCode: 'upi'),
+    PaymentMethod(name: 'Bank transfer', kind: 'bank', reference: 'reference', legacyCode: 'upi'),
     PaymentMethod(name: 'Cheque', kind: 'cheque', reference: 'cheque', handIn: true, legacyCode: 'cheque'),
   ];
 }
 
 /// How the day-end close groups collections.
-const collectionKinds = <String, String>{'cash': 'Cash', 'cheque': 'Cheque', 'bank': 'Bank and UPI'};
+const collectionKinds = <String, String>{'cash': 'Cash', 'cheque': 'Cheque', 'bank': 'Bank and card'};
 
 /// The name of the method a payment record was taken with.
 String paymentMethodName(Map<String, dynamic> data) =>
     (data['methodName'] as String?) ??
-    const {'cash': 'Cash', 'cheque': 'Cheque', 'upi': 'UPI'}[data['method']] ??
+    const {'cash': 'Cash', 'cheque': 'Cheque', 'upi': 'Bank transfer'}[data['method']] ??
     'Payment';
 
 /// `cash`, `cheque` or `bank` for a payment record, including ones made before

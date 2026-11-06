@@ -48,6 +48,9 @@ dependencies:
   share_plus: ^13.3.1
   mobile_scanner: ^7.5.0
   sqflite_common_ffi: ^2.4.5
+  print_bluetooth_thermal: ^1.2.5
+  pdf: ^3.13.1
+  permission_handler: ^13.0.2
 
 dev_dependencies:
   flutter_test:
@@ -87,6 +90,13 @@ flutter:
           weight: 700
         - asset: assets/fonts/Manrope-ExtraBold.ttf
           weight: 800
+    # Arabic on invoices and slips. Noto Naskh Arabic, SIL Open Font License
+    # (assets/fonts/OFL-NotoNaskhArabic.txt).
+    - family: NotoNaskhArabic
+      fonts:
+        - asset: assets/fonts/NotoNaskhArabic-Regular.ttf
+        - asset: assets/fonts/NotoNaskhArabic-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:
