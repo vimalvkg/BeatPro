@@ -74,7 +74,11 @@ class OdooCredentials {
       response = await client
           .post(
             Uri.parse('$base/beatpro/app/login'),
-            headers: {'Content-Type': 'application/json; charset=utf-8'},
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              // With several databases, Odoo only finds the BeatPro sign-in for the database named here.
+              if (database.isNotEmpty) 'X-Odoo-Database': database,
+            },
             body: jsonEncode({
               'jsonrpc': '2.0',
               'method': 'call',
@@ -105,8 +109,12 @@ class OdooCredentials {
     if (response.statusCode != 200 || json == null || json['result'] is! Map) {
       if (response.statusCode >= 502) throw OfflineException('HTTP ${response.statusCode}');
       throw OdooException(
-        "This Odoo server can't sign the app in with a password. Check the address, or ask your "
-        'administrator to update the BeatPro module.',
+        response.statusCode == 404 && database.isEmpty
+            ? "Odoo didn't find the BeatPro sign-in. If your server has several databases, enter the "
+                  'database name. Otherwise check the address, or ask your administrator to install or '
+                  'update the BeatPro module.'
+            : "This Odoo server can't sign the app in with a password. Check the address and database, or ask "
+                  'your administrator to install or update the BeatPro module.',
         statusCode: response.statusCode,
       );
     }

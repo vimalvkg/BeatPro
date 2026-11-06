@@ -114,6 +114,7 @@ void main() {
     expect(session.login, 'ravi@beatpro.test');
     expect(session.toJson().values, isNot(contains('ravi123')));
     expect(odoo.signIns.last['device'], matches(RegExp(r'· [0-9a-f]{6}$')));
+    expect(odoo.signIns.last['header_db'], isNull, reason: 'no database entered');
 
     // Home.
     expect(find.text('My Day'), findsOneWidget);
@@ -444,11 +445,13 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Database (optional)'), 'mumbai');
     await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
     await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
+    expect(odoo.signIns.last['header_db'], 'mumbai', reason: 'Odoo picks the database from this header');
     expect(find.text('Van Sales Dashboard', skipOffstage: false), findsOneWidget, reason: 'a card on My Day');
     container.read(routerProvider).push('/dashboard');
     await tester.pumpAndSettle();

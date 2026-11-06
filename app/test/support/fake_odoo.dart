@@ -73,7 +73,7 @@ class FakeOdoo {
   http.Response _appLogin(http.Request request) {
     calls.add('app_login');
     final params = (jsonDecode(request.body) as Map<String, dynamic>)['params'] as Map<String, dynamic>;
-    signIns.add(params);
+    signIns.add({...params, 'header_db': request.headers['X-Odoo-Database']});
     final ok = params['login'] == 'ravi@beatpro.test' && params['password'] == 'ravi123';
     final result = ok
         ? {'api_key': 'k' * 40, 'database': 'mumbai', 'expires': '2027-11-06'}
