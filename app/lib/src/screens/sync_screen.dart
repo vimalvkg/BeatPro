@@ -7,13 +7,16 @@ import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-const _kindLabels = {
-  RecordKind.customer: 'New customer',
-  RecordKind.visit: 'Visit',
-  RecordKind.order: 'Order',
-  RecordKind.payment: 'Payment',
-  RecordKind.dayClose: 'Day-end close',
-};
+/// A name for each kind of record. A switch, so a new kind can't be left out.
+String _kindLabel(LocalRecord r) => switch (r.kind) {
+      RecordKind.customer => 'New customer',
+      RecordKind.visit => 'Visit',
+      RecordKind.order => 'Order',
+      RecordKind.payment => 'Payment',
+      RecordKind.dayClose => 'Day-end close',
+      RecordKind.shopReturn => 'Goods taken back',
+      RecordKind.vanTransfer => r.data['kind'] == 'unload' ? 'Van unload' : 'Van load',
+    };
 
 class SyncScreen extends ConsumerWidget {
   const SyncScreen({super.key});
@@ -54,7 +57,7 @@ class SyncScreen extends ConsumerWidget {
             child: Column(children: [
               for (final r in waiting)
                 ListTile(
-                  title: Text(_kindLabels[r.kind]!),
+                  title: Text(_kindLabel(r)),
                   subtitle: Text(r.error ??
                       (r.kind == RecordKind.visit && r.data['state'] == 'in_progress'
                           ? 'Syncs after you check out'
@@ -74,7 +77,7 @@ class SyncScreen extends ConsumerWidget {
               ListTile(
                 dense: true,
                 leading: const Icon(Icons.check, color: BeatproColors.success),
-                title: Text(_kindLabels[r.kind]!),
+                title: Text(_kindLabel(r)),
                 subtitle: Text((r.data['name'] as String?) ?? formatTime(r.createdAt)),
               ),
           ]),

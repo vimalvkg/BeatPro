@@ -841,6 +841,16 @@ void main() {
       delivery: DeliveryMode.van,
       lines: [CartLine(product: biscuits, unitPrice: 240, qty: 2)],
     );
+    // The Sync screen lists everything waiting, goods taken back and van loads included.
+    await repo.requestLoad({biscuits: 24});
+    router.push('/sync');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Goods taken back'), findsOneWidget);
+    expect(find.text('Van load'), findsWidgets);
+    router.pop();
+    await tester.pumpAndSettle();
+
     router.push('/invoice/${order.uuid}');
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('Collect payment ·'));
