@@ -93,12 +93,24 @@ void main() {
     }
 
     // Sign in.
-    expect(find.text("Connect to your company's Odoo"), findsOneWidget);
+    expect(find.text("Sign in to your company's Odoo"), findsOneWidget);
     await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
-    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await screen('sign-in');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'wrong');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
+    expect(find.text('Wrong login or password.'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    // Odoo made a key for this phone; the password is not kept.
+    final session = container.read(sessionProvider)!;
+    expect(session.apiKey, 'k' * 40);
+    expect(session.login, 'ravi@beatpro.test');
+    expect(session.toJson().values, isNot(contains('ravi123')));
+    expect(odoo.signIns.last['device'], matches(RegExp(r'· [0-9a-f]{6}$')));
 
     // Home.
     expect(find.text('My Day'), findsOneWidget);
@@ -219,6 +231,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    // Users with two-step sign-in paste an API key instead.
+    await tester.tap(find.text('Two-step sign-in? Use an API key'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
@@ -285,7 +300,8 @@ void main() {
     }
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
-    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
     final router = container.read(routerProvider);
@@ -425,7 +441,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
-    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
@@ -467,7 +484,8 @@ void main() {
     await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const BeatproApp()));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
-    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
@@ -479,6 +497,21 @@ void main() {
     expect(report!.offlineMessage, isNotNull);
     expect(await repo.pendingCount(), 1);
     expect(odoo.uploaded, isEmpty);
+
+    // Signing in again (e.g. after the key expired) keeps the work on the phone.
+    odoo.offline = false;
+    container.read(routerProvider).push('/sign-in-again');
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in again'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.ensureVisible(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final loginsBefore = odoo.signIns.length;
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    expect(odoo.signIns.length, loginsBefore + 1);
+    expect(find.text('Sign in again'), findsNothing, reason: 'back where the rep was');
+    expect(await tester.runAsync(() => repo.pendingCount()), 1);
 
     odoo.offline = false;
     final second = await container.read(syncControllerProvider.notifier).run();

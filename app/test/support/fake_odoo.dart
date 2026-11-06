@@ -54,6 +54,7 @@ class FakeOdoo {
 
   Future<http.Response> _handle(http.Request request) async {
     if (offline) throw http.ClientException('No signal');
+    if (request.url.path == '/beatpro/app/login') return _appLogin(request);
     final parts = request.url.path.split('/'); // /json/2/<model>/<method>
     final model = parts[3];
     final method = parts[4];
@@ -63,6 +64,21 @@ class FakeOdoo {
       return http.Response(jsonEncode({'name': 'odoo.exceptions.AccessDenied', 'message': 'Access Denied'}), 401);
     }
     return http.Response.bytes(utf8.encode(jsonEncode(_answer(model, method, body))), 200,
+        headers: {'content-type': 'application/json; charset=utf-8'});
+  }
+
+  /// Devices that signed in with a password, with the database they asked for.
+  final signIns = <Map<String, dynamic>>[];
+
+  http.Response _appLogin(http.Request request) {
+    calls.add('app_login');
+    final params = (jsonDecode(request.body) as Map<String, dynamic>)['params'] as Map<String, dynamic>;
+    signIns.add(params);
+    final ok = params['login'] == 'ravi@beatpro.test' && params['password'] == 'ravi123';
+    final result = ok
+        ? {'api_key': 'k' * 40, 'database': 'mumbai', 'expires': '2027-11-06'}
+        : {'error': 'Wrong login or password.'};
+    return http.Response.bytes(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': null, 'result': result})), 200,
         headers: {'content-type': 'application/json; charset=utf-8'});
   }
 

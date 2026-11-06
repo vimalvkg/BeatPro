@@ -43,6 +43,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
+      GoRoute(path: '/sign-in-again', builder: (_, _) => const SignInScreen(again: true)),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => _TabsShell(shell: shell),
         branches: [

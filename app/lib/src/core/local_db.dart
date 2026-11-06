@@ -235,7 +235,9 @@ class LocalDb {
 
   /// Removes everything, for signing out.
   Future<void> clear() async {
-    for (final table in ['kv', 'customers', 'products', 'prices', 'stops', 'invoices', 'records']) {
+    // The phone's own ID stays, so Odoo keeps recognising this phone.
+    await _db.delete('kv', where: 'key != ?', whereArgs: ['install_id']);
+    for (final table in ['customers', 'products', 'prices', 'stops', 'invoices', 'records']) {
       await _db.delete(table);
     }
   }

@@ -59,7 +59,7 @@ class MoreScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.dns_outlined),
               title: const Text('Odoo'),
-              subtitle: Text([session?.url, session?.database].whereType<String>().where((s) => s.isNotEmpty).join(' · ')),
+              subtitle: Text([session?.login, session?.url, session?.database].whereType<String>().where((s) => s.isNotEmpty).join(' · ')),
             ),
             ListTile(
               leading: const Icon(Icons.percent),
@@ -72,6 +72,12 @@ class MoreScreen extends ConsumerWidget {
                 title: const Text('Supervisor'),
                 subtitle: const Text('Approve discounts and reopen closed days in Odoo'),
               ),
+            ListTile(
+              leading: const Icon(Icons.login),
+              title: const Text('Sign in again'),
+              subtitle: const Text('When Odoo says your sign-in expired. Keeps your work on the phone.'),
+              onTap: () => context.push('/sign-in-again'),
+            ),
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Sign out'),

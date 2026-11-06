@@ -29,17 +29,22 @@ class OfflineException implements Exception {
   String toString() => "Can't reach Odoo right now. Your work is saved on the phone.";
 }
 
-/// Connection details for one Odoo database, signed in with a user API key.
+/// Connection details for one Odoo database. The app always talks to Odoo
+/// with an API key: either one the user pasted, or one Odoo made for this
+/// phone when the user signed in with their login and password.
 class OdooCredentials {
-  const OdooCredentials({required this.url, required this.database, required this.apiKey});
+  const OdooCredentials({required this.url, required this.database, required this.apiKey, this.login});
 
   final String url;
   final String database;
   final String apiKey;
 
+  /// The login the user signed in with, when they used a password.
+  final String? login;
+
   String get baseUrl => url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
-  Map<String, String> toJson() => {'url': url, 'database': database, 'apiKey': apiKey};
+  Map<String, String> toJson() => {'url': url, 'database': database, 'apiKey': apiKey, 'login': ?login};
 
   static OdooCredentials? fromJson(Map<String, dynamic>? json) {
     if (json == null || json['url'] == null || json['apiKey'] == null) return null;
@@ -47,6 +52,71 @@ class OdooCredentials {
       url: json['url'] as String,
       database: (json['database'] as String?) ?? '',
       apiKey: json['apiKey'] as String,
+      login: json['login'] as String?,
+    );
+  }
+
+  /// Signs in with the user's Odoo login and password. Odoo checks them and
+  /// returns an API key made for this phone; the password is not kept.
+  static Future<OdooCredentials> signInWithPassword({
+    required String url,
+    required String database,
+    required String login,
+    required String password,
+    required String device,
+    http.Client? httpClient,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final base = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+    final client = httpClient ?? http.Client();
+    final http.Response response;
+    try {
+      response = await client
+          .post(
+            Uri.parse('$base/beatpro/app/login'),
+            headers: {'Content-Type': 'application/json; charset=utf-8'},
+            body: jsonEncode({
+              'jsonrpc': '2.0',
+              'method': 'call',
+              'params': {
+                'login': login,
+                'password': password,
+                'db': database.isEmpty ? null : database,
+                'device': device,
+              },
+            }),
+          )
+          .timeout(timeout);
+    } on SocketException catch (e) {
+      throw OfflineException(e);
+    } on TimeoutException catch (e) {
+      throw OfflineException(e);
+    } on http.ClientException catch (e) {
+      throw OfflineException(e);
+    } finally {
+      if (httpClient == null) client.close();
+    }
+    Map<String, dynamic>? json;
+    try {
+      json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {
+      json = null;
+    }
+    if (response.statusCode != 200 || json == null || json['result'] is! Map) {
+      if (response.statusCode >= 502) throw OfflineException('HTTP ${response.statusCode}');
+      throw OdooException(
+        "This Odoo server can't sign the app in with a password. Check the address, or ask your "
+        'administrator to update the BeatPro module.',
+        statusCode: response.statusCode,
+      );
+    }
+    final result = json['result'] as Map<String, dynamic>;
+    if (result['error'] != null) throw OdooException(result['error'] as String);
+    return OdooCredentials(
+      url: url,
+      database: (result['database'] as String?) ?? database,
+      apiKey: result['api_key'] as String,
+      login: login,
     );
   }
 }
@@ -125,6 +195,12 @@ class OdooClient {
   }
 
   OdooException _error(int status, String text) {
+    if (status == 401) {
+      return OdooException(
+        'Your sign-in has expired or was turned off in Odoo. Open More > Sign in again.',
+        statusCode: status,
+      );
+    }
     try {
       final json = jsonDecode(text) as Map<String, dynamic>;
       final message = (json['message'] as String?)?.trim();

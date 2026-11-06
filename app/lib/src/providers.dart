@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 
 import 'core/local_db.dart';
@@ -44,6 +47,37 @@ class SessionNotifier extends Notifier<OdooCredentials?> {
     await SyncService(db, client).download();
     await ref.read(credentialStoreProvider).write(credentials);
     state = credentials;
+  }
+
+  /// Signs in with the user's Odoo login and password: Odoo returns an API key
+  /// for this phone, which is kept instead of the password.
+  Future<void> signInWithPassword({
+    required String url,
+    required String database,
+    required String login,
+    required String password,
+  }) async {
+    final credentials = await OdooCredentials.signInWithPassword(
+      url: url,
+      database: database,
+      login: login,
+      password: password,
+      device: await _deviceName(),
+      httpClient: ref.read(httpClientProvider),
+    );
+    await signIn(credentials);
+  }
+
+  /// "Android · a1b2c3": tells this phone's key apart in the user's Odoo profile.
+  Future<String> _deviceName() async {
+    final db = ref.read(localDbProvider);
+    var id = await db.getValue('install_id');
+    if (id == null) {
+      id = const Uuid().v4().substring(0, 6);
+      await db.setValue('install_id', id);
+    }
+    final os = Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iPhone' : Platform.operatingSystem;
+    return '$os · $id';
   }
 
   Future<void> signOut() async {

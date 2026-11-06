@@ -2,6 +2,7 @@
 //
 //   BEATPRO_ODOO_URL=http://127.0.0.1:8069 BEATPRO_ODOO_DB=beatpro_e2e \
 //   BEATPRO_ODOO_KEY=<rep API key> flutter test test/sync_integration_test.dart
+// or, instead of the key, BEATPRO_ODOO_LOGIN=<login> BEATPRO_ODOO_PASSWORD=<password>.
 //
 // Skipped when BEATPRO_ODOO_URL isn't set.
 import 'dart:io';
@@ -18,12 +19,26 @@ void main() {
   final env = Platform.environment;
   final url = env['BEATPRO_ODOO_URL'];
 
+  // An API key (BEATPRO_ODOO_KEY), or a login and password (BEATPRO_ODOO_LOGIN,
+  // BEATPRO_ODOO_PASSWORD) that Odoo exchanges for a key, as the sign-in screen does.
+  Future<OdooCredentials> credentials() async {
+    final database = env['BEATPRO_ODOO_DB'] ?? '';
+    if (env['BEATPRO_ODOO_LOGIN'] != null) {
+      final signedIn = await OdooCredentials.signInWithPassword(
+        url: url!,
+        database: database,
+        login: env['BEATPRO_ODOO_LOGIN']!,
+        password: env['BEATPRO_ODOO_PASSWORD'] ?? '',
+        device: 'integration test',
+      );
+      expect(signedIn.apiKey, isNotEmpty);
+      return signedIn;
+    }
+    return OdooCredentials(url: url!, database: database, apiKey: env['BEATPRO_ODOO_KEY']!);
+  }
+
   test('a rep works a full day offline, then syncs to Odoo', () async {
-    final client = OdooClient(OdooCredentials(
-      url: url!,
-      database: env['BEATPRO_ODOO_DB'] ?? '',
-      apiKey: env['BEATPRO_ODOO_KEY']!,
-    ));
+    final client = OdooClient(await credentials());
     sqfliteFfiInit();
     final db = await LocalDb.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
     final repo = Repository(db);
@@ -127,11 +142,7 @@ void main() {
 
   // Needs a rep with a loaded van and no unload yet today.
   test('a van day: deliver from the van, take goods back, unload', () async {
-    final client = OdooClient(OdooCredentials(
-      url: url!,
-      database: env['BEATPRO_ODOO_DB'] ?? '',
-      apiKey: env['BEATPRO_ODOO_KEY']!,
-    ));
+    final client = OdooClient(await credentials());
     sqfliteFfiInit();
     final db = await LocalDb.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
     final repo = Repository(db);

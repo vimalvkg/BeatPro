@@ -14,7 +14,12 @@ does is saved on the phone and sent to Odoo when there's signal.
 
 ## What a rep can do
 
-- **Sign in** with the Odoo address and an API key (Odoo: profile > Security > New API Key).
+- **Sign in** with the Odoo address and the rep's Odoo email (or username) and password. Odoo checks
+  them and gives the phone an API key of its own; the password is not kept on the phone. The key is
+  listed on the user's Odoo profile (Security tab) as "BeatPro app · <phone>", where it can be
+  revoked, and lasts a year (system parameter `beatpro_field_sales.app_key_days`). Users with
+  two-step sign-in paste an API key instead. **More > Sign in again** renews an expired or revoked
+  sign-in without losing work on the phone.
   Only users in the BeatPro Rep or Supervisor group can sign in.
 - **My Day** (home): progress ring with the day's orders and collections, the next shop with Start visit,
   directions and call, and today's route with each shop's status.
@@ -73,10 +78,12 @@ flutter analyze
 flutter test                      # screen flow tests against a fake Odoo
 ```
 
-Against a real Odoo 19 server with the module installed and a rep's API key:
+Against a real Odoo 19 server with the module installed, as a rep (login and password, or
+`BEATPRO_ODOO_KEY=<API key>` instead):
 
 ```bash
-BEATPRO_ODOO_URL=http://127.0.0.1:8069 BEATPRO_ODOO_DB=mydb BEATPRO_ODOO_KEY=... \
+BEATPRO_ODOO_URL=http://127.0.0.1:8069 BEATPRO_ODOO_DB=mydb \
+  BEATPRO_ODOO_LOGIN=rep@example.com BEATPRO_ODOO_PASSWORD=... \
   flutter test test/sync_integration_test.dart
 ```
 
