@@ -179,7 +179,7 @@ class TestBeatproVan(AccountTestInvoicingCommon):
         self.assertEqual(result['amount_total'], 3 * 240 + 2 * 280)
         ret = self.env['beatpro.shop.return'].browse(result['id'])
         self.assertEqual(ret.credit_note_id.move_type, 'out_refund')
-        self.assertEqual(ret.credit_note_id.state, 'draft')
+        self.assertEqual(ret.credit_note_id.state, 'posted', 'The credit note counts at once')
         self.assertEqual(ret.credit_note_id.amount_total, 1280.0)
         self.assertEqual(self.qty(self.biscuits, self.van.lot_stock_id), 15)
         self.assertEqual(self.qty(self.salt, self.van.lot_stock_id), 10)
@@ -342,3 +342,68 @@ class TestBeatproVanInvoice(TestBeatproVan):
 
         action = invoice.action_beatpro_print_slip()
         self.assertEqual(action['report_name'], 'beatpro_field_sales.report_invoice_slip_80')
+
+    def test_collection_settles_shop_invoice_and_credit_notes(self):
+        """A payment collected for an invoice printed at the shop settles that invoice,
+        and credit notes for goods taken back can be used against invoices."""
+        self._loaded_van()
+        cash = self.company_data['default_journal_cash'].inbound_payment_method_line_ids[:1]
+        Order = self.env['sale.order'].with_user(self.rep)
+        Payment = self.env['account.payment'].with_user(self.rep)
+
+        def van_order(uuid, qty):
+            return Order.beatpro_submit_orders([{
+                'mobile_uuid': uuid, 'partner_id': self.shop.id, 'beatpro_delivery_mode': 'van',
+                'beatpro_van_invoice_name': 'X',
+                'order_line': [Command.create({'product_id': self.biscuits.id, 'product_uom_qty': qty})],
+            }])[uuid]['invoice']
+
+        # The phone doesn't know the invoice's id: it names the order it was printed for.
+        info = van_order('pay-ord-1', 2)
+        Payment.beatpro_register_payment([{
+            'mobile_uuid': 'pay-a', 'partner_id': self.shop.id, 'amount': info['amount_total'],
+            'payment_method_line_id': cash.id, 'order_uuids': ['pay-ord-1'],
+        }])
+        invoice = self.env['account.move'].browse(info['id'])
+        self.assertIn(invoice.payment_state, ('paid', 'in_payment'))
+
+        # Goods taken back: a posted credit note the shop can use later.
+        ret = self.env['beatpro.shop.return'].with_user(self.rep).beatpro_submit_returns([{
+            'mobile_uuid': 'pay-ret-1', 'partner_id': self.shop.id,
+            'line_ids': [Command.create({'product_id': self.biscuits.id, 'qty': 1, 'reason': 'expired', 'price_unit': 240.0})],
+        }])['pay-ret-1']
+        credit_note = self.env['beatpro.shop.return'].browse(ret['id']).credit_note_id
+        self.assertEqual(credit_note.state, 'posted')
+        open_items = self.env['res.partner'].with_user(self.rep).beatpro_open_invoices(self.shop.ids)
+        credit = next(i for i in open_items if i['id'] == credit_note.id)
+        self.assertEqual(credit['kind'], 'credit_note')
+        self.assertAlmostEqual(credit['amount_due'], -252.0)
+
+        # Next invoice: the credit note pays part of it, cash the rest.
+        info = van_order('pay-ord-2', 3)
+        self.assertAlmostEqual(info['amount_total'], 756.0)
+        Payment.beatpro_register_payment([{
+            'mobile_uuid': 'pay-b', 'partner_id': self.shop.id, 'amount': 504.0,
+            'payment_method_line_id': cash.id, 'order_uuids': ['pay-ord-2'], 'return_uuids': ['pay-ret-1'],
+        }])
+        invoice = self.env['account.move'].browse(info['id'])
+        self.assertIn(invoice.payment_state, ('paid', 'in_payment'))
+        self.assertIn(credit_note.payment_state, ('paid', 'reversed'))
+
+        # A credit note bigger than the invoice: no money changes hands.
+        big = self.env['beatpro.shop.return'].with_user(self.rep).beatpro_submit_returns([{
+            'mobile_uuid': 'pay-ret-2', 'partner_id': self.shop.id,
+            'line_ids': [Command.create({'product_id': self.biscuits.id, 'qty': 2, 'reason': 'expired', 'price_unit': 240.0})],
+        }])['pay-ret-2']
+        info = van_order('pay-ord-3', 1)
+        result = Payment.beatpro_register_payment([{
+            'mobile_uuid': 'pay-c', 'partner_id': self.shop.id, 'amount': 0,
+            'invoice_ids': [info['id']], 'return_uuids': ['pay-ret-2'],
+        }])
+        self.assertEqual(result['pay-c'], 0)
+        self.assertIn(self.env['account.move'].browse(info['id']).payment_state, ('paid', 'reversed'))
+        left = self.env['beatpro.shop.return'].browse(big['id']).credit_note_id
+        self.assertAlmostEqual(left.amount_residual, 252.0, msg='The rest of the credit stays for later')
+        with self.assertRaises(UserError):
+            Payment.beatpro_register_payment([{'mobile_uuid': 'pay-d', 'partner_id': self.shop.id, 'amount': 0,
+                                               'return_uuids': ['pay-ret-2']}])

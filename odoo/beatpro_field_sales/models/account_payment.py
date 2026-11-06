@@ -48,11 +48,21 @@ class AccountPayment(models.Model):
 
         Each dict in ``vals_list`` holds ``mobile_uuid``, ``partner_id``, ``amount`` and
         ``payment_method_line_id`` (one of the company's payment methods for reps), and
-        optionally ``invoice_ids``, ``date``, ``beatpro_visit_id``, ``memo``,
-        ``beatpro_reference`` and cheque details. Apps from before payment methods came
-        from Odoo send ``beatpro_method`` (cash, cheque or upi) instead.
+        optionally ``date``, ``beatpro_visit_id``, ``memo``, ``beatpro_reference`` and
+        cheque details. Apps from before payment methods came from Odoo send
+        ``beatpro_method`` (cash, cheque or upi) instead.
 
-        :return: ``{mobile_uuid: payment id}``
+        What the money pays, all optional:
+
+        * ``invoice_ids``: invoices, and credit notes the shop uses against them
+        * ``order_uuids``: orders taken on the phone, for the invoice printed at the shop
+          (the phone doesn't know its id yet)
+        * ``return_uuids``: goods taken back on the phone, for their credit notes
+
+        With credit notes that cover the invoices, ``amount`` may be 0: the credit notes
+        settle the invoices and no payment is made.
+
+        :return: ``{mobile_uuid: payment id}`` (0 when only credit notes were used)
         """
         self._beatpro_check_rep()
         uuids = [vals.get('mobile_uuid') for vals in vals_list]
@@ -66,8 +76,17 @@ class AccountPayment(models.Model):
         for vals in vals_list:
             if vals['mobile_uuid'] in result:
                 continue
+            partner = self.env['res.partner'].browse(vals['partner_id'])
+            partner.check_access('read')
+            moves = self._beatpro_moves_to_settle(partner, vals)
+            invoices = moves.filtered(lambda m: m.move_type == 'out_invoice')
+            credit_notes = moves - invoices
             if vals.get('amount', 0.0) <= 0:
-                raise UserError(self.env._("The amount collected must be more than zero."))
+                if not (invoices and credit_notes):
+                    raise UserError(self.env._("The amount collected must be more than zero."))
+                self._beatpro_reconcile_moves(invoices | credit_notes)
+                result[vals['mobile_uuid']] = 0
+                continue
             if vals.get('payment_method_line_id'):
                 line = allowed.filtered(lambda l: l.id == vals['payment_method_line_id'])
                 if not line:
@@ -76,14 +95,8 @@ class AccountPayment(models.Model):
                 line = company._beatpro_method_line_for(vals['beatpro_method'])
             else:
                 raise UserError(self.env._("Choose how the payment was collected."))
-            partner = self.env['res.partner'].browse(vals['partner_id'])
-            partner.check_access('read')
             if vals.get('beatpro_visit_id'):
                 self.env['beatpro.visit'].browse(vals['beatpro_visit_id']).check_access('read')
-            invoices = self.env['account.move'].sudo().browse(vals.get('invoice_ids') or [])
-            commercial = partner.commercial_partner_id
-            if any(inv.commercial_partner_id != commercial or inv.move_type != 'out_invoice' for inv in invoices):
-                raise UserError(self.env._("Payments can only settle this customer's invoices."))
 
             payment = Payment.create({
                 'mobile_uuid': vals['mobile_uuid'],
@@ -104,19 +117,41 @@ class AccountPayment(models.Model):
                 'beatpro_reference': vals.get('beatpro_reference') or vals.get('beatpro_upi_reference') or False,
             })
             payment.action_post()
-            if invoices:
-                payment._beatpro_reconcile(invoices)
+            if moves:
+                payment._beatpro_reconcile(moves)
             result[payment.mobile_uuid] = payment.id
         return result
 
-    def _beatpro_reconcile(self, invoices):
-        """Match the payment's receivable line with the invoices' open receivable lines."""
-        self.ensure_one()
+    @api.model
+    def _beatpro_moves_to_settle(self, partner, vals):
+        """The customer's invoices and credit notes a collection names, by id or by the
+        mobile ID of the order or return they came from."""
+        Move = self.env['account.move'].sudo()
+        moves = Move.browse(vals.get('invoice_ids') or [])
+        if vals.get('order_uuids'):
+            orders = self.env['sale.order'].sudo().search([('mobile_uuid', 'in', vals['order_uuids'])])
+            moves |= orders.invoice_ids.filtered(lambda m: m.move_type == 'out_invoice')
+        if vals.get('return_uuids'):
+            returns = self.env['beatpro.shop.return'].sudo().search([('mobile_uuid', 'in', vals['return_uuids'])])
+            moves |= returns.credit_note_id
+        moves = moves.filtered(lambda m: m.state == 'posted')
+        commercial = partner.commercial_partner_id
+        if any(m.commercial_partner_id != commercial or m.move_type not in ('out_invoice', 'out_refund') for m in moves):
+            raise UserError(self.env._("Payments can only settle this customer's invoices and credit notes."))
+        return moves
+
+    @api.model
+    def _beatpro_reconcile_moves(self, moves):
+        """Match the open receivable lines of the given entries with each other."""
         domain = [('account_type', '=', 'asset_receivable'), ('reconciled', '=', False)]
-        lines = self.move_id.line_ids.filtered_domain(domain)
-        lines |= invoices.filtered(lambda m: m.state == 'posted').line_ids.filtered_domain(domain)
+        lines = moves.line_ids.filtered_domain(domain)
         for account in lines.account_id:
             lines.filtered(lambda l: l.account_id == account).reconcile()
+
+    def _beatpro_reconcile(self, moves):
+        """Settle the invoices with this payment and any credit notes given with it."""
+        self.ensure_one()
+        self._beatpro_reconcile_moves(self.move_id | moves)
 
     # -- Online payment ----------------------------------------------------------
 

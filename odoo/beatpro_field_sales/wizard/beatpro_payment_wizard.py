@@ -63,6 +63,7 @@ class BeatproPaymentWizard(models.TransientModel):
             wizard.line_ids = [fields.Command.create({
                 'invoice_id': inv['id'],
                 'name': inv['name'],
+                'kind': inv['kind'],
                 'due_date': inv['due_date'],
                 'amount_due': inv['amount_due'],
                 'overdue': inv['overdue'],
@@ -70,7 +71,7 @@ class BeatproPaymentWizard(models.TransientModel):
         return wizards
 
     @api.depends('line_ids.amount_due')
-    def _compute_amount_due(self):
+    def _compute_amount_due(self):  # Credit notes count as negative amounts.
         for wizard in self:
             wizard.amount_due = sum(wizard.line_ids.mapped('amount_due'))
 
@@ -89,11 +90,12 @@ class BeatproPaymentWizard(models.TransientModel):
     def _onchange_selected_invoices(self):
         selected = self.line_ids.filtered('selected')
         if selected:
-            self.amount = sum(selected.mapped('amount_due'))
+            # Credit notes picked are used first; the shop pays the rest.
+            self.amount = max(sum(selected.mapped('amount_due')), 0.0)
 
     def action_confirm(self):
         self.ensure_one()
-        if self.method_reference == 'cheque' and not self.cheque_number:
+        if self.amount and self.method_reference == 'cheque' and not self.cheque_number:
             raise UserError(self.env._("Enter the cheque number."))
         result = self.env['account.payment'].beatpro_register_payment([{
             'mobile_uuid': f'web-{uuid.uuid4()}',
@@ -108,16 +110,20 @@ class BeatproPaymentWizard(models.TransientModel):
             'invoice_ids': self.line_ids.filtered('selected').mapped('invoice_id'),
         }])
         payment = self.env['account.payment'].sudo().browse(next(iter(result.values())))
+        if not payment:
+            message = self.env._("Credit notes of %s used against the selected invoices.", self.partner_id.display_name)
+        else:
+            message = self.env._(
+                "%(amount)s collected from %(customer)s (%(payment)s).",
+                amount=payment.currency_id.format(payment.amount),
+                customer=self.partner_id.display_name,
+                payment=payment.name)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'type': 'success',
-                'message': self.env._(
-                    "%(amount)s collected from %(customer)s (%(payment)s).",
-                    amount=payment.currency_id.format(payment.amount),
-                    customer=self.partner_id.display_name,
-                    payment=payment.name),
+                'message': message,
                 'next': {'type': 'ir.actions.act_window_close'},
             },
         }
@@ -126,7 +132,7 @@ class BeatproPaymentWizard(models.TransientModel):
     def action_payment_link(self):
         """Show a link and QR code the customer uses to pay the selected invoice online."""
         self.ensure_one()
-        selected = self.line_ids.filtered('selected')
+        selected = self.line_ids.filtered(lambda l: l.selected and l.kind == 'invoice')
         if len(selected) != 1:
             raise UserError(self.env._("Select the one invoice the customer will pay online."))
         info = self.env['account.payment'].beatpro_payment_link(
@@ -165,6 +171,7 @@ class BeatproPaymentWizardLine(models.TransientModel):
     # Plain id, not a Many2one: reps often can't read invoices directly.
     invoice_id = fields.Integer(string="Invoice ID", required=True)
     name = fields.Char(string="Invoice", readonly=True)
+    kind = fields.Selection([('invoice', "Invoice"), ('credit_note', "Credit Note")], readonly=True, default='invoice')
     due_date = fields.Date(readonly=True)
     amount_due = fields.Monetary(readonly=True)
     overdue = fields.Boolean(readonly=True)

@@ -28,33 +28,36 @@ class ResPartner(models.Model):
 
     @api.model
     def beatpro_open_invoices(self, partner_ids):
-        """Unpaid customer invoices for the given customers, for collecting payments.
+        """Unpaid customer invoices and unused credit notes, for collecting payments.
 
         Reps usually can't read every invoice, so this reads as superuser after
-        checking the rep can see the customers.
+        checking the rep can see the customers. A credit note (for goods taken back)
+        has a negative ``amount_due``: the shop can use it against any invoice.
 
         :return: list of dicts, oldest due date first
         """
         partners = self.browse(partner_ids)
         partners.check_access('read')
-        invoices = self.env['account.move'].sudo().search([
+        moves = self.env['account.move'].sudo().search([
             ('commercial_partner_id', 'in', partners.commercial_partner_id.ids),
-            ('move_type', '=', 'out_invoice'),
+            ('move_type', 'in', ('out_invoice', 'out_refund')),
             ('state', '=', 'posted'),
             ('payment_state', 'in', ('not_paid', 'partial')),
             ('company_id', 'in', self.env.companies.ids),
         ], order='invoice_date_due, id')
         today = fields.Date.context_today(self)
         return [{
-            'id': inv.id,
-            'partner_id': inv.commercial_partner_id.id,
-            'name': inv.name,
-            'invoice_date': fields.Date.to_string(inv.invoice_date),
-            'due_date': fields.Date.to_string(inv.invoice_date_due),
-            'amount_total': inv.amount_total,
-            'amount_due': inv.amount_residual,
-            'overdue': bool(inv.invoice_date_due and inv.invoice_date_due < today),
-        } for inv in invoices]
+            'id': move.id,
+            'partner_id': move.commercial_partner_id.id,
+            'name': move.name,
+            'kind': 'credit_note' if move.move_type == 'out_refund' else 'invoice',
+            'invoice_date': fields.Date.to_string(move.invoice_date),
+            'due_date': fields.Date.to_string(move.invoice_date_due),
+            'amount_total': move.amount_total,
+            'amount_due': move.amount_residual if move.move_type == 'out_invoice' else -move.amount_residual,
+            'overdue': bool(move.move_type == 'out_invoice' and move.invoice_date_due and move.invoice_date_due < today),
+            'origin': move.invoice_origin or False,
+        } for move in moves]
 
     def _beatpro_oldest_overdue(self, company=None):
         """The customer's oldest overdue invoice, or False.

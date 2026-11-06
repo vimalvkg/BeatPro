@@ -131,6 +131,9 @@ class BeatproShopReturn(models.Model):
                 'name': "%s (%s)" % (line.product_id.display_name, reasons.get(line.reason)),
             }) for line in lines],
         })
+        # Posted at once: it lowers what the shop owes, and the rep or the office uses it
+        # against an invoice when collecting payment.
+        credit_note.action_post()
         self.sudo().credit_note_id = credit_note
 
     def action_cancel(self):
