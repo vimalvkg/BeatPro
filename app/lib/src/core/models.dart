@@ -71,6 +71,7 @@ class Customer {
     this.longitude,
     this.pricelistId,
     this.vat,
+    this.credit,
   });
 
   final String key;
@@ -86,6 +87,24 @@ class Customer {
 
   /// The shop's tax number (UAE: TRN). Shops without one get a simplified tax invoice.
   final String? vat;
+
+  /// What the shop owes, its credit limit and overdue invoices, from the last sync.
+  final CreditInfo? credit;
+
+  Customer withCredit(CreditInfo? credit) => Customer(
+        key: key,
+        serverId: serverId,
+        uuid: uuid,
+        name: name,
+        phone: phone,
+        street: street,
+        city: city,
+        latitude: latitude,
+        longitude: longitude,
+        pricelistId: pricelistId,
+        vat: vat,
+        credit: credit,
+      );
 
   bool get isLocal => key.startsWith('loc:');
 
@@ -114,6 +133,7 @@ class Customer {
         'longitude': longitude,
         'pricelistId': pricelistId,
         'vat': vat,
+        if (credit != null) 'credit': credit!.toJson(),
       };
 
   static Customer fromJson(Map<String, dynamic> j) => Customer(
@@ -128,7 +148,66 @@ class Customer {
         longitude: (j['longitude'] as num?)?.toDouble(),
         pricelistId: j['pricelistId'] as int?,
         vat: j['vat'] as String?,
+        credit: j['credit'] is Map ? CreditInfo.fromJson((j['credit'] as Map).cast<String, dynamic>()) : null,
       );
+}
+
+/// A shop's credit position from Odoo. Reps are warned, never blocked.
+class CreditInfo {
+  CreditInfo({this.limit = 0, this.owed = 0, this.overdueName, this.overdueDays = 0, this.overdueAmount = 0});
+
+  /// 0: no credit limit.
+  final double limit;
+  final double owed;
+  final String? overdueName;
+  final int overdueDays;
+  final double overdueAmount;
+
+  static CreditInfo fromOdoo(Map<String, dynamic> r) => CreditInfo(
+        limit: _num(r['limit']),
+        owed: _num(r['owed']),
+        overdueName: _str(r['overdue_name']),
+        overdueDays: (r['overdue_days'] as num?)?.toInt() ?? 0,
+        overdueAmount: _num(r['overdue_amount']),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'limit': limit,
+        'owed': owed,
+        'overdueName': overdueName,
+        'overdueDays': overdueDays,
+        'overdueAmount': overdueAmount,
+      };
+
+  static CreditInfo fromJson(Map<String, dynamic> j) => CreditInfo(
+        limit: _num(j['limit']),
+        owed: _num(j['owed']),
+        overdueName: j['overdueName'] as String?,
+        overdueDays: (j['overdueDays'] as num?)?.toInt() ?? 0,
+        overdueAmount: _num(j['overdueAmount']),
+      );
+}
+
+/// A unit a product sells in: its own unit (pieces) or a packaging (a case).
+/// [factor] is the unit's absolute size, so a case of 24 pieces has 24.
+class ProductUnit {
+  const ProductUnit({required this.id, required this.name, this.short = 'pc', this.factor = 1});
+
+  final int? id;
+  final String name;
+
+  /// `pc` or `cs`, as on the slip.
+  final String short;
+  final double factor;
+
+  static ProductUnit fromJson(Map<String, dynamic> j) => ProductUnit(
+        id: j['id'] as int?,
+        name: (j['name'] as String?) ?? '',
+        short: (j['short'] as String?) ?? 'pc',
+        factor: _num(j['factor']) == 0 ? 1 : _num(j['factor']),
+      );
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'short': short, 'factor': factor};
 }
 
 class Product {
@@ -142,6 +221,8 @@ class Product {
     this.uom,
     this.category,
     this.taxPercent = 0,
+    this.uomId,
+    this.units = const [],
   });
 
   final int id;
@@ -155,6 +236,54 @@ class Product {
   final String? uom;
   final String? category;
   final double taxPercent;
+  final int? uomId;
+
+  /// Its own unit first, then its packagings (cases), from Odoo.
+  final List<ProductUnit> units;
+
+  ProductUnit get baseUnit =>
+      units.isNotEmpty ? units.first : ProductUnit(id: uomId, name: uom ?? 'Units');
+
+  /// The biggest packaging, or null for products sold only by the piece.
+  ProductUnit? get caseUnit {
+    final cases = units.where((u) => u.factor > baseUnit.factor).toList()..sort((a, b) => b.factor.compareTo(a.factor));
+    return cases.firstOrNull;
+  }
+
+  /// Orders start in cases.
+  ProductUnit get defaultUnit => caseUnit ?? baseUnit;
+
+  /// How many of the product's own unit (pieces) one [unit] holds.
+  double perUnit(ProductUnit unit) => unit.factor / baseUnit.factor;
+
+  ProductUnit unitById(int? id) => units.where((u) => u.id == id).firstOrNull ?? baseUnit;
+
+  /// `12 cs + 5 pc` for a quantity in pieces.
+  String packText(double pieces) {
+    String q(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
+    final unit = caseUnit;
+    if (unit == null) return '${q(pieces)} ${baseUnit.short}';
+    final per = perUnit(unit);
+    final sign = pieces < 0 ? '-' : '';
+    final n = pieces.abs();
+    final full = ((n + 1e-9) / per).floor();
+    final rest = double.parse((n - full * per).toStringAsFixed(3));
+    return sign + [if (full > 0) '$full cs', if (rest > 0 || full == 0) '${q(rest)} ${baseUnit.short}'].join(' + ');
+  }
+
+  Product withUnits(List<ProductUnit> units) => Product(
+        id: id,
+        name: name,
+        listPrice: listPrice,
+        qtyAvailable: qtyAvailable,
+        code: code,
+        barcode: barcode,
+        uom: uom,
+        category: category,
+        taxPercent: taxPercent,
+        uomId: uomId,
+        units: units,
+      );
 
   static Product fromOdoo(Map<String, dynamic> r, double taxPercent) => Product(
         id: r['id'] as int,
@@ -164,6 +293,7 @@ class Product {
         code: _str(r['default_code']),
         barcode: _str(r['barcode']),
         uom: r['uom_id'] is List ? (r['uom_id'] as List)[1] as String : null,
+        uomId: _m2oId(r['uom_id']),
         category: r['categ_id'] is List ? (r['categ_id'] as List)[1] as String : null,
         taxPercent: taxPercent,
       );
@@ -178,6 +308,8 @@ class Product {
         'uom': uom,
         'category': category,
         'taxPercent': taxPercent,
+        'uomId': uomId,
+        'units': [for (final u in units) u.toJson()],
       };
 
   static Product fromJson(Map<String, dynamic> j) => Product(
@@ -190,6 +322,8 @@ class Product {
         uom: j['uom'] as String?,
         category: j['category'] as String?,
         taxPercent: _num(j['taxPercent']),
+        uomId: j['uomId'] as int?,
+        units: [for (final u in (j['units'] as List?) ?? const []) ProductUnit.fromJson((u as Map).cast<String, dynamic>())],
       );
 }
 
@@ -544,15 +678,51 @@ String paymentKind(Map<String, dynamic> data) =>
 
 /// One line in the cart.
 class CartLine {
-  CartLine({required this.product, required this.unitPrice, this.qty = 1, this.discount = 0});
+  CartLine({
+    required this.product,
+    required this.unitPrice,
+    this.qty = 1,
+    this.discount = 0,
+    ProductUnit? unit,
+    this.free = false,
+    this.schemeId,
+    this.schemeName,
+    double? listPrice,
+  })  : unit = unit ?? product.baseUnit,
+        listPrice = listPrice ?? unitPrice;
 
   final Product product;
-  final double unitPrice;
+
+  /// Price for one [unit], after quantity prices (slabs).
+  double unitPrice;
+
+  /// Price for one [unit] when buying just one: what the shop saves is measured from it.
+  double listPrice;
+  ProductUnit unit;
   double qty;
+
+  /// The rep's own discount.
   double discount;
 
-  double get subtotal => qty * unitPrice * (1 - discount / 100);
+  /// Free goods from a scheme: 100% off.
+  final bool free;
+  int? schemeId;
+  String? schemeName;
+
+  /// A scheme's discount, when bigger than the rep's.
+  double schemeDiscount = 0;
+
+  /// The quantity in the product's own unit (pieces).
+  double get baseQty => qty * product.perUnit(unit);
+  double get effectiveDiscount => free ? 100 : (schemeDiscount > discount ? schemeDiscount : discount);
+  double get subtotal => qty * unitPrice * (1 - effectiveDiscount / 100);
   double get tax => subtotal * product.taxPercent / 100;
+
+  /// What the shop saves on this line against the price for one.
+  double get saved {
+    final s = qty * listPrice - subtotal;
+    return s > 0.005 ? s : 0;
+  }
 }
 
 /// Totals for a list of order lines, as a preview: Odoo recalculates them.

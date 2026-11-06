@@ -12,6 +12,7 @@ import 'package:beatpro/src/core/invoice.dart';
 import 'package:beatpro/src/core/models.dart';
 import 'package:beatpro/src/core/odoo_client.dart';
 import 'package:beatpro/src/core/repository.dart';
+import 'package:beatpro/src/core/schemes.dart';
 import 'package:beatpro/src/core/sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -258,6 +259,66 @@ void main() {
     expect(serverUnload['total_difference'], -1.0);
     expect(serverUnload['note'], 'One box torn');
     expect((await repo.vanStock()).serverUnload?['state'], 'sent');
+    await db.close();
+  }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
+
+  // Needs a van loaded with products sold in cases, running schemes and a quantity price.
+  test('cases, schemes and quantity prices on the phone match Odoo', () async {
+    final client = OdooClient(await credentials());
+    sqfliteFfiInit();
+    final db = await LocalDb.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+    final repo = Repository(db);
+    final sync = SyncService(db, client);
+    await sync.download();
+    final schemes = await repo.schemes();
+    expect(schemes, isNotEmpty, reason: 'set up a scheme in Odoo');
+    final products = {for (final p in await db.products()) p.id: p};
+    final stock = await repo.vanStock();
+    final cased = products.values.where((p) => p.caseUnit != null && stock.leftOf(p.id) >= 11 * p.perUnit(p.caseUnit!)).toList();
+    expect(cased, isNotEmpty, reason: 'the van needs products sold in cases');
+    final stop = (await repo.todayPlan()).first;
+    final pricing = await repo.pricingFor(stop.customer.key);
+
+    // Ten cases of each product sold in cases: enough for "buy 10 cases" schemes and quantity prices.
+    final lines = [
+      for (final p in cased) CartLine(product: p, unitPrice: 0, unit: p.caseUnit, qty: 10),
+    ];
+    for (final l in lines) {
+      pricing.price(l);
+    }
+    final free = applySchemes(lines, schemes, products, pricing);
+    expect(free, isNotEmpty, reason: 'a free-goods scheme on one of these products');
+    final visit = await repo.startVisit(stop.customer.key, routeId: stop.stop.routeId);
+    final order = await repo.placeOrder(
+      customerKey: stop.customer.key,
+      visitUuid: visit.uuid,
+      delivery: DeliveryMode.van,
+      lines: [...lines, ...free],
+    );
+    final phone = (await repo.invoiceFor(order.uuid))!;
+    expect(phone.saved, greaterThan(0));
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    final report = await sync.sync();
+    expect(report.failed, 0, reason: (await db.records(state: SyncState.failed)).map((r) => r.error).join('; '));
+
+    // Odoo added the same free goods and priced the order as the phone did.
+    final orderId = (await db.record(order.uuid))!.serverId;
+    final freeLines = await client.searchRead('sale.order.line', domain: [
+      ['order_id', '=', orderId],
+      ['beatpro_free', '=', true],
+    ], fields: ['product_id', 'product_uom_qty', 'product_uom_id']);
+    expect(freeLines, hasLength(free.length));
+    expect((freeLines.first['product_uom_qty'] as num).toDouble(), free.first.qty);
+    final invoice = (await client.searchRead('account.move', domain: [
+      ['name', '=', phone.name],
+    ], fields: ['amount_untaxed', 'amount_total'])).single;
+    expect((invoice['amount_untaxed'] as num).toDouble(), closeTo(phone.untaxed, 0.02));
+    expect((invoice['amount_total'] as num).toDouble(), closeTo(phone.total, 0.02));
+    // The free goods left the van too.
+    final after = await repo.vanStock();
+    final first = cased.first;
+    final need = Repository.piecesNeeded([...lines, ...free])[first.id]!;
+    expect(after.leftOf(first.id), closeTo(stock.leftOf(first.id) - need, 0.001));
     await db.close();
   }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
 }

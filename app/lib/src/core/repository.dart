@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'invoice.dart';
 import 'local_db.dart';
 import 'models.dart';
+import 'schemes.dart';
 
 /// A GPS fix, or null when the phone couldn't get one.
 class GeoPoint {
@@ -252,6 +253,45 @@ class Repository {
 
   // -- Orders ---------------------------------------------------------------
 
+  /// The customer's prices, with quantity prices (slabs) from their price list.
+  Future<Pricing> pricingFor(String customerKey) async {
+    final customer = await db.customer(customerKey);
+    final prices = await db.pricesFor(customer?.pricelistId);
+    final raw = await db.getValue('price_breaks');
+    final all = raw == null ? const <String, dynamic>{} : jsonDecode(raw) as Map<String, dynamic>;
+    final mine = (all['${customer?.pricelistId}'] as Map?)?.cast<String, dynamic>() ?? const {};
+    return Pricing(prices: prices, breaks: {
+      for (final e in mine.entries)
+        int.parse(e.key): [
+          for (final b in (e.value as List).cast<List>()) ((b[0] as num).toDouble(), (b[1] as num).toDouble()),
+        ],
+    });
+  }
+
+  /// Schemes running today, from the last sync.
+  Future<List<Scheme>> schemes() async {
+    final raw = await db.getValue('schemes');
+    if (raw == null) return const [];
+    return (jsonDecode(raw) as List).cast<Map<String, dynamic>>().map(Scheme.fromOdoo).toList();
+  }
+
+  /// What the shop owes now, with orders and payments not yet in Odoo, against
+  /// its credit limit; null when there is nothing to warn about.
+  Future<CreditWarning?> creditFor(String customerKey, {double adding = 0}) async {
+    final customer = await db.customer(customerKey);
+    final info = customer?.credit;
+    if (info == null) return null;
+    var owed = info.owed + adding;
+    for (final r in [...await db.records(state: SyncState.pending), ...await db.records(state: SyncState.failed)]) {
+      if (r.data['customerKey'] != customerKey) continue;
+      if (r.kind == RecordKind.order) owed += (r.data['total'] as num?)?.toDouble() ?? 0;
+      if (r.kind == RecordKind.payment) owed -= (r.data['amount'] as num?)?.toDouble() ?? 0;
+    }
+    final over = info.limit > 0 && owed > info.limit + 0.005;
+    if (!over && info.overdueDays <= 0) return null;
+    return CreditWarning(info: info, owed: owed, overLimit: over);
+  }
+
   Future<LocalRecord> placeOrder({
     required String customerKey,
     String? visitUuid,
@@ -266,7 +306,7 @@ class Repository {
       final stock = await vanStock();
       if (stock.hasVan) {
         vanLines = vanLinesFor(delivery, lines, stock);
-        if (delivery == DeliveryMode.van && lines.any((l) => stock.leftOf(l.product.id) < l.qty)) {
+        if (delivery == DeliveryMode.van && !vanHasAll(lines, stock)) {
           throw StateError('The van does not have enough of every product. Choose another way to deliver.');
         }
       } else {
@@ -287,8 +327,16 @@ class Repository {
               'productId': l.product.id,
               'name': l.product.name,
               'qty': l.qty,
+              'uomId': l.unit.id,
+              'unit': l.unit.short,
+              'pieces': l.baseQty,
               'unitPrice': l.unitPrice,
+              'listPrice': l.listPrice,
               'discount': l.discount,
+              'schemeDiscount': l.schemeDiscount,
+              'free': l.free,
+              'schemeId': l.schemeId,
+              'schemeName': l.schemeName,
               'taxPercent': l.product.taxPercent,
             },
         ],
@@ -298,6 +346,7 @@ class Repository {
         'untaxed': totals.untaxed,
         'tax': totals.tax,
         'total': totals.total,
+        'saved': lines.fold<double>(0, (s, l) => s + l.saved),
       },
     );
     await db.saveRecord(order);
@@ -487,16 +536,29 @@ class Repository {
   Future<List<LocalRecord>> returnsFor(String visitUuid) async =>
       (await db.records(kind: RecordKind.shopReturn)).where((r) => r.data['visitUuid'] == visitUuid).toList();
 
-  /// Which lines the van hands over now, for each delivery choice.
+  /// Pieces of each product the order needs, free goods included.
+  static Map<int, double> piecesNeeded(Iterable<CartLine> lines) {
+    final need = <int, double>{};
+    for (final l in lines) {
+      need[l.product.id] = (need[l.product.id] ?? 0) + l.baseQty;
+    }
+    return need;
+  }
+
+  /// The van has every product of the order, free goods included.
+  static bool vanHasAll(Iterable<CartLine> lines, VanStockView stock) =>
+      piecesNeeded(lines).entries.every((e) => stock.leftOf(e.key) + 1e-9 >= e.value);
+
+  /// Which lines the van hands over now, for each delivery choice, in pieces.
   static Map<int, double> vanLinesFor(DeliveryMode mode, List<CartLine> lines, VanStockView stock) {
     if (mode == DeliveryMode.warehouse) return {};
     final left = {for (final i in stock.items) i.productId: i.left};
     final result = <int, double>{};
     for (final l in lines) {
       final have = left[l.product.id] ?? 0;
-      if (mode == DeliveryMode.van || have >= l.qty) {
-        result[l.product.id] = (result[l.product.id] ?? 0) + l.qty;
-        left[l.product.id] = have - l.qty;
+      if (mode == DeliveryMode.van || have + 1e-9 >= l.baseQty) {
+        result[l.product.id] = (result[l.product.id] ?? 0) + l.baseQty;
+        left[l.product.id] = have - l.baseQty;
       }
     }
     return result;
@@ -516,21 +578,35 @@ class Repository {
     final items = <Map<String, dynamic>>[];
     var untaxed = 0.0;
     var tax = 0.0;
+    var saved = 0.0;
     for (final l in lines) {
-      final qty = (left[l.product.id] ?? 0) < l.qty ? (left[l.product.id] ?? 0) : l.qty;
-      if (qty <= 0) continue;
-      left[l.product.id] = (left[l.product.id] ?? 0) - qty;
-      final amount = ShopInvoice.round2(qty * l.unitPrice * (1 - l.discount / 100));
+      final pieces = (left[l.product.id] ?? 0) < l.baseQty ? (left[l.product.id] ?? 0) : l.baseQty;
+      if (pieces <= 1e-9) continue;
+      left[l.product.id] = (left[l.product.id] ?? 0) - pieces;
+      final qty = pieces / l.product.perUnit(l.unit);
+      final amount = ShopInvoice.round2(qty * l.unitPrice * (1 - l.effectiveDiscount / 100));
       final vat = ShopInvoice.round2(amount * l.product.taxPercent / 100);
       untaxed += amount;
       tax += vat;
+      final lineSaved = qty * l.listPrice - amount;
+      if (lineSaved > 0.005) saved += lineSaved;
+      final vatText = 'VAT ${formatPercent(l.product.taxPercent)}';
       items.add({
-        'name': l.product.name,
+        'name': l.free ? '${l.product.name} · FREE' : l.product.name,
         'qty': qty,
-        'price': l.unitPrice,
-        'discount': l.discount,
+        'unit': l.unit.short,
+        'price': l.free ? 0.0 : l.unitPrice,
+        'discount': l.effectiveDiscount,
         'vat': l.product.taxPercent,
         'amount': amount,
+        'free': l.free,
+        'note': l.free
+            ? 'FREE · ${l.schemeName ?? ''}'
+            : l.schemeDiscount > l.discount
+                ? '${formatPercent(l.schemeDiscount)} off · $vatText'
+                : l.unitPrice + 0.005 < l.listPrice
+                    ? 'Qty price · $vatText'
+                    : vatText,
       });
     }
     if (items.isEmpty) return null;
@@ -550,6 +626,7 @@ class Repository {
       'untaxed': ShopInvoice.round2(untaxed),
       'tax': ShopInvoice.round2(tax),
       'total': ShopInvoice.round2(untaxed + tax),
+      'saved': ShopInvoice.round2(saved),
       'previous': ShopInvoice.round2(previous),
     };
   }
@@ -796,3 +873,16 @@ extension _LastWhere<T> on List<T> {
     return null;
   }
 }
+
+/// Why the rep is warned before taking an order. Orders are never blocked.
+class CreditWarning {
+  CreditWarning({required this.info, required this.owed, required this.overLimit});
+
+  final CreditInfo info;
+
+  /// What the shop owes now, including work on the phone not yet in Odoo.
+  final double owed;
+  final bool overLimit;
+}
+
+String formatPercent(num p) => '${p == p.roundToDouble() ? p.toInt() : p}%';

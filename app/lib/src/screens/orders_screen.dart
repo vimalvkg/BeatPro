@@ -128,13 +128,23 @@ class OrderDetailScreen extends ConsumerWidget {
               title: 'Products',
               child: Column(children: [
                 for (final l in lines)
-                  ListTile(
-                    dense: true,
-                    title: Text(l['name'] as String),
-                    subtitle: Text('${formatQty(l['qty'] as num)} × ${money((l['unitPrice'] as num).toDouble())}'
-                        '${(l['discount'] as num) > 0 ? ' · ${formatQty(l['discount'] as num)}% off' : ''}'),
-                    trailing: Text(money((l['qty'] as num) * (l['unitPrice'] as num) * (1 - (l['discount'] as num) / 100))),
-                  ),
+                  Builder(builder: (context) {
+                    final free = l['free'] == true;
+                    final scheme = (l['schemeDiscount'] as num? ?? 0).toDouble();
+                    final manual = (l['discount'] as num).toDouble();
+                    final discount = free ? 100.0 : (scheme > manual ? scheme : manual);
+                    final unit = l['unit'] == null ? '' : ' ${l['unit']}';
+                    return ListTile(
+                      dense: true,
+                      title: Text(free ? '${l['name']} · FREE' : l['name'] as String),
+                      subtitle: Text(free
+                          ? '${formatQty(l['qty'] as num)}$unit · ${l['schemeName'] ?? 'Scheme'}'
+                          : '${formatQty(l['qty'] as num)}$unit × ${money((l['unitPrice'] as num).toDouble())}'
+                              '${discount > 0 ? ' · ${formatQty(discount)}% off' : ''}'),
+                      trailing: Text(money((l['qty'] as num) * (l['unitPrice'] as num) * (1 - discount / 100)),
+                          style: free ? const TextStyle(color: BeatproColors.success, fontWeight: FontWeight.w700) : null),
+                    );
+                  }),
               ]),
             ),
             const Divider(),

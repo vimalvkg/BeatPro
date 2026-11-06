@@ -21,6 +21,11 @@ class FakeOdoo {
   /// The user is a supervisor with the Van Sales Dashboard.
   bool supervisor = false;
 
+  /// Parle-G sells by the piece (AED 10) and in cases of 24, with a scheme
+  /// "buy 10 cases, get 1 free"; Maggi drops to 540 from 10; Patel Kirana is
+  /// over its credit limit with an overdue invoice.
+  bool withSchemes = false;
+
   /// The van's stock per product: loaded, sold, returned, left.
   final van = <int, Map<String, double>>{};
   Map<String, dynamic>? openLoad;
@@ -154,7 +159,7 @@ class FakeOdoo {
             {
               'id': p['id'],
               'display_name': p['name'],
-              'lst_price': p['price'],
+              'lst_price': withSchemes && p['id'] == 1 ? 10.0 : p['price'],
               'qty_available': p['qty'],
               'default_code': p['code'],
               'barcode': p['barcode'],
@@ -169,7 +174,52 @@ class FakeOdoo {
         ];
       case 'product.pricelist.beatpro_prices':
         return {
-          '1': {for (final p in products) '${p['id']}': p['id'] == 2 ? 560.0 : p['price']},
+          '1': {
+            for (final p in products) '${p['id']}': p['id'] == 2 ? 560.0 : (withSchemes && p['id'] == 1 ? 10.0 : p['price']),
+          },
+        };
+      case 'product.product.beatpro_units':
+        return {
+          for (final id in (body['product_ids'] as List))
+            '$id': [
+              {'id': 1, 'name': 'Units', 'short': 'pc', 'factor': 1.0},
+              if (withSchemes && id == 1) {'id': 7, 'name': 'Case of 24', 'short': 'cs', 'factor': 24.0},
+            ],
+        };
+      case 'product.pricelist.beatpro_price_breaks':
+        return {
+          for (final id in (body['pricelist_ids'] as List))
+            '$id': {
+              if (withSchemes)
+                '2': [
+                  [10.0, 540.0],
+                ],
+            },
+        };
+      case 'beatpro.scheme.beatpro_schemes':
+        return [
+          if (withSchemes)
+            {
+              'id': 3,
+              'name': 'Parle-G: buy 10 cases, get 1 free',
+              'kind': 'free_goods',
+              'product_ids': [1],
+              'min_qty': 240.0,
+              'min_label': '10 Case of 24',
+              'discount': 0.0,
+              'free_product_id': 1,
+              'free_qty': 1.0,
+              'free_uom_id': 7,
+              'date_to': false,
+              'rule': 'Buy 10 Case of 24, get 1 Case of 24 Parle-G free',
+            },
+        ];
+      case 'res.partner.beatpro_credit':
+        return {
+          for (final id in (body['partner_ids'] as List))
+            '$id': withSchemes && id == 9
+                ? {'limit': 1000.0, 'owed': 1200.0, 'overdue_name': 'INV/2026/00042', 'overdue_days': 25, 'overdue_amount': 1200.0}
+                : {'limit': 0.0, 'owed': 0.0, 'overdue_name': false, 'overdue_days': 0, 'overdue_amount': 0.0},
         };
       case 'res.partner.beatpro_open_invoices':
         return [

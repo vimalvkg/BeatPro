@@ -63,8 +63,8 @@ class InvoiceSlip extends StatelessWidget {
           rule(),
           for (final l in i.lines) ...[
             Text(l['name'] as String),
-            row('VAT ${_pct(l['vat'] as num)}',
-                '${_qty(l['qty'] as num)} x ${n(l['price'] as num)} · ${n(l['amount'] as num)}'),
+            row((l['note'] as String?) ?? 'VAT ${_pct(l['vat'] as num)}',
+                '${_qty(l['qty'] as num)}${l['unit'] == null ? '' : ' ${l['unit']}'} x ${n(l['price'] as num)} · ${n(l['amount'] as num)}'),
             const SizedBox(height: 3),
           ],
           rule(),
@@ -78,6 +78,10 @@ class InvoiceSlip extends StatelessWidget {
             Text('الإجمالي شامل الضريبة', textDirection: TextDirection.rtl, style: ar),
           ]),
           Text(i.words, style: base.copyWith(fontSize: (base.fontSize ?? 11) - 1.5)),
+          if (i.saved >= 0.01) ...[
+            rule(),
+            row('You saved ${i.currency}', n(i.saved), style: bold),
+          ],
           rule(),
           row('Previous balance', n(i.previous)),
           row('Balance due ${i.currency}', n(i.balance), style: bold),

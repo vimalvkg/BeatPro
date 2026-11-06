@@ -145,7 +145,7 @@ void main() {
     // Take an order: 2 cases of Maggi at the customer's price, 1 box of Parle-G.
     await tester.tap(find.text('Take order'));
     await tester.pumpAndSettle();
-    expect(find.text('AED 560.00'), findsOneWidget, reason: "Maggi at the customer's price list price");
+    expect(find.text('AED 560.00 / pc'), findsOneWidget, reason: "Maggi at the customer's price list price");
     Finder addButtonFor(String product) => find.descendant(
         of: find.widgetWithText(ListTile, product), matching: find.widgetWithText(OutlinedButton, 'Add'));
     await tester.tap(addButtonFor('Maggi Noodles (Case of 48)'));
@@ -322,9 +322,9 @@ void main() {
     expect(find.text('Empty · load the van before you leave'), findsOneWidget);
     router.push('/van/load');
     await tester.pumpAndSettle();
-    expect(find.text('36 cases'), findsOneWidget);
+    expect(find.text('36 items'), findsOneWidget);
     await screen('15-van-load');
-    await tester.tap(find.text('Send load request · 36 cases'));
+    await tester.tap(find.text('Send load request · 36 items'));
     await tester.pumpAndSettle();
     final load = odoo.uploaded['beatpro.van.transfer.load']!.single;
     expect((load['line_ids'] as List).length, 3);
@@ -335,7 +335,7 @@ void main() {
     await container.read(syncControllerProvider.notifier).run();
     router.push('/van');
     await tester.pumpAndSettle();
-    expect(find.text('36 cases'), findsOneWidget);
+    expect(find.text('36 items'), findsNWidgets(2), reason: 'in the van now, and loaded');
     expect(find.text('AED 15,920.00 at sale price'), findsOneWidget);
     await screen('16-van-stock');
 
@@ -411,15 +411,15 @@ void main() {
     expect(tester.widget<TextField>(parleCount).controller!.text, '15');
     await tester.enterText(parleCount, '14');
     await tester.pumpAndSettle();
-    expect(find.text('1 short: Parle-G Biscuits (Box of 24)'), findsOneWidget);
+    expect(find.text('1 pc short: Parle-G Biscuits (Box of 24)'), findsOneWidget);
     expect(find.text('2 items'), findsOneWidget, reason: 'damaged returns go to the damaged area');
-    await tester.tap(find.text('Send unload · 32 cases'));
+    await tester.tap(find.text('Send unload · 32 items'));
     await tester.pumpAndSettle();
     expect(odoo.uploaded['beatpro.van.transfer.unload'], isNull, reason: 'a shortage needs a note');
     await tester.enterText(find.byType(TextField).last, 'One box torn, given to the shop as a free sample.');
     await tester.pumpAndSettle();
     await screen('19-van-unload');
-    await tester.tap(find.text('Send unload · 32 cases'));
+    await tester.tap(find.text('Send unload · 32 items'));
     await tester.pumpAndSettle();
     await container.read(syncControllerProvider.notifier).run();
     final unload = odoo.uploaded['beatpro.van.transfer.unload']!.single;
@@ -517,8 +517,8 @@ void main() {
     expect(scanner.titles.last, 'Scan products to load');
     expect(scanner.feedback.map((f) => f.ok), [true, true, false]);
     expect(scanner.feedback.last.message, contains('No product with barcode 0000000000000'));
-    expect(find.text('Send load request · 38 cases'), findsOneWidget, reason: '36 suggested + 2 scanned');
-    await tester.tap(find.text('Send load request · 38 cases'));
+    expect(find.text('Send load request · 38 items'), findsOneWidget, reason: '36 suggested + 2 scanned');
+    await tester.tap(find.text('Send load request · 38 items'));
     await tester.pumpAndSettle();
     final loadLines = (odoo.uploaded['beatpro.van.transfer.load']!.single['line_ids'] as List)
         .map((l) => (l as List)[2] as Map<String, dynamic>);
@@ -533,11 +533,11 @@ void main() {
     scanner.queue.addAll(['8901719101038', '8901719101038', '8901719101038']);
     await tester.tap(find.byTooltip('Scan barcodes'));
     await tester.pumpAndSettle();
-    expect(scanner.feedback.last.message, 'Added Parle-G Biscuits (Box of 24) · 3 in the order');
+    expect(scanner.feedback.last.message, 'Added Parle-G Biscuits (Box of 24) · 3 pc in the order');
     await tester.enterText(find.widgetWithText(TextField, 'Search or scan products'), '8904043901015');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    expect(find.text('Added Tata Salt 1kg (Bag of 10) · 1 in the order'), findsOneWidget);
+    expect(find.text('Added Tata Salt 1kg (Bag of 10) · 1 pc in the order'), findsOneWidget);
     expect(find.text('4 items'), findsOneWidget);
     if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
       await _loadImages(tester);
@@ -570,7 +570,7 @@ void main() {
     await tester.tap(find.byTooltip('Scan barcodes'));
     await tester.pumpAndSettle();
     expect(scanner.titles.last, 'Count by scanning');
-    expect(scanner.feedback.last.message, 'Maggi Noodles (Case of 48) · counted 2 of 2');
+    expect(scanner.feedback.last.message, 'Maggi Noodles (Case of 48) · counted 2 pc of 2 pc');
     scanner.queue.add('8901030704116');
     await tester.tap(find.byTooltip('Scan barcodes'));
     await tester.pumpAndSettle();
@@ -691,6 +691,110 @@ void main() {
     final renumbered = (await repo.invoiceFor(second.uuid))!;
     expect(renumbered.name, 'VAN1/2026/00999');
     expect(renumbered.renumberedFrom, 'VAN1/$year/00148');
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('cases, a free-goods scheme and a credit warning on a van order', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()
+      ..withVan = true
+      ..withSchemes = true;
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+      printerServiceProvider.overrideWithValue(FakePrinter()),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+    final products = {for (final p in await repo.db.products()) p.id: p};
+    expect(products[1]!.caseUnit?.name, 'Case of 24');
+    await repo.requestLoad({for (final p in products.values) p: p.id == 1 ? 300 : 10});
+    await container.read(syncControllerProvider.notifier).run();
+    odoo.storekeeperLoads();
+    await container.read(syncControllerProvider.notifier).run();
+
+    final visit = await repo.startVisit('srv:9');
+    router.push('/order/new?customer=srv%3A9&visit=${visit.uuid}');
+    await tester.pumpAndSettle();
+    // Patel Kirana owes more than its limit: a warning, not a block.
+    expect(find.text('Over the credit limit'), findsOneWidget);
+    expect(find.textContaining('INV/2026/00042 is 25 days overdue'), findsOneWidget);
+    expect(find.text('1 scheme running · they apply by themselves'), findsOneWidget);
+    Finder inTile(String product, Finder f) => find.descendant(of: find.widgetWithText(ListTile, product), matching: f);
+    const parle = 'Parle-G Biscuits (Box of 24)';
+    // Parle-G starts in cases: a case of 24 at AED 10 a piece.
+    expect(inTile(parle, find.text('AED 240.00 / cs')), findsOneWidget);
+    expect(inTile(parle, find.text('12 cs + 12 pc in van')), findsOneWidget);
+    expect(inTile(parle, find.text('Buy 10 Case of 24, get 1 free')), findsOneWidget);
+    await tester.tap(inTile(parle, find.widgetWithText(OutlinedButton, 'Add')));
+    await tester.pump();
+    expect(inTile(parle, find.text('9 cs more: 1 free')), findsOneWidget);
+    for (var i = 0; i < 9; i++) {
+      await tester.tap(inTile(parle, find.byTooltip('More')));
+      await tester.pump();
+    }
+    expect(inTile(parle, find.text('1 cs free earned')), findsOneWidget);
+    // Maggi by the piece: 10 or more at the quantity price.
+    const maggi = 'Maggi Noodles (Case of 48)';
+    expect(inTile(maggi, find.text('AED 540.00 / pc from 10 pc')), findsOneWidget);
+    await tester.tap(inTile(maggi, find.widgetWithText(OutlinedButton, 'Add')));
+    await tester.pump();
+    await tester.pumpAndSettle();
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/24-schemes-order.png'));
+    }
+
+    await tester.tap(find.textContaining('Review'));
+    await tester.pumpAndSettle();
+    expect(find.text('$parle · FREE'), findsOneWidget);
+    expect(find.text('1 cs · Parle-G: buy 10 cases, get 1 free'), findsOneWidget);
+    expect(find.text('The shop saves AED 240.00'), findsOneWidget);
+    expect(find.text('1 cs Parle-G Biscuits (Box of 24) free'), findsOneWidget);
+    // 10 cases at 240 + 1 Maggi at 560, plus 18%: the free case costs nothing.
+    expect(find.text('AED 3,492.80'), findsWidgets);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/25-schemes-summary.png'));
+    }
+    await tester.tap(find.textContaining('Deliver now ·'));
+    await tester.pumpAndSettle();
+
+    // The invoice printed at the shop: the free case and what the shop saved.
+    expect(find.text('$parle · FREE'), findsOneWidget);
+    expect(find.text('FREE · Parle-G: buy 10 cases, get 1 free'), findsOneWidget);
+    expect(find.text('10 cs x 240.00 · 2400.00'), findsOneWidget);
+    expect(find.text('You saved AED'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/26-schemes-invoice.png'));
+    }
+    // 11 cases left the van, free one included: 300 - 264 pieces.
+    expect((await repo.vanStock()).leftOf(1), 36);
+
+    // Odoo gets the cases bought; it adds the free case itself, from the same scheme.
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    await container.read(syncControllerProvider.notifier).run();
+    final lines = [for (final l in odoo.uploaded['sale.order']!.last['order_line'] as List) (l as List)[2] as Map];
+    expect(lines.firstWhere((l) => l['product_id'] == 1), {'product_id': 1, 'product_uom_qty': 10.0, 'product_uom_id': 7, 'discount': 0.0});
+    expect(lines, hasLength(2));
 
     await tester.pumpWidget(const SizedBox());
     await db.close();

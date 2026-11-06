@@ -14,6 +14,8 @@ class ShopInvoice {
   double get untaxed => (json['untaxed'] as num).toDouble();
   double get tax => (json['tax'] as num).toDouble();
   double get total => (json['total'] as num).toDouble();
+  /// What the shop saved: free goods, scheme discounts and quantity prices.
+  double get saved => (json['saved'] as num?)?.toDouble() ?? 0;
   double get previous => (json['previous'] as num?)?.toDouble() ?? 0;
   double get balance => previous + total;
   String get words => amountInWords(total, currency);

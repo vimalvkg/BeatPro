@@ -85,9 +85,19 @@ class SyncService {
         taxPercent[t['id'] as int] = t['amount_type'] == 'percent' ? (t['amount'] as num).toDouble() : 0.0;
       }
     }
+    // Cases and pieces: the units each product sells in.
+    final units = productRows.isEmpty
+        ? const <String, dynamic>{}
+        : await _optional(() => client.call('product.product', 'beatpro_units', kwargs: {
+              'product_ids': [for (final r in productRows) r['id']],
+            })) as Map<String, dynamic>? ??
+            const {};
     final products = [
       for (final r in productRows)
-        Product.fromOdoo(r, (r['taxes_id'] as List).cast<int>().fold(0.0, (sum, id) => sum + (taxPercent[id] ?? 0))),
+        Product.fromOdoo(r, (r['taxes_id'] as List).cast<int>().fold(0.0, (sum, id) => sum + (taxPercent[id] ?? 0)))
+            .withUnits([
+          for (final u in (units['${r['id']}'] as List?) ?? const []) ProductUnit.fromJson((u as Map).cast<String, dynamic>()),
+        ]),
     ];
 
     final pricelistIds = {for (final c in customers) if (c.pricelistId != null) c.pricelistId!};
@@ -103,6 +113,28 @@ class SyncService {
         };
       });
     }
+
+    // Quantity prices (slabs), schemes, and what each shop owes against its credit limit.
+    final breaks = pricelistIds.isEmpty || products.isEmpty
+        ? null
+        : await _optional(() => client.call('product.pricelist', 'beatpro_price_breaks', kwargs: {
+              'pricelist_ids': pricelistIds.toList(),
+              'product_ids': products.map((p) => p.id).toList(),
+            }));
+    final schemes = await _optional(() => client.call('beatpro.scheme', 'beatpro_schemes'));
+    final credit = customers.isEmpty
+        ? null
+        : await _optional(() => client.call('res.partner', 'beatpro_credit', kwargs: {
+              'partner_ids': customers.map((c) => c.serverId).toList(),
+            })) as Map<String, dynamic>?;
+    if (credit != null) {
+      for (final (i, c) in customers.indexed) {
+        final info = credit['${c.serverId}'];
+        if (info is Map) customers[i] = c.withCredit(CreditInfo.fromOdoo(info.cast<String, dynamic>()));
+      }
+    }
+    await db.setValue('price_breaks', breaks == null ? null : jsonEncode(breaks));
+    await db.setValue('schemes', schemes == null ? null : jsonEncode(schemes));
 
     final invoices = customers.isEmpty
         ? <OpenInvoice>[]
@@ -253,11 +285,17 @@ class SyncService {
                 'beatpro_van_invoice_date': (r.data['invoice'] as Map)['date'],
               },
               'order_line': [
-                for (final l in (r.data['lines'] as List).cast<Map<String, dynamic>>())
+                // Odoo adds the free goods itself, from the same schemes.
+                for (final l in (r.data['lines'] as List).cast<Map<String, dynamic>>().where((l) => l['free'] != true))
                   [
                     0,
                     0,
-                    {'product_id': l['productId'], 'product_uom_qty': l['qty'], 'discount': l['discount']},
+                    {
+                      'product_id': l['productId'],
+                      'product_uom_qty': l['qty'],
+                      if (l['uomId'] != null) 'product_uom_id': l['uomId'],
+                      'discount': l['discount'],
+                    },
                   ],
               ],
             },
@@ -444,6 +482,15 @@ class SyncService {
 
   Future<void> _markSynced(LocalRecord r, int serverId) =>
       db.saveRecord(r.copyWith(state: SyncState.synced, serverId: serverId));
+
+  /// Calls Odoo for something older BeatPro modules don't have: null when missing.
+  Future<Object?> _optional(Future<Object?> Function() call) async {
+    try {
+      return await call();
+    } on OdooException {
+      return null;
+    }
+  }
 
   Future<int?> _customerId(String key) async {
     if (key.startsWith('srv:')) return int.parse(key.substring(4));

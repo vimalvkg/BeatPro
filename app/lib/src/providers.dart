@@ -206,6 +206,12 @@ final recordsProvider = FutureProvider<List<LocalRecord>>((ref) async {
   return (await db.records()).reversed.toList();
 });
 
+/// Products by id, for showing quantities as cases and pieces.
+final productsByIdProvider = FutureProvider<Map<int, Product>>((ref) async {
+  ref.watch(dataVersionProvider);
+  return {for (final p in await ref.watch(localDbProvider).products()) p.id: p};
+});
+
 final vanStockProvider = FutureProvider<VanStockView>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).vanStock();

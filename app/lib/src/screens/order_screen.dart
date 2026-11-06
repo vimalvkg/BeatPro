@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/models.dart';
 import '../core/repository.dart';
+import '../core/schemes.dart';
 import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
@@ -13,6 +14,10 @@ import '../widgets/common.dart';
 import '../widgets/scanner.dart';
 
 /// Product catalogue with the customer's prices, and the cart.
+///
+/// Lines sell in cases or pieces. Quantity prices (slabs) and running schemes
+/// apply as the rep adds products, offline; Odoo applies the same schemes when
+/// the order arrives.
 class OrderScreen extends ConsumerStatefulWidget {
   const OrderScreen({super.key, required this.customerKey, this.visitUuid});
 
@@ -25,8 +30,17 @@ class OrderScreen extends ConsumerStatefulWidget {
 
 class _OrderScreenState extends ConsumerState<OrderScreen> {
   List<Product> _products = [];
-  Map<int, double> _prices = {};
+  Map<int, Product> _byId = {};
+  Pricing _pricing = Pricing(prices: const {});
+  List<Scheme> _schemes = const [];
+  CreditWarning? _credit;
   final Map<int, CartLine> _cart = {};
+
+  /// Free goods the cart earns, worked out again after every change.
+  List<CartLine> _free = [];
+
+  /// The unit chosen for each product, also before it is in the cart.
+  final Map<int, ProductUnit> _units = {};
   String _search = '';
   VanStockView? _stock;
   bool _loading = true;
@@ -39,22 +53,36 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   }
 
   Future<void> _load() async {
-    final db = ref.read(localDbProvider);
-    final customer = await db.customer(widget.customerKey);
-    final products = await db.products();
-    final prices = await db.pricesFor(customer?.pricelistId);
-    final stock = await ref.read(repositoryProvider).vanStock();
+    final repo = ref.read(repositoryProvider);
+    final products = await repo.db.products();
+    final pricing = await repo.pricingFor(widget.customerKey);
+    final schemes = await repo.schemes();
+    final stock = await repo.vanStock();
+    final credit = await repo.creditFor(widget.customerKey);
     if (mounted) {
       setState(() {
         _products = products;
-        _prices = prices;
+        _byId = {for (final p in products) p.id: p};
+        _pricing = pricing;
+        _schemes = schemes;
         _stock = stock;
+        _credit = credit;
         _loading = false;
       });
     }
   }
 
-  double _priceOf(Product p) => _prices[p.id] ?? p.listPrice;
+  List<CartLine> get _lines => [..._cart.values, ..._free];
+
+  ProductUnit _unitOf(Product p) => _cart[p.id]?.unit ?? _units[p.id] ?? p.defaultUnit;
+
+  /// Prices and schemes follow the quantities.
+  void _recalculate() {
+    for (final l in _cart.values) {
+      _pricing.price(l);
+    }
+    _free = applySchemes(_cart.values.toList(), _schemes, _byId, _pricing);
+  }
 
   final _searchField = TextEditingController();
 
@@ -70,7 +98,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     if (p == null) return ScanFeedback('No product with barcode $code. Sync to update the products.', ok: false);
     final qty = (_cart[p.id]?.qty ?? 0) + 1;
     _setQty(p, qty);
-    return ScanFeedback('Added ${p.name} · ${formatQty(qty)} in the order');
+    return ScanFeedback('Added ${p.name} · ${formatQty(qty)} ${_unitOf(p).short} in the order');
   }
 
   /// Handheld scanners type the barcode into the search box and press Enter.
@@ -86,8 +114,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
         if (qty <= 0) {
           _cart.remove(p.id);
         } else {
-          (_cart[p.id] ??= CartLine(product: p, unitPrice: _priceOf(p))).qty = qty;
+          (_cart[p.id] ??= CartLine(product: p, unitPrice: 0, unit: _unitOf(p))).qty = qty;
         }
+        _recalculate();
+      });
+
+  void _setUnit(Product p, ProductUnit unit) => setState(() {
+        _units[p.id] = unit;
+        _cart[p.id]?.unit = unit;
+        _recalculate();
       });
 
   Future<void> _repeatLastOrder() async {
@@ -97,12 +132,18 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       return;
     }
     setState(() {
-      for (final l in (last.data['lines'] as List).cast<Map<String, dynamic>>()) {
-        final product = _products.where((p) => p.id == l['productId']).firstOrNull;
+      for (final l in (last.data['lines'] as List).cast<Map<String, dynamic>>().where((l) => l['free'] != true)) {
+        final product = _byId[l['productId']];
         if (product != null) {
-          _cart[product.id] = CartLine(product: product, unitPrice: _priceOf(product), qty: (l['qty'] as num).toDouble());
+          _cart[product.id] = CartLine(
+            product: product,
+            unitPrice: 0,
+            unit: l['uomId'] == null ? product.baseUnit : product.unitById(l['uomId'] as int),
+            qty: (l['qty'] as num).toDouble(),
+          );
         }
       }
+      _recalculate();
     });
   }
 
@@ -112,9 +153,10 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => _CartSheet(
-        lines: _cart.values.toList(),
+        lines: () => _lines,
         stock: _stock?.hasVan == true ? _stock : null,
-        onChanged: () => setState(() {}),
+        credit: () async => ref.read(repositoryProvider).creditFor(widget.customerKey, adding: OrderTotals.of(_lines).total),
+        onChanged: () => setState(_recalculate),
       ),
     );
     if (confirmed == null) return;
@@ -123,7 +165,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
       final order = await ref.read(repositoryProvider).placeOrder(
             customerKey: widget.customerKey,
             visitUuid: widget.visitUuid,
-            lines: _cart.values.toList(),
+            lines: _lines,
             note: confirmed.note.isEmpty ? null : confirmed.note,
             delivery: confirmed.delivery,
           );
@@ -139,6 +181,26 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     }
   }
 
+  /// Where the cart stands on a scheme: `3 cs more: 1 free`, or `1 cs free earned`.
+  String? _nudge(Product p, Scheme s) {
+    final bought = _cart.values
+        .where((l) => s.productIds.contains(l.product.id))
+        .fold<double>(0, (sum, l) => sum + l.qty * l.unit.factor);
+    if (bought <= 0 || s.minQty <= 0) return null;
+    final times = (bought / s.minQty + 1e-9).floor();
+    if (times > 0) {
+      final free = _free.where((l) => l.schemeId == s.id).firstOrNull;
+      return s.isFreeGoods
+          ? '${formatQty(s.freeQty * times)} ${free?.unit.short ?? ''} free earned'.replaceAll('  ', ' ')
+          : '${formatQty(s.discount)}% off earned';
+    }
+    final unit = _unitOf(p);
+    final more = ((s.minQty - bought) / unit.factor - 1e-9).ceil();
+    return s.isFreeGoods
+        ? '$more ${unit.short} more: ${formatQty(s.freeQty)} free'
+        : '$more ${unit.short} more: ${formatQty(s.discount)}% off';
+  }
+
   @override
   Widget build(BuildContext context) {
     final money = ref.watch(moneyProvider);
@@ -146,8 +208,11 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final visible = _search.isEmpty
         ? _products
         : _products.where((p) => p.name.toLowerCase().contains(_search) || (p.code ?? '').toLowerCase().contains(_search) || (p.barcode ?? '').contains(_search)).toList();
-    final totals = OrderTotals.of(_cart.values);
-    final count = _cart.values.fold<double>(0, (s, l) => s + l.qty);
+    final totals = OrderTotals.of(_lines);
+    final cases = _cart.values.where((l) => l.unit.short == 'cs').fold<double>(0, (s, l) => s + l.qty);
+    final pieces = _cart.values.where((l) => l.unit.short != 'cs').fold<double>(0, (s, l) => s + l.qty);
+    final count = [if (cases > 0) '${formatQty(cases)} cs', if (pieces > 0 || cases == 0) '${formatQty(pieces)} ${pieces == 1 ? 'item' : 'items'}'].join(' + ');
+    final running = _schemes.where((s) => s.productIds.any(_byId.containsKey)).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -179,24 +244,52 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
               ? const EmptyState(icon: Icons.inventory_2_outlined, title: 'No products', message: 'Sync to download the product list.')
               : ListView.separated(
                   padding: const EdgeInsets.only(bottom: 120),
-                  itemCount: visible.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, i) {
-                    final p = visible[i];
-                    final qty = _cart[p.id]?.qty ?? 0;
+                  itemCount: visible.length + 1,
+                  separatorBuilder: (_, i) => i == 0 ? const SizedBox.shrink() : const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(children: [
+                        if (_credit != null) CreditWarningCard(warning: _credit!, compact: true),
+                        if (running > 0)
+                          _Banner(
+                            icon: Icons.card_giftcard,
+                            color: BeatproColors.amberInk,
+                            background: BeatproColors.amberSoft,
+                            text: '$running ${running == 1 ? 'scheme' : 'schemes'} running · they apply by themselves',
+                          ),
+                      ]);
+                    }
+                    final p = visible[index - 1];
+                    final line = _cart[p.id];
+                    final qty = line?.qty ?? 0;
+                    final unit = _unitOf(p);
                     final inVan = _stock?.hasVan == true ? _stock!.leftOf(p.id) : null;
                     final have = inVan ?? p.qtyAvailable;
+                    final price = line?.unitPrice ?? _pricing.unitPrice(p, unit, p.perUnit(unit));
+                    final next = _pricing.nextBreak(p, line?.baseQty ?? 0);
+                    final schemes = _schemes.where((s) => s.productIds.contains(p.id)).toList();
                     return ListTile(
                       title: Text(p.name),
-                      subtitle: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                        Text(money(_priceOf(p)), style: const TextStyle(fontWeight: FontWeight.w600)),
-                        StatusChip(
-                          have > 0
-                              ? '${formatQty(have)} ${inVan != null ? 'in van' : 'in stock'}'
-                              : (inVan != null ? '0 in van' : 'Out of stock'),
-                          color: have > 0 ? BeatproColors.success : BeatproColors.danger,
-                        ),
-                      ]),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          if (p.caseUnit != null) _UnitSwitch(product: p, unit: unit, onChanged: (u) => _setUnit(p, u)),
+                          Text('${money(price)} / ${unit.short}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          if (line != null && line.unitPrice + 0.005 < line.listPrice)
+                            const StatusChip('Qty price', color: BeatproColors.success),
+                          StatusChip(
+                            have > 0
+                                ? '${p.packText(have)} ${inVan != null ? 'in van' : 'in stock'}'
+                                : (inVan != null ? '0 in van' : 'Out of stock'),
+                            color: have > 0 ? BeatproColors.success : BeatproColors.danger,
+                          ),
+                          for (final s in schemes)
+                            StatusChip(_nudge(p, s) ?? s.badge, color: BeatproColors.amberInk, icon: Icons.card_giftcard),
+                          if (next != null)
+                            Text('${money(_pricing.unitPrice(p, unit, next.$1))} / ${unit.short} from ${p.packText(next.$1)}',
+                                style: const TextStyle(fontSize: 12, color: BeatproColors.muted)),
+                        ]),
+                      ),
                       trailing: _QtyStepper(qty: qty, onChanged: (q) => _setQty(p, q)),
                     );
                   },
@@ -209,13 +302,121 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                 child: FilledButton(
                   onPressed: _saving ? null : _openCart,
                   child: Row(children: [
-                    Text('${formatQty(count)} items'),
-                    const Spacer(),
+                    Flexible(
+                      child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(count)),
+                    ),
+                    const SizedBox(width: 12),
                     Text('Review  ${money(totals.total)}'),
                   ]),
                 ),
               ),
             ),
+    );
+  }
+}
+
+/// Case or pieces, for products sold in cases.
+class _UnitSwitch extends StatelessWidget {
+  const _UnitSwitch({required this.product, required this.unit, required this.onChanged});
+
+  final Product product;
+  final ProductUnit unit;
+  final ValueChanged<ProductUnit> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [(product.caseUnit!, 'Case'), (product.baseUnit, 'Pcs')];
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: BeatproColors.line), borderRadius: BorderRadius.circular(8)),
+      clipBehavior: Clip.antiAlias,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (final (u, label) in options)
+          Semantics(
+            button: true,
+            selected: u.factor == unit.factor,
+            child: InkWell(
+              onTap: () => onChanged(u),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 32),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                color: u.factor == unit.factor ? BeatproColors.brand : Colors.white,
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: u.factor == unit.factor ? Colors.white : BeatproColors.muted)),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({required this.icon, required this.color, required this.background, required this.text});
+
+  final IconData icon;
+  final Color color;
+  final Color background;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(12)),
+        child: Row(children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13))),
+        ]),
+      );
+}
+
+/// A shop over its credit limit or with an overdue invoice. Only a warning:
+/// the rep can still take the order.
+class CreditWarningCard extends ConsumerWidget {
+  const CreditWarningCard({super.key, required this.warning, this.compact = false});
+
+  final CreditWarning warning;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final money = ref.watch(moneyProvider);
+    final info = warning.info;
+    final lines = [
+      if (warning.overLimit) 'Owes ${money(warning.owed)}, over its ${money(info.limit)} credit limit.',
+      if (info.overdueDays > 0)
+        '${info.overdueName ?? 'An invoice'} is ${info.overdueDays} days overdue · ${money(info.overdueAmount)} overdue in all.',
+    ];
+    return Container(
+      margin: EdgeInsets.fromLTRB(16, 12, 16, compact ? 4 : 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BeatproColors.amberSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: BeatproColors.amber),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.warning_amber_rounded, color: BeatproColors.amberInk),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(warning.overLimit ? 'Over the credit limit' : 'Overdue invoice',
+                style: const TextStyle(fontWeight: FontWeight.w800, color: BeatproColors.amberInk)),
+            for (final l in lines) Text(l, style: const TextStyle(fontSize: 13, color: BeatproColors.amberInk)),
+            if (!compact)
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text('You can still take the order. Try to collect a payment first.',
+                    style: TextStyle(fontSize: 12, color: BeatproColors.amberInk)),
+              ),
+          ]),
+        ),
+      ]),
     );
   }
 }
@@ -256,10 +457,14 @@ class _CartResult {
 }
 
 class _CartSheet extends ConsumerStatefulWidget {
-  const _CartSheet({required this.lines, required this.onChanged, this.stock});
+  const _CartSheet({required this.lines, required this.onChanged, required this.credit, this.stock});
 
-  final List<CartLine> lines;
+  /// The order's lines, free goods included; they change as discounts change.
+  final List<CartLine> Function() lines;
   final VoidCallback onChanged;
+
+  /// The shop's credit position with this order added.
+  final Future<CreditWarning?> Function() credit;
 
   /// The van's stock, for reps with a van: they choose how the order is delivered.
   final VanStockView? stock;
@@ -271,9 +476,23 @@ class _CartSheet extends ConsumerStatefulWidget {
 class _CartSheetState extends ConsumerState<_CartSheet> {
   final _note = TextEditingController();
   DeliveryMode? _delivery;
+  CreditWarning? _credit;
 
-  bool get _vanHasAll => widget.lines.every((l) => (widget.stock?.leftOf(l.product.id) ?? 0) >= l.qty);
-  bool get _vanHasSome => widget.lines.any((l) => (widget.stock?.leftOf(l.product.id) ?? 0) >= l.qty);
+  @override
+  void initState() {
+    super.initState();
+    _loadCredit();
+  }
+
+  Future<void> _loadCredit() async {
+    final credit = await widget.credit();
+    if (mounted) setState(() => _credit = credit);
+  }
+
+  List<CartLine> get _lines => widget.lines();
+  bool get _vanHasAll => Repository.vanHasAll(_lines, widget.stock!);
+  bool _inVan(CartLine l) => (widget.stock?.leftOf(l.product.id) ?? 0) + 1e-9 >= l.baseQty;
+  bool get _vanHasSome => _lines.any(_inVan);
 
   DeliveryMode? get _mode {
     if (widget.stock == null) return null;
@@ -284,11 +503,13 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
   String _optionText(DeliveryMode mode) {
     final stock = widget.stock!;
     final main = stock.van?.mainWarehouse ?? 'the main warehouse';
-    final short = [for (final l in widget.lines) if (stock.leftOf(l.product.id) < l.qty) l.product.name];
-    final now = [for (final l in widget.lines) if (stock.leftOf(l.product.id) >= l.qty) l.product.name];
+    final need = Repository.piecesNeeded(_lines);
+    final names = {for (final l in _lines) l.product.id: l.product.name};
+    final short = [for (final e in need.entries) if (stock.leftOf(e.key) + 1e-9 < e.value) names[e.key]!];
+    final now = [for (final e in need.entries) if (stock.leftOf(e.key) + 1e-9 >= e.value) names[e.key]!];
     return switch (mode) {
       DeliveryMode.van => short.isEmpty
-          ? 'Hand everything over now.'
+          ? 'Hand everything over now, free goods included.'
           : 'Not possible: ${short.join(', ')} ${short.length == 1 ? 'is' : 'are'} short in the van.',
       DeliveryMode.split => now.isEmpty
           ? 'Nothing in this order is in the van.'
@@ -301,7 +522,7 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
 
   String _ctaFor(DeliveryMode? mode, String total) {
     if (mode == null) return 'Place order · $total';
-    final nowCount = Repository.vanLinesFor(mode, widget.lines, widget.stock!).length;
+    final nowCount = Repository.vanLinesFor(mode, _lines, widget.stock!).length;
     return switch (mode) {
       DeliveryMode.van => 'Deliver now · $total',
       DeliveryMode.split => 'Place order · deliver $nowCount item${nowCount == 1 ? '' : 's'} now',
@@ -337,17 +558,36 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
       ),
     );
     if (value != null) {
-      setState(() => line.discount = value.clamp(0, 100).toDouble());
+      line.discount = value.clamp(0, 100).toDouble();
       widget.onChanged();
+      setState(() {});
+      unawaited(_loadCredit());
     }
+  }
+
+  String _lineText(CartLine l, Money money) {
+    final qty = '${formatQty(l.qty)} ${l.unit.short}';
+    if (l.free) return '$qty · ${l.schemeName ?? 'Scheme'}';
+    final parts = ['$qty × ${money(l.unitPrice)}'];
+    if (l.unitPrice + 0.005 < l.listPrice) parts.add('qty price (was ${money(l.listPrice)})');
+    if (l.schemeDiscount > l.discount) {
+      parts.add('${formatQty(l.schemeDiscount)}% off · ${l.schemeName}');
+    } else if (l.discount > 0) {
+      parts.add('${formatQty(l.discount)}% off');
+    }
+    return parts.join(' · ');
   }
 
   @override
   Widget build(BuildContext context) {
     final money = ref.watch(moneyProvider);
     final limit = ref.watch(appContextProvider).value?.discountLimit ?? 0;
-    final totals = OrderTotals.of(widget.lines);
-    final needsApproval = widget.lines.any((l) => l.discount > limit);
+    final lines = _lines;
+    final totals = OrderTotals.of(lines);
+    final saved = lines.fold<double>(0, (s, l) => s + l.saved);
+    final freeNames = [for (final l in lines.where((l) => l.free)) '${formatQty(l.qty)} ${l.unit.short} ${l.product.name} free'];
+    final needsApproval = lines.any((l) => !l.free && l.discount > limit);
+    final need = Repository.piecesNeeded(lines);
     final theme = Theme.of(context);
     return DraggableScrollableSheet(
       expand: false,
@@ -360,37 +600,68 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text('Order summary', style: theme.textTheme.titleLarge),
             ),
-            for (final l in widget.lines)
-              ListTile(
-                title: Text(l.product.name),
-                subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${formatQty(l.qty)} × ${money(l.unitPrice)}'
-                      '${l.discount > 0 ? ' · ${formatQty(l.discount)}% off' : ''}'),
-                  if (widget.stock != null)
-                    Text(
-                      widget.stock!.leftOf(l.product.id) >= l.qty
-                          ? '${formatQty(l.qty)} of ${formatQty(widget.stock!.leftOf(l.product.id))} in van'
-                          : '${formatQty(widget.stock!.leftOf(l.product.id))} in van · warehouse has ${formatQty(widget.stock!.mainOf(l.product.id))}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: widget.stock!.leftOf(l.product.id) >= l.qty ? BeatproColors.success : BeatproColors.danger,
-                      ),
-                    ),
-                ]),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(money(l.subtotal), style: const TextStyle(fontWeight: FontWeight.w600)),
-                  IconButton(tooltip: 'Discount', icon: const Icon(Icons.percent, size: 20), onPressed: () => _editDiscount(l)),
-                ]),
+            for (final l in lines)
+              Container(
+                color: l.free ? BeatproColors.successSoft : null,
+                child: ListTile(
+                  title: Text(l.free ? '${l.product.name} · FREE' : l.product.name),
+                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(_lineText(l, money),
+                        style: l.free || l.schemeDiscount > l.discount || l.unitPrice + 0.005 < l.listPrice
+                            ? const TextStyle(color: BeatproColors.success, fontWeight: FontWeight.w600)
+                            : null),
+                    if (widget.stock != null && !l.free)
+                      Builder(builder: (context) {
+                        final left = widget.stock!.leftOf(l.product.id);
+                        final enough = left + 1e-9 >= (need[l.product.id] ?? l.baseQty);
+                        return Text(
+                          enough
+                              ? '${l.product.packText(need[l.product.id] ?? l.baseQty)} of ${l.product.packText(left)} in van'
+                              : '${l.product.packText(left)} in van · warehouse has ${l.product.packText(widget.stock!.mainOf(l.product.id))}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: enough ? BeatproColors.success : BeatproColors.danger,
+                          ),
+                        );
+                      }),
+                  ]),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(money(l.subtotal),
+                        style: TextStyle(fontWeight: FontWeight.w600, color: l.free ? BeatproColors.success : null)),
+                    if (!l.free)
+                      IconButton(tooltip: 'Discount', icon: const Icon(Icons.percent, size: 20), onPressed: () => _editDiscount(l))
+                    else
+                      const SizedBox(width: 48),
+                  ]),
+                ),
               ),
             const Divider(),
             _TotalRow(label: 'Before tax', value: money(totals.untaxed)),
             _TotalRow(label: 'Tax (estimate)', value: money(totals.tax)),
             _TotalRow(label: 'Total', value: money(totals.total), bold: true),
+            if (saved >= 0.01)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: BeatproColors.successSoft, borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('The shop saves ${money(saved)}',
+                          style: const TextStyle(fontWeight: FontWeight.w800, color: BeatproColors.success)),
+                      if (freeNames.isNotEmpty)
+                        Text(freeNames.join(' · '), style: const TextStyle(fontSize: 12, color: BeatproColors.success)),
+                    ]),
+                  ),
+                  const Icon(Icons.card_giftcard, color: BeatproColors.success),
+                ]),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Text('Odoo confirms the final prices and taxes when the order syncs.', style: theme.textTheme.bodySmall),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text('Odoo confirms the final prices, schemes and taxes when the order syncs.', style: theme.textTheme.bodySmall),
             ),
+            if (_credit != null) CreditWarningCard(warning: _credit!),
             if (needsApproval)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

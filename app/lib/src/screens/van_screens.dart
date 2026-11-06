@@ -31,6 +31,7 @@ class _VanStockScreenState extends ConsumerState<VanStockScreen> {
     final stock = ref.watch(vanStockProvider);
     final lastSync = ref.watch(lastSyncProvider).value;
     final money = ref.watch(moneyProvider);
+    final products = ref.watch(productsByIdProvider).value ?? const <int, Product>{};
     return Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -57,7 +58,7 @@ class _VanStockScreenState extends ConsumerState<VanStockScreen> {
                 ),
               if (s.hasVan && !showMain) ...[
                 const SizedBox(height: 14),
-                _VanHero(stock: s, money: money),
+                _VanHero(stock: s, money: money, products: products),
                 const SizedBox(height: 12),
                 _VanActions(stock: s),
               ],
@@ -83,7 +84,11 @@ class _VanStockScreenState extends ConsumerState<VanStockScreen> {
                     : Column(children: [
                         for (final (n, i) in list.indexed) ...[
                           if (n > 0) const Divider(height: 1),
-                          _StockRow(item: i, main: showMain, mainName: s.van?.mainWarehouse ?? 'Main warehouse'),
+                          _StockRow(
+                              item: i,
+                              product: products[i.productId],
+                              main: showMain,
+                              mainName: s.van?.mainWarehouse ?? 'Main warehouse'),
                         ],
                       ]),
               ),
@@ -143,17 +148,23 @@ class _Segmented extends StatelessWidget {
 }
 
 class _VanHero extends StatelessWidget {
-  const _VanHero({required this.stock, required this.money});
+  const _VanHero({required this.stock, required this.money, required this.products});
 
   final VanStockView stock;
   final Money money;
+  final Map<int, Product> products;
 
   @override
   Widget build(BuildContext context) {
-    Widget figure(String label, double v) => Expanded(
+    String total(double Function(VanItem) of) => packTotal(products, [for (final i in stock.items) (i.productId, of(i))]);
+    Widget figure(String label, String v) => Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: BeatproColors.onBrand)),
-            Text(formatQty(v), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+            ),
           ]),
         );
     return Container(
@@ -161,7 +172,7 @@ class _VanHero extends StatelessWidget {
       decoration: BoxDecoration(gradient: BeatproColors.bandGradient, borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('In the van now', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: BeatproColors.onBrand)),
-        Text('${formatQty(stock.inVan)} cases',
+        Text(total((i) => i.left > 0 ? i.left : 0),
             style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
         Text('${money(stock.value)} at sale price',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: BeatproColors.onBrand)),
@@ -169,9 +180,9 @@ class _VanHero extends StatelessWidget {
         const Divider(color: Color(0x29FFFFFF), height: 1),
         const SizedBox(height: 12),
         Row(children: [
-          figure('Loaded', stock.loaded),
-          figure('Delivered', stock.sold),
-          figure('Returned in', stock.returned),
+          figure('Loaded', total((i) => i.loaded)),
+          figure('Delivered', total((i) => i.sold)),
+          figure('Returned in', total((i) => i.returned)),
         ]),
       ]),
     );
@@ -242,12 +253,35 @@ class _Note extends StatelessWidget {
       );
 }
 
+/// `14 cs + 30 pc`: quantities of several products, in their cases and pieces.
+String packTotal(Map<int, Product> products, Iterable<(int, double)> quantities) {
+  var cases = 0;
+  var pieces = 0.0;
+  for (final (id, qty) in quantities) {
+    final p = products[id];
+    final unit = p?.caseUnit;
+    if (p == null || unit == null) {
+      pieces += qty;
+      continue;
+    }
+    final per = p.perUnit(unit);
+    final full = ((qty.abs() + 1e-9) / per).floor() * (qty < 0 ? -1 : 1);
+    cases += full;
+    pieces += qty - full * per;
+  }
+  if (cases == 0) return '${formatQty(pieces)} ${pieces == 1 ? 'item' : 'items'}';
+  return pieces.abs() < 1e-9 ? '$cases cs' : '$cases cs + ${formatQty(pieces)} pc';
+}
+
 class _StockRow extends StatelessWidget {
-  const _StockRow({required this.item, required this.main, required this.mainName});
+  const _StockRow({required this.item, required this.main, required this.mainName, this.product});
 
   final VanItem item;
+  final Product? product;
   final bool main;
   final String mainName;
+
+  String _pack(double q) => product?.packText(q) ?? formatQty(q);
 
   @override
   Widget build(BuildContext context) {
@@ -265,13 +299,13 @@ class _StockRow extends StatelessWidget {
             Text(
               main
                   ? 'Delivered by $mainName'
-                  : 'Loaded ${formatQty(item.loaded)} · delivered ${formatQty(item.sold)} · returned ${formatQty(item.returned)}',
+                  : 'Loaded ${_pack(item.loaded)} · delivered ${_pack(item.sold)} · returned ${_pack(item.returned)}',
               style: const TextStyle(fontSize: 12, color: BeatproColors.muted),
             ),
           ]),
         ),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(formatQty(main ? item.mainQty : item.left), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+          Text(_pack(main ? item.mainQty : item.left), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           if (!main)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -298,6 +332,7 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
   Map<int, Product> _products = {};
   VanStockView? _stock;
   double _suggested = 0;
+  String _suggestedText = '';
   bool _loading = true;
   bool _saving = false;
 
@@ -320,6 +355,7 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
         if (products.containsKey(s['product_id'])) _qty[s['product_id'] as int] = (s['qty'] as num).toDouble();
       }
       _suggested = _qty.values.fold(0.0, (a, b) => a + b);
+      _suggestedText = packTotal(products, [for (final e in _qty.entries) (e.key, e.value)]);
       _loading = false;
     });
   }
@@ -330,13 +366,18 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
   ScanFeedback _scanned(String code) {
     final p = productForCode(_products.values, code);
     if (p == null) return ScanFeedback('No product with barcode $code. Sync to update the products.', ok: false);
-    setState(() => _qty[p.id] = (_qty[p.id] ?? 0) + 1);
-    return ScanFeedback('Added ${p.name} · ${formatQty(_qty[p.id]!)} to load');
+    setState(() => _qty[p.id] = (_qty[p.id] ?? 0) + _caseStep(p.id));
+    return ScanFeedback('Added ${p.name} · ${p.packText(_qty[p.id]!)} to load');
   }
 
   Future<void> _addProduct() async {
     final picked = await pickProduct(context, _products.values.where((p) => !_qty.containsKey(p.id)).toList());
-    if (picked != null) setState(() => _qty[picked.id] = 1);
+    if (picked != null) setState(() => _qty[picked.id] = _caseStep(picked.id));
+  }
+
+  double _caseStep(int id) {
+    final p = _products[id];
+    return p?.caseUnit == null ? 1 : p!.perUnit(p.caseUnit!);
   }
 
   Future<void> _send() async {
@@ -383,7 +424,7 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
                     const Text('Suggested for today',
                         style: TextStyle(color: BeatproColors.amber, fontWeight: FontWeight.w800, fontSize: 13)),
                     const SizedBox(height: 6),
-                    Text('${formatQty(_suggested)} cases',
+                    Text(_suggestedText,
                         style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
                     const Text("Based on today's shops' last 4 orders.",
                         style: TextStyle(color: BeatproColors.onBrand, fontSize: 13)),
@@ -408,11 +449,17 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(_products[id]?.name ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                              Text('Main warehouse has ${formatQty(_stock?.mainOf(id) ?? 0)}',
+                              Text('Main warehouse has ${_products[id]?.packText(_stock?.mainOf(id) ?? 0) ?? formatQty(_stock?.mainOf(id) ?? 0)}',
                                   style: const TextStyle(fontSize: 12, color: BeatproColors.muted)),
                             ]),
                           ),
-                          QtyStepper(qty: _qty[id]!, onChanged: (q) => setState(() => q <= 0 ? _qty.remove(id) : _qty[id] = q)),
+                          // Products sold in cases load a case at a time.
+                          QtyStepper(
+                            qty: _qty[id]!,
+                            step: _caseStep(id),
+                            label: _products[id]?.packText,
+                            onChanged: (q) => setState(() => q <= 0 ? _qty.remove(id) : _qty[id] = q),
+                          ),
                         ]),
                       ),
                     ],
@@ -428,8 +475,8 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
             ]),
       bottomNavigationBar: _BottomButton(
         label: van?.selfLoad == true
-            ? 'Load the van · ${formatQty(_total)} cases'
-            : 'Send load request · ${formatQty(_total)} cases',
+            ? 'Load the van · ${packTotal(_products, [for (final e in _qty.entries) (e.key, e.value)])}'
+            : 'Send load request · ${packTotal(_products, [for (final e in _qty.entries) (e.key, e.value)])}',
         sub: _total > 0 ? money(value) : null,
         onPressed: _saving || _total <= 0 ? null : _send,
       ),
@@ -453,7 +500,9 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
   /// Products counted by scanning: their first scan replaces the expected
   /// quantity filled in, each later scan adds one.
   final Set<int> _scanCounted = {};
+  /// Pieces counted, and cases counted for products sold in cases.
   final Map<int, TextEditingController> _counted = {};
+  final Map<int, TextEditingController> _cases = {};
   final _note = TextEditingController();
   int _damaged = 0;
   bool _saving = false;
@@ -466,7 +515,7 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
 
   @override
   void dispose() {
-    for (final c in _counted.values) {
+    for (final c in [..._counted.values, ..._cases.values]) {
       c.dispose();
     }
     _note.dispose();
@@ -490,14 +539,33 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
       _products = products;
       _damaged = damaged.round();
       for (final i in _expectedItems) {
-        _counted[i.productId] = TextEditingController(text: formatQty(_expected(i)))..addListener(() => setState(() {}));
+        final per = _perCase(i.productId);
+        final expected = _expected(i);
+        final cases = per == null ? 0 : ((expected + 1e-9) / per).floor();
+        if (per != null) {
+          _cases[i.productId] = TextEditingController(text: '$cases')..addListener(() => setState(() {}));
+        }
+        _counted[i.productId] = TextEditingController(text: formatQty(expected - cases * (per ?? 0)))
+          ..addListener(() => setState(() {}));
       }
     });
   }
 
   List<VanItem> get _expectedItems => _stock?.items.where((i) => i.left != 0 || i.loaded != 0).toList() ?? [];
   double _expected(VanItem i) => i.left > 0 ? i.left : 0;
-  double _countOf(VanItem i) => double.tryParse(_counted[i.productId]?.text.trim() ?? '') ?? 0;
+  double _countOf(VanItem i) {
+    final pieces = double.tryParse(_counted[i.productId]?.text.trim() ?? '') ?? 0;
+    final cases = double.tryParse(_cases[i.productId]?.text.trim() ?? '') ?? 0;
+    return pieces + cases * (_perCase(i.productId) ?? 0);
+  }
+
+  /// Pieces in a case, for products sold in cases.
+  double? _perCase(int productId) {
+    final p = _products.where((p) => p.id == productId).firstOrNull;
+    return p?.caseUnit == null ? null : p!.perUnit(p.caseUnit!);
+  }
+
+  Product? _product(int id) => _products.where((p) => p.id == id).firstOrNull;
 
   /// Count by scanning each box left in the van.
   ScanFeedback _scanned(String code) {
@@ -507,9 +575,12 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
     if (item == null) {
       return ScanFeedback("${p.name} isn't expected in the van. Put it aside and tell the storekeeper.", ok: false);
     }
-    final now = _scanCounted.add(p.id) ? 1.0 : _countOf(item) + 1;
-    _counted[p.id]!.text = formatQty(now);
-    return ScanFeedback('${p.name} · counted ${formatQty(now)} of ${formatQty(_expected(item))}');
+    // Each scan is one case of products sold in cases, otherwise one piece.
+    final first = _scanCounted.add(p.id);
+    final field = _cases[p.id] ?? _counted[p.id]!;
+    if (first && _cases.containsKey(p.id)) _counted[p.id]!.text = '0';
+    field.text = formatQty(first ? 1.0 : (double.tryParse(field.text.trim()) ?? 0) + 1);
+    return ScanFeedback('${p.name} · counted ${p.packText(_countOf(item))} of ${p.packText(_expected(item))}');
   }
 
   Future<void> _send() async {
@@ -537,7 +608,6 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
     final stock = _stock;
     final items = _expectedItems;
     final shortages = [for (final i in items) if (_countOf(i) != _expected(i)) i];
-    final counted = items.fold(0.0, (s, i) => s + _countOf(i));
     final expected = items.fold(0.0, (s, i) => s + _expected(i));
     return Scaffold(
       appBar: AppBar(
@@ -566,14 +636,21 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
                     padding: EdgeInsets.fromLTRB(14, 10, 14, 10),
                     child: Row(children: [
                       Expanded(child: _Head('Product')),
-                      SizedBox(width: 64, child: _Head('Expected', center: true)),
+                      SizedBox(width: 72, child: _Head('Expected', center: true)),
                       SizedBox(width: 8),
-                      SizedBox(width: 76, child: _Head('Counted', center: true)),
+                      SizedBox(width: 112, child: _Head('Counted', center: true)),
                     ]),
                   ),
                   for (final i in items) ...[
                     const Divider(height: 1),
-                    _CountRow(item: i, expected: _expected(i), counted: _countOf(i), controller: _counted[i.productId]!),
+                    _CountRow(
+                      item: i,
+                      product: _product(i.productId),
+                      expected: _expected(i),
+                      counted: _countOf(i),
+                      controller: _counted[i.productId]!,
+                      cases: _cases[i.productId],
+                    ),
                   ],
                 ]),
               ),
@@ -586,7 +663,8 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
                     Text(
                       shortages.map((i) {
                         final d = _countOf(i) - _expected(i);
-                        return '${formatQty(d.abs())} ${d < 0 ? 'short' : 'extra'}: ${i.name}';
+                        final text = _product(i.productId)?.packText(d.abs()) ?? formatQty(d.abs());
+                        return '$text ${d < 0 ? 'short' : 'extra'}: ${i.name}';
                       }).join('\n'),
                       style: const TextStyle(fontWeight: FontWeight.w800, color: BeatproColors.danger),
                     ),
@@ -619,7 +697,7 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
               ],
             ]),
       bottomNavigationBar: _BottomButton(
-        label: 'Send unload · ${formatQty(counted)} cases',
+        label: 'Send unload · ${packTotal({for (final p in _products) p.id: p}, [for (final i in items) (i.productId, _countOf(i))])}',
         onPressed: _saving || stock == null || items.isEmpty ? null : _send,
       ),
     );
@@ -656,12 +734,27 @@ class _Head extends StatelessWidget {
 }
 
 class _CountRow extends StatelessWidget {
-  const _CountRow({required this.item, required this.expected, required this.counted, required this.controller});
+  const _CountRow({
+    required this.item,
+    required this.expected,
+    required this.counted,
+    required this.controller,
+    this.product,
+    this.cases,
+  });
 
   final VanItem item;
+  final Product? product;
   final double expected;
   final double counted;
+
+  /// Pieces counted.
   final TextEditingController controller;
+
+  /// Cases counted, for products sold in cases.
+  final TextEditingController? cases;
+
+  String _pack(double q) => product?.packText(q) ?? formatQty(q);
 
   @override
   Widget build(BuildContext context) {
@@ -675,38 +768,47 @@ class _CountRow extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(item.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             Text(
-              off ? '${formatQty(diff.abs())} ${diff < 0 ? 'short' : 'extra'}' : 'Matches',
+              off ? '${_pack(diff.abs())} ${diff < 0 ? 'short' : 'extra'}' : 'Matches',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: off ? BeatproColors.danger : BeatproColors.success),
             ),
           ]),
         ),
         SizedBox(
-          width: 64,
-          child: Text(formatQty(expected),
+          width: 72,
+          child: Text(_pack(expected),
               textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700, color: BeatproColors.muted)),
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 76,
-          child: TextField(
-            controller: controller,
-            textAlign: TextAlign.center,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-            decoration: InputDecoration(
-              isDense: true,
-              semanticCounterText: 'Counted',
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: off ? BeatproColors.danger : BeatproColors.line, width: off ? 2 : 1),
-              ),
-            ),
-          ),
+          width: 112,
+          child: Row(children: [
+            if (cases != null) ...[
+              Expanded(child: _field(cases!, 'cs', off)),
+              const SizedBox(width: 4),
+            ],
+            Expanded(child: _field(controller, cases == null ? null : 'pc', off)),
+          ]),
         ),
       ]),
     );
   }
 }
+
+Widget _field(TextEditingController controller, String? suffix, bool off) => TextField(
+      controller: controller,
+      textAlign: TextAlign.center,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      decoration: InputDecoration(
+        isDense: true,
+        suffixText: suffix,
+        semanticCounterText: suffix == 'cs' ? 'Cases counted' : 'Counted',
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: off ? BeatproColors.danger : BeatproColors.line, width: off ? 2 : 1),
+        ),
+      ),
+    );
 
 // -- Shared -------------------------------------------------------------------------
 
@@ -735,20 +837,30 @@ class _BottomButton extends StatelessWidget {
 
 /// A minus / quantity / plus control.
 class QtyStepper extends StatelessWidget {
-  const QtyStepper({super.key, required this.qty, required this.onChanged});
+  const QtyStepper({super.key, required this.qty, required this.onChanged, this.step = 1, this.label});
 
   final double qty;
   final ValueChanged<double> onChanged;
 
+  /// How much a tap adds or takes away: a case, for products sold in cases.
+  final double step;
+
+  /// Shows the quantity, e.g. as `2 cs + 4 pc`.
+  final String Function(double)? label;
+
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton.outlined(onPressed: () => onChanged(qty - 1), icon: const Icon(Icons.remove), tooltip: 'Less'),
+        IconButton.outlined(onPressed: () => onChanged(qty - step), icon: const Icon(Icons.remove), tooltip: 'Less'),
         SizedBox(
-          width: 36,
-          child: Text(formatQty(qty), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          width: label == null ? 36 : 64,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(label?.call(qty) ?? formatQty(qty),
+                textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          ),
         ),
         IconButton.filled(
-          onPressed: () => onChanged(qty + 1),
+          onPressed: () => onChanged(qty + step),
           icon: const Icon(Icons.add),
           tooltip: 'More',
           color: Theme.of(context).colorScheme.onPrimary,
