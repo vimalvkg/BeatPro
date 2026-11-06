@@ -294,6 +294,10 @@ class SyncService {
           visitId = await _serverIdOf(visitUuid);
           if (visitId == null) return false;
         }
+        // An invoice printed at the shop, or goods taken back, reach Odoo first.
+        for (final uuid in [...?(r.data['orderUuids'] as List?), ...?(r.data['returnUuids'] as List?)]) {
+          if ((await db.record(uuid as String))?.state != SyncState.synced) return false;
+        }
         final result = await client.call('account.payment', 'beatpro_register_payment', kwargs: {
           'vals_list': [
             {
@@ -307,6 +311,8 @@ class SyncService {
                 'beatpro_method': r.data['method'],
               'beatpro_visit_id': visitId ?? false,
               'invoice_ids': r.data['invoiceIds'] ?? [],
+              'order_uuids': r.data['orderUuids'] ?? [],
+              'return_uuids': r.data['returnUuids'] ?? [],
               'beatpro_cheque_number': r.data['chequeNumber'] ?? false,
               'beatpro_cheque_date': r.data['chequeDate'] ?? false,
               'beatpro_reference': r.data['reference'] ?? r.data['upiReference'] ?? false,

@@ -189,6 +189,12 @@ final invoicesProvider = FutureProvider.family<List<OpenInvoice>, String>((ref, 
   return ref.watch(localDbProvider).invoices(customerKey: customerKey);
 });
 
+/// Invoices and credit notes a payment can settle, including ones made on the phone.
+final openItemsProvider = FutureProvider.family<List<OpenInvoice>, String>((ref, customerKey) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).openItemsFor(customerKey);
+});
+
 final ordersProvider = FutureProvider<List<LocalRecord>>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).orders();

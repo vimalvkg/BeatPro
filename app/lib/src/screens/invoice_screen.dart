@@ -201,8 +201,10 @@ class _InvoiceScreenState extends ConsumerState<InvoiceScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     FilledButton(
+                      // The invoice just printed is ticked, so the payment settles it.
                       onPressed: () => context.pushReplacement('/payment/new?customer=${Uri.encodeComponent(_customerKey!)}'
-                          '${_visitUuid == null ? '' : '&visit=$_visitUuid'}'),
+                          '${_visitUuid == null ? '' : '&visit=$_visitUuid'}'
+                          '&settle=${Uri.encodeComponent('ord:${widget.orderUuid}')}&invoice=${Uri.encodeComponent(invoice.name)}'),
                       child: Text('Collect payment · ${money(invoice.balance)}'),
                     ),
                     TextButton(onPressed: () => context.pop(), child: const Text('Done')),

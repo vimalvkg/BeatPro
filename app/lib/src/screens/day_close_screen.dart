@@ -208,7 +208,7 @@ class _VisitRecap extends ConsumerWidget {
     final parts = <String>[
       if (result == 'order') 'Order' else if (result == 'closed') 'Shop closed' else 'No order',
       if (result == 'no_order' && visit.data['noOrderReason'] != null) noOrderReasons[visit.data['noOrderReason']]!.toLowerCase(),
-      for (final p in payments) '${paymentMethodName(p.data)} ${money((p.data['amount'] as num).toDouble())}',
+      for (final p in payments.where((p) => (p.data['amount'] as num) > 0)) '${paymentMethodName(p.data)} ${money((p.data['amount'] as num).toDouble())}',
     ];
     return ListTile(
       leading: Container(

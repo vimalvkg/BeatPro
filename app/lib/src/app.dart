@@ -78,6 +78,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => PaymentScreen(
           customerKey: state.uri.queryParameters['customer']!,
           visitUuid: state.uri.queryParameters['visit'],
+          settle: state.uri.queryParameters['settle'],
+          settleName: state.uri.queryParameters['invoice'],
         ),
       ),
       GoRoute(

@@ -696,6 +696,78 @@ void main() {
     await db.close();
   });
 
+  testWidgets('a payment settles the invoice printed at the shop, using a credit note', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..withVan = true;
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+      printerServiceProvider.overrideWithValue(FakePrinter()),
+    ]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const BeatproApp()));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+    await repo.requestLoad({for (final p in await repo.db.products()) p: 10});
+    await container.read(syncControllerProvider.notifier).run();
+    odoo.storekeeperLoads();
+    await container.read(syncControllerProvider.notifier).run();
+
+    // Offline at the shop: goods taken back, then a van delivery with its invoice.
+    odoo.offline = true;
+    final visit = await repo.startVisit('srv:9');
+    final biscuits = (await repo.db.products()).first;
+    final taken = await repo.takeBack(customerKey: 'srv:9', visitUuid: visit.uuid, lines: [
+      ReturnLine(productId: biscuits.id, name: biscuits.name, priceUnit: 240, qty: 1, reason: ReturnReason.defaults.first),
+    ]);
+    final order = await repo.placeOrder(
+      customerKey: 'srv:9',
+      visitUuid: visit.uuid,
+      delivery: DeliveryMode.van,
+      lines: [CartLine(product: biscuits, unitPrice: 240, qty: 2)],
+    );
+    router.push('/invoice/${order.uuid}');
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Collect payment ·'));
+    await tester.pumpAndSettle();
+
+    // The invoice just printed is ticked: 2 × 240 + 18% VAT.
+    final invoiceTile = find.widgetWithText(CheckboxListTile, (order.data['invoice'] as Map)['name'] as String);
+    expect(tester.widget<CheckboxListTile>(invoiceTile).value, isTrue);
+    expect(find.text('Printed at the shop · not synced yet'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '566.40'), findsOneWidget);
+    // The shop uses its credit for the goods taken back (240 + 18%); it pays the rest.
+    await tester.tap(find.textContaining('Credit note · use it'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, '283.20'), findsOneWidget);
+    await tester.tap(find.textContaining('Record '));
+    await tester.pumpAndSettle();
+    expect(await repo.openItemsFor('srv:9'), isEmpty, reason: 'invoice and credit used up on the phone');
+
+    // In Odoo the payment names the order and the return, so it settles that invoice.
+    odoo.offline = false;
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    await container.read(syncControllerProvider.notifier).run();
+    final sent = odoo.uploaded['account.payment']!.single;
+    expect(sent['amount'], 283.2);
+    expect(sent['order_uuids'], [order.uuid]);
+    expect(sent['return_uuids'], [taken.uuid]);
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
   testWidgets('work done offline waits on the phone, then syncs', (tester) async {
     final odoo = FakeOdoo();
     // Real file access must run outside the test's fake clock.

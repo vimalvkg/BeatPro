@@ -203,6 +203,12 @@ class RouteStop {
   final String customerKey;
 }
 
+/// Something the shop still has to settle: an unpaid invoice, or a credit note
+/// (goods taken back) it can use against invoices. Credit notes have a negative
+/// [amountDue], so adding everything up gives what the shop owes.
+///
+/// Invoices printed and goods taken back on the phone, not yet in Odoo, are
+/// listed too ([onPhone]): they are found in Odoo by their order or return.
 class OpenInvoice {
   OpenInvoice({
     required this.id,
@@ -211,14 +217,30 @@ class OpenInvoice {
     required this.amountDue,
     this.dueDate,
     this.overdue = false,
+    this.creditNote = false,
+    this.orderUuid,
+    this.returnUuid,
   });
 
+  /// Odoo's id; 0 for an invoice or credit note made on the phone.
   final int id;
   final String customerKey;
   final String name;
   final double amountDue;
   final String? dueDate;
   final bool overdue;
+  final bool creditNote;
+
+  /// The phone's order an invoice printed at the shop belongs to.
+  final String? orderUuid;
+
+  /// The phone's shop return a credit note will be made for.
+  final String? returnUuid;
+
+  bool get onPhone => id == 0;
+
+  /// Tells items apart, whether from Odoo or made on the phone.
+  String get key => orderUuid != null ? 'ord:$orderUuid' : (returnUuid != null ? 'ret:$returnUuid' : 'inv:$id');
 
   static OpenInvoice fromOdoo(Map<String, dynamic> r) => OpenInvoice(
         id: r['id'] as int,
@@ -227,6 +249,19 @@ class OpenInvoice {
         amountDue: _num(r['amount_due']),
         dueDate: _str(r['due_date']),
         overdue: r['overdue'] == true,
+        creditNote: r['kind'] == 'credit_note',
+      );
+
+  OpenInvoice withDue(double due) => OpenInvoice(
+        id: id,
+        customerKey: customerKey,
+        name: name,
+        amountDue: due,
+        dueDate: dueDate,
+        overdue: overdue,
+        creditNote: creditNote,
+        orderUuid: orderUuid,
+        returnUuid: returnUuid,
       );
 
   Map<String, dynamic> toJson() => {
@@ -236,6 +271,7 @@ class OpenInvoice {
         'amountDue': amountDue,
         'dueDate': dueDate,
         'overdue': overdue,
+        'creditNote': creditNote,
       };
 
   static OpenInvoice fromJson(Map<String, dynamic> j) => OpenInvoice(
@@ -245,6 +281,7 @@ class OpenInvoice {
         amountDue: _num(j['amountDue']),
         dueDate: j['dueDate'] as String?,
         overdue: j['overdue'] == true,
+        creditNote: j['creditNote'] == true,
       );
 }
 
@@ -259,8 +296,9 @@ int uploadRank(LocalRecord r) => switch (r.kind) {
       RecordKind.visit => 1,
       RecordKind.vanTransfer => r.data['kind'] == 'load' ? 2 : 7,
       RecordKind.order => 3,
-      RecordKind.payment => 4,
-      RecordKind.shopReturn => 5,
+      // Goods taken back first: a payment can use their credit note.
+      RecordKind.shopReturn => 4,
+      RecordKind.payment => 5,
       RecordKind.dayClose => 8,
     };
 

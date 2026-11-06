@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../core/invoice.dart';
 import '../core/models.dart';
 import '../core/services.dart';
 import '../providers.dart';
@@ -13,17 +14,23 @@ import '../theme.dart';
 import '../widgets/common.dart';
 
 IconData _iconFor(PaymentMethod m) {
-  if (m.kind == 'cash') return Icons.currency_rupee;
+  if (m.kind == 'cash') return Icons.payments_outlined;
   if (m.kind == 'cheque') return Icons.edit_note;
   if (m.name.toLowerCase().contains('upi')) return Icons.swap_horiz;
   return Icons.account_balance_outlined;
 }
 
 class PaymentScreen extends ConsumerStatefulWidget {
-  const PaymentScreen({super.key, required this.customerKey, this.visitUuid});
+  const PaymentScreen({super.key, required this.customerKey, this.visitUuid, this.settle, this.settleName});
 
   final String customerKey;
   final String? visitUuid;
+
+  /// An invoice to tick from the start ([OpenInvoice.key]), e.g. the one just printed.
+  final String? settle;
+
+  /// The same invoice by number, once it is in Odoo.
+  final String? settleName;
 
   @override
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
@@ -33,7 +40,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _amount = TextEditingController();
   final _chequeNumber = TextEditingController();
   final _reference = TextEditingController();
-  final Set<int> _selected = {};
+  final Set<String> _selected = {};
+  bool _preselected = false;
   PaymentMethod? _method;
   DateTime? _chequeDate;
   bool _saving = false;
@@ -63,13 +71,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   String _plain(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 
+  /// Invoices ticked, less the credit notes ticked: what the shop pays in money.
+  double _toPay(List<OpenInvoice> all) {
+    final sum = all.where((i) => _selected.contains(i.key)).fold<double>(0, (s, i) => s + i.amountDue);
+    return sum < 0 ? 0 : ShopInvoice.round2(sum);
+  }
+
   void _toggle(OpenInvoice invoice, List<OpenInvoice> all) {
     setState(() {
-      _selected.contains(invoice.id) ? _selected.remove(invoice.id) : _selected.add(invoice.id);
-      final sum = all.where((i) => _selected.contains(i.id)).fold<double>(0, (s, i) => s + i.amountDue);
-      _amount.text = sum == 0 ? '' : _plain(sum);
+      _selected.contains(invoice.key) ? _selected.remove(invoice.key) : _selected.add(invoice.key);
+      final pay = _toPay(all);
+      _amount.text = pay == 0 ? '' : _plain(pay);
     });
   }
+
+  List<OpenInvoice> _items = const [];
 
   Future<void> _save(PaymentMethod method) async {
     setState(() => _saving = true);
@@ -80,7 +96,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             visitUuid: widget.visitUuid,
             amount: _amountValue,
             method: method,
-            invoiceIds: _selected.toList(),
+            settles: _items.where((i) => _selected.contains(i.key)).toList(),
             chequeNumber: method.reference == 'cheque' ? _chequeNumber.text.trim() : null,
             chequeDate: method.reference == 'cheque' && _chequeDate != null
                 ? '${_chequeDate!.year}-${two(_chequeDate!.month)}-${two(_chequeDate!.day)}'
@@ -147,9 +163,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final providers = appContext?.onlineProviders ?? const <String>[];
     final method = _method ?? (methods.isEmpty ? null : methods.first);
     final customer = ref.watch(customerProvider(widget.customerKey)).value;
-    final invoices = ref.watch(invoicesProvider(widget.customerKey)).value ?? const <OpenInvoice>[];
-    final due = invoices.fold<double>(0, (s, i) => s + i.amountDue);
-    final left = (due - _amountValue).clamp(0, double.infinity).toDouble();
+    final items = ref.watch(openItemsProvider(widget.customerKey)).value ?? const <OpenInvoice>[];
+    _items = items;
+    final preselect = items
+        .where((i) => i.key == widget.settle || (widget.settleName != null && !i.creditNote && i.name == widget.settleName))
+        .firstOrNull;
+    if (!_preselected && preselect != null) {
+      _preselected = true;
+      _selected.add(preselect.key);
+      final pay = _toPay(items);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _amount.text = pay == 0 ? '' : _plain(pay));
+    }
+    // Online payment works on Odoo's invoices only.
+    final invoices = items.where((i) => !i.onPhone && !i.creditNote).toList();
+    final due = items.fold<double>(0, (s, i) => s + i.amountDue);
+    final invoiceTotal = items.where((i) => !i.creditNote).fold<double>(0, (s, i) => s + i.amountDue);
+    final credits = items.where((i) => _selected.contains(i.key) && i.creditNote).fold<double>(0, (s, i) => s - i.amountDue);
+    final invoicesPicked = items.any((i) => _selected.contains(i.key) && !i.creditNote);
+    final left = (invoiceTotal - _amountValue - (invoicesPicked ? credits : 0)).clamp(0, double.infinity).toDouble();
+    final creditOnly = _amountValue <= 0 && credits > 0 && invoicesPicked;
     final symbol = appContext?.currencySymbol ?? '';
     final online = _online && providers.isNotEmpty;
 
@@ -205,7 +237,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 ),
               ]),
               Text(
-                due == 0 ? 'No unpaid invoices · kept as an advance' : 'of ${money(due)} due · ${money(left)} left after this',
+                due <= 0
+                    ? (due < 0 ? 'The shop has ${money(-due)} credit · kept as an advance' : 'No unpaid invoices · kept as an advance')
+                    : credits > 0 && invoicesPicked
+                        ? '${money(credits)} credit used · ${money(left)} left after this'
+                        : 'of ${money(invoiceTotal)} due · ${money(left)} left after this',
                 style: const TextStyle(fontSize: 13, color: BeatproColors.muted),
               ),
             ]),
@@ -264,25 +300,34 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ]),
           ],
           const Eyebrow('Settles invoices', padding: EdgeInsets.fromLTRB(0, 20, 0, 8)),
-          if (invoices.isEmpty)
-            const Text("No unpaid invoices. The payment is kept as an advance on the customer's account.",
+          if (items.isEmpty)
+            const Text("Nothing unpaid. The payment is kept as an advance on the customer's account.",
                 style: TextStyle(color: BeatproColors.muted))
           else
             Card(
               clipBehavior: Clip.antiAlias,
               child: Column(children: [
-                for (final (index, i) in invoices.indexed) ...[
+                for (final (index, i) in items.indexed) ...[
                   if (index > 0) const Divider(height: 1, color: BeatproColors.lineSoft),
                   CheckboxListTile(
                     controlAffinity: ListTileControlAffinity.leading,
-                    value: _selected.contains(i.id),
-                    onChanged: (_) => _toggle(i, invoices),
+                    value: _selected.contains(i.key),
+                    onChanged: (_) => _toggle(i, items),
                     title: Text(i.name),
                     subtitle: Text(
-                      i.dueDate == null ? '' : '${i.overdue ? 'Overdue since' : 'Due'} ${i.dueDate}',
-                      style: TextStyle(color: i.overdue ? BeatproColors.danger : null, fontWeight: i.overdue ? FontWeight.w600 : null),
+                      i.creditNote
+                          ? 'Credit note · use it against an invoice${i.onPhone ? ' · not synced yet' : ''}'
+                          : i.onPhone
+                              ? 'Printed at the shop · not synced yet'
+                              : (i.dueDate == null ? '' : '${i.overdue ? 'Overdue since' : 'Due'} ${i.dueDate}'),
+                      style: TextStyle(
+                        color: i.creditNote ? BeatproColors.success : (i.overdue ? BeatproColors.danger : null),
+                        fontWeight: i.overdue || i.creditNote ? FontWeight.w600 : null,
+                      ),
                     ),
-                    secondary: Text(money(i.amountDue), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    secondary: Text(i.creditNote ? '− ${money(-i.amountDue)}' : money(i.amountDue),
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w800, color: i.creditNote ? BeatproColors.success : null)),
                   ),
                 ],
               ]),
@@ -298,7 +343,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: FilledButton(
                     onPressed: _saving ? null : () => _save(method),
-                    child: Text(_amountValue > 0 ? 'Record ${money(_amountValue)} by ${method.name}' : 'Record payment'),
+                    child: Text(creditOnly
+                        ? 'Use ${money(credits)} credit'
+                        : _amountValue > 0
+                            ? 'Record ${money(_amountValue)} by ${method.name}'
+                            : 'Record payment'),
                   ),
                 ),
               ),

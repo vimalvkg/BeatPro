@@ -8,6 +8,7 @@
 import 'dart:io';
 
 import 'package:beatpro/src/core/local_db.dart';
+import 'package:beatpro/src/core/invoice.dart';
 import 'package:beatpro/src/core/models.dart';
 import 'package:beatpro/src/core/odoo_client.dart';
 import 'package:beatpro/src/core/repository.dart';
@@ -79,7 +80,7 @@ void main() {
         amount: due,
         method: context.paymentMethods.firstWhere((m) => m.kind == 'bank'),
         reference: 'UPI-TEST-1',
-        invoiceIds: invoices.map((i) => i.id).toList(),
+        settles: invoices,
       );
       expect(await repo.amountDue(stop.customer.key), 0, reason: 'invoices show as settled on the phone');
     }
@@ -185,9 +186,24 @@ void main() {
       ReturnLine(productId: tooMuch.id, name: tooMuch.name, priceUnit: 20, qty: 1,
           reason: reasons.firstWhere((r) => r.value == 'damaged')),
     ]);
+    // The shop pays the invoice printed at the shop, using the credit for the goods taken back.
+    final settles = (await repo.openItemsFor(stop.customer.key))
+        .where((i) => i.orderUuid == order.uuid || i.returnUuid == ret.uuid)
+        .toList();
+    final toPay = settles.fold<double>(0, (s, i) => s + i.amountDue);
+    if (context.vanInvoice != null) {
+      await repo.collectPayment(
+        customerKey: stop.customer.key,
+        visitUuid: visit.uuid,
+        amount: toPay > 0 ? ShopInvoice.round2(toPay) : 0,
+        method: context.paymentMethods.firstWhere((m) => m.kind == 'cash'),
+        settles: settles,
+      );
+    }
     await repo.checkOut(visit.uuid, result: VisitResult.order);
     final report = await sync.sync();
     expect(report.failed, 0, reason: (await db.records(state: SyncState.failed)).map((r) => r.error).join('; '));
+    expect(report.waiting, 0);
 
     final serverOrder = (await client.searchRead('sale.order', domain: [
       ['id', '=', (await db.record(order.uuid))!.serverId],
@@ -202,8 +218,9 @@ void main() {
       expect(localInvoice, isNotNull, reason: 'the van handed something over');
       final serverInvoice = (await client.searchRead('account.move', domain: [
         ['name', '=', localInvoice!.name],
-      ], fields: ['state', 'amount_total', 'beatpro_van_id'])).single;
+      ], fields: ['state', 'amount_total', 'beatpro_van_id', 'amount_residual'])).single;
       expect(serverInvoice['state'], 'posted');
+      expect(serverInvoice['amount_residual'], 0, reason: 'the payment and the credit note settled this invoice');
       expect((serverInvoice['amount_total'] as num).toDouble(), closeTo(localInvoice.total, 0.05));
     }
 
@@ -213,6 +230,15 @@ void main() {
     expect(serverReturn['state'], 'done');
     expect(serverReturn['amount_total'], 40.0);
     expect(serverReturn['credit_note_id'], isNot(false));
+    final creditNote = (await client.searchRead('account.move', domain: [
+      ['id', '=', (serverReturn['credit_note_id'] as List).first],
+    ], fields: ['state', 'amount_total', 'amount_residual'])).single;
+    expect(creditNote['state'], 'posted');
+    if (context.vanInvoice != null) {
+      // Used against the invoice; whatever the invoice didn't need stays for later.
+      final unused = toPay < 0 ? -toPay : 0.0;
+      expect((creditNote['amount_residual'] as num).toDouble(), closeTo(unused, 0.05));
+    }
 
     // Odoo's van count matches what the phone showed: 1 delivered, 2 back in.
     final after = await repo.vanStock();

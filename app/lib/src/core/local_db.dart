@@ -154,25 +154,19 @@ class LocalDb {
     return rows.map((r) => OpenInvoice.fromJson(jsonDecode(r['data'] as String) as Map<String, dynamic>)).toList();
   }
 
-  /// Lowers what the phone shows as due on an invoice after a collection,
+  /// Lowers what the phone shows as due on an invoice after a collection (or
+  /// what is left of a credit note after using [amount] of it),
   /// until the next download brings Odoo's figure.
   Future<void> reduceInvoiceDue(int invoiceId, double amount) async {
     final rows = await _db.query('invoices', where: 'id = ?', whereArgs: [invoiceId]);
     if (rows.isEmpty) return;
     final invoice = OpenInvoice.fromJson(jsonDecode(rows.first['data'] as String) as Map<String, dynamic>);
-    final left = invoice.amountDue - amount;
-    if (left <= 0.005) {
+    // A credit note's due is negative: using some of it brings it towards zero.
+    final left = invoice.creditNote ? invoice.amountDue + amount : invoice.amountDue - amount;
+    if (left.abs() <= 0.005) {
       await _db.delete('invoices', where: 'id = ?', whereArgs: [invoiceId]);
     } else {
-      final updated = OpenInvoice(
-        id: invoice.id,
-        customerKey: invoice.customerKey,
-        name: invoice.name,
-        amountDue: left,
-        dueDate: invoice.dueDate,
-        overdue: invoice.overdue,
-      );
-      await _db.update('invoices', {'data': jsonEncode(updated.toJson())}, where: 'id = ?', whereArgs: [invoiceId]);
+      await _db.update('invoices', {'data': jsonEncode(invoice.withDue(left).toJson())}, where: 'id = ?', whereArgs: [invoiceId]);
     }
   }
 

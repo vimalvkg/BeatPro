@@ -591,19 +591,89 @@ class Repository {
 
   // -- Payments -------------------------------------------------------------
 
+  /// What the shop can settle now: Odoo's unpaid invoices and credit notes, plus
+  /// invoices printed and goods taken back on this phone that Odoo hasn't got yet.
+  /// Phone items show what is left after payments already recorded here.
+  Future<List<OpenInvoice>> openItemsFor(String customerKey) async {
+    final items = [...await db.invoices(customerKey: customerKey)];
+    final unsynced = [...await db.records(state: SyncState.pending), ...await db.records(state: SyncState.failed)]
+        .where((r) => r.data['customerKey'] == customerKey)
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final used = <String, double>{};
+    for (final p in unsynced.where((r) => r.kind == RecordKind.payment)) {
+      ((p.data['applied'] as Map?) ?? const {}).forEach((k, v) => used[k as String] = (used[k] ?? 0) + (v as num).toDouble());
+    }
+    final taxes = {for (final p in await db.products()) p.id: p.taxPercent};
+    for (final r in unsynced) {
+      if (r.kind == RecordKind.order && r.data['invoice'] is Map) {
+        final invoice = ShopInvoice((r.data['invoice'] as Map).cast<String, dynamic>());
+        final due = ShopInvoice.round2(invoice.total - (used['ord:${r.uuid}'] ?? 0));
+        if (due > 0.005) {
+          items.add(OpenInvoice(
+              id: 0, customerKey: customerKey, name: invoice.name, amountDue: due, dueDate: invoice.date, orderUuid: r.uuid));
+        }
+      } else if (r.kind == RecordKind.shopReturn) {
+        // Odoo's credit note adds the products' VAT to what the shop is given back.
+        final total = ShopInvoice.round2((r.data['lines'] as List).cast<Map<String, dynamic>>().fold<double>(0, (s, l) {
+          final amount = ShopInvoice.round2((l['qty'] as num).toDouble() * (l['priceUnit'] as num).toDouble());
+          return s + amount + ShopInvoice.round2(amount * (taxes[l['productId']] ?? 0) / 100);
+        }));
+        final left = ShopInvoice.round2(total - (used['ret:${r.uuid}'] ?? 0));
+        if (left > 0.005) {
+          items.add(OpenInvoice(
+            id: 0,
+            customerKey: customerKey,
+            name: 'Goods taken back ${r.data['date'] ?? ''}'.trim(),
+            amountDue: -left,
+            dueDate: r.data['date'] as String?,
+            creditNote: true,
+            returnUuid: r.uuid,
+          ));
+        }
+      }
+    }
+    return items;
+  }
+
+  /// Records money collected from a shop.
+  ///
+  /// [settles] are the invoices it pays and the credit notes the shop uses against
+  /// them. Credit notes are used first, then [amount]; with credit notes that cover
+  /// the invoices, [amount] can be 0.
   Future<LocalRecord> collectPayment({
     required String customerKey,
     String? visitUuid,
     required double amount,
     required PaymentMethod method,
-    List<int> invoiceIds = const [],
+    List<OpenInvoice> settles = const [],
     String? chequeNumber,
     String? chequeDate,
     String? reference,
   }) async {
-    if (amount <= 0) throw ArgumentError('Enter the amount collected.');
-    if (method.reference == 'cheque' && (chequeNumber == null || chequeNumber.trim().isEmpty)) {
+    final invoices = settles.where((i) => !i.creditNote).toList();
+    final credits = settles.where((i) => i.creditNote).toList();
+    if (amount < 0 || amount == 0 && (invoices.isEmpty || credits.isEmpty)) {
+      throw ArgumentError('Enter the amount collected.');
+    }
+    if (amount > 0 && method.reference == 'cheque' && (chequeNumber == null || chequeNumber.trim().isEmpty)) {
       throw ArgumentError('Enter the cheque number.');
+    }
+    // How much of each invoice and credit note this settles: credit notes first, then the money.
+    final applied = <String, double>{};
+    var invoiceLeft = invoices.fold<double>(0, (s, i) => s + i.amountDue);
+    for (final c in credits) {
+      final use = ShopInvoice.round2((-c.amountDue) < invoiceLeft ? -c.amountDue : invoiceLeft);
+      if (use <= 0) continue;
+      applied[c.key] = use;
+      invoiceLeft -= use;
+    }
+    var pay = credits.fold<double>(0, (s, c) => s + (applied[c.key] ?? 0)) + amount;
+    for (final i in invoices) {
+      final use = ShopInvoice.round2(pay < i.amountDue ? pay : i.amountDue);
+      if (use <= 0) break;
+      applied[i.key] = use;
+      pay -= use;
     }
     final payment = LocalRecord(
       uuid: _uuid.v4(),
@@ -615,24 +685,22 @@ class Repository {
         'amount': amount,
         'methodId': method.id,
         'method': method.legacyCode,
-        'methodName': method.name,
-        'kind': method.kind,
-        'invoiceIds': invoiceIds,
-        'chequeNumber': chequeNumber,
-        'chequeDate': chequeDate,
+        'methodName': amount > 0 ? method.name : 'Credit note',
+        'kind': amount > 0 ? method.kind : 'credit',
+        'invoiceIds': [for (final i in settles) if (!i.onPhone) i.id],
+        'orderUuids': [for (final i in settles) if (i.orderUuid != null) i.orderUuid],
+        'returnUuids': [for (final i in settles) if (i.returnUuid != null) i.returnUuid],
+        'applied': applied,
+        'chequeNumber': amount > 0 ? chequeNumber : null,
+        'chequeDate': amount > 0 ? chequeDate : null,
         'reference': reference,
         'date': todayIso,
       },
     );
     await db.saveRecord(payment);
-    // Show the invoices as settled straight away, oldest first.
-    var left = amount;
-    final open = await db.invoices(customerKey: customerKey);
-    for (final invoice in open.where((i) => invoiceIds.contains(i.id))) {
-      if (left <= 0) break;
-      final applied = left < invoice.amountDue ? left : invoice.amountDue;
-      await db.reduceInvoiceDue(invoice.id, applied);
-      left -= applied;
+    // Show Odoo's invoices and credit notes as settled straight away.
+    for (final i in settles.where((i) => !i.onPhone)) {
+      if ((applied[i.key] ?? 0) > 0) await db.reduceInvoiceDue(i.id, applied[i.key]!);
     }
     return payment;
   }
