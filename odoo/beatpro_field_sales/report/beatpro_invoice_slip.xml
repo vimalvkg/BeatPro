@@ -69,9 +69,9 @@
             <div class="c b mt" t-esc="d['title']"/>
             <div class="c b ar" t-esc="d['title_ar']"/>
             <div class="mt">
-                <div class="row"><span>Inv</span><span t-esc="o.name"/></div>
-                <div class="row"><span>Date</span><span t-esc="d['date']"/></div>
-                <div class="row" t-if="d['van']"><span>Van</span><span t-esc="d['van']"/></div>
+                <div class="bp-row"><span>Inv</span><span t-esc="o.name"/></div>
+                <div class="bp-row"><span>Date</span><span t-esc="d['date']"/></div>
+                <div class="bp-row" t-if="d['van']"><span>Van</span><span t-esc="d['van']"/></div>
             </div>
             <div class="rule"/>
             <div>
@@ -80,28 +80,28 @@
                 <div t-if="o.commercial_partner_id.vat">TRN <t t-esc="o.commercial_partner_id.vat"/></div>
             </div>
             <div class="rule"/>
-            <div class="row b"><span>Item</span><span>Qty x Price · Amount</span></div>
+            <div class="bp-row b"><span>Item</span><span>Qty x Price · Amount</span></div>
             <div class="rule"/>
             <t t-foreach="d['lines']" t-as="l">
                 <div class="item">
                     <div t-esc="l['name']"/>
-                    <div class="row"><span t-esc="l['note']"/>
+                    <div class="bp-row"><span t-esc="l['note']"/>
                         <span><t t-esc="l['qty']"/> x <t t-esc="'%.2f' % l['price']"/> · <t t-esc="'%.2f' % l['amount']"/></span></div>
                 </div>
             </t>
             <div class="rule"/>
-            <div class="row"><span>Total excl. VAT</span><span t-esc="'%.2f' % o.amount_untaxed"/></div>
-            <div class="row"><span>VAT</span><span t-esc="'%.2f' % o.amount_tax"/></div>
-            <div class="row b big mt"><span>TOTAL <t t-esc="cur.name"/></span><span t-esc="'%.2f' % o.amount_total"/></div>
-            <div class="row ar"><span>الإجمالي شامل الضريبة</span><span class="ltr" t-esc="'%.2f' % o.amount_total"/></div>
+            <div class="bp-row"><span>Total excl. VAT</span><span t-esc="'%.2f' % o.amount_untaxed"/></div>
+            <div class="bp-row"><span>VAT</span><span t-esc="'%.2f' % o.amount_tax"/></div>
+            <div class="bp-row b big mt"><span>TOTAL <t t-esc="cur.name"/></span><span t-esc="'%.2f' % o.amount_total"/></div>
+            <div class="bp-row ar"><span>الإجمالي شامل الضريبة</span><span class="ltr" t-esc="'%.2f' % o.amount_total"/></div>
             <div class="small" t-esc="d['words']"/>
             <t t-if="d['saved'] &gt;= 0.01">
                 <div class="rule"/>
-                <div class="row b"><span>You saved <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['saved']"/></div>
+                <div class="bp-row b"><span>You saved <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['saved']"/></div>
             </t>
             <div class="rule"/>
-            <div class="row"><span>Previous balance</span><span t-esc="'%.2f' % d['previous']"/></div>
-            <div class="row b"><span>Balance due <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['balance']"/></div>
+            <div class="bp-row"><span>Previous balance</span><span t-esc="'%.2f' % d['previous']"/></div>
+            <div class="bp-row b"><span>Balance due <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['balance']"/></div>
             <div class="rule"/>
             <div class="mt">Received by: ________________<br/>Signature &amp; stamp</div>
             <div class="c mt">Thank you for your business<br/><span class="ar">شكراً لتعاملكم معنا</span></div>
@@ -120,8 +120,9 @@
             .bp-slip .small { font-size: 0.85em; }
             .bp-slip .ar { font-family: "DejaVu Sans", sans-serif; direction: rtl; }
             .bp-slip .ltr { direction: ltr; }
-            .bp-slip .row { display: -webkit-box; display: flex; -webkit-box-pack: justify; justify-content: space-between; }
-            .bp-slip .row > span + span { text-align: right; }
+            .bp-slip .bp-row { display: -webkit-box; display: flex; -webkit-box-pack: justify; justify-content: space-between; }
+            .bp-slip .bp-row > span { display: block; }
+            .bp-slip .bp-row > span + span { text-align: right; white-space: nowrap; padding-left: 6px; }
             .bp-slip .item { margin-bottom: 3px; page-break-inside: avoid; }
             .bp-slip .rule { border-top: 1px dashed #000; margin: 5px 0; }
         </style>
