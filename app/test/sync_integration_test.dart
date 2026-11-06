@@ -124,4 +124,86 @@ void main() {
     expect((await db.customers(search: 'Test Shop')).any((c) => c.serverId != null), isTrue);
     await db.close();
   }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
+
+  // Needs a rep with a loaded van and no unload yet today.
+  test('a van day: deliver from the van, take goods back, unload', () async {
+    final client = OdooClient(OdooCredentials(
+      url: url!,
+      database: env['BEATPRO_ODOO_DB'] ?? '',
+      apiKey: env['BEATPRO_ODOO_KEY']!,
+    ));
+    sqfliteFfiInit();
+    final db = await LocalDb.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+    final repo = Repository(db);
+    final sync = SyncService(db, client);
+    await sync.download();
+    final context = (await repo.appContext())!;
+    expect(context.van, isNotNull, reason: 'the rep needs a van');
+    final before = await repo.vanStock();
+    expect(before.inVan, greaterThan(0), reason: 'the van needs stock');
+
+    // One product the van has, and more of another than the van carries.
+    final products = {for (final p in await db.products()) p.id: p};
+    final inVan = before.items.where((i) => i.left >= 1).toList();
+    final fromVan = products[inVan.first.productId]!;
+    final tooMuch = products[inVan.last.productId]!;
+    final tooMuchQty = inVan.last.left + 5;
+    final stop = (await repo.todayPlan()).first;
+    final visit = await repo.startVisit(stop.customer.key, routeId: stop.stop.routeId);
+    final order = await repo.placeOrder(
+      customerKey: stop.customer.key,
+      visitUuid: visit.uuid,
+      delivery: DeliveryMode.split,
+      lines: [
+        CartLine(product: fromVan, unitPrice: fromVan.listPrice, qty: 1),
+        CartLine(product: tooMuch, unitPrice: tooMuch.listPrice, qty: tooMuchQty),
+      ],
+    );
+    expect((await repo.vanStock()).leftOf(fromVan.id), inVan.first.left - 1);
+
+    final reasons = context.returnReasons;
+    final ret = await repo.takeBack(customerKey: stop.customer.key, visitUuid: visit.uuid, lines: [
+      ReturnLine(productId: fromVan.id, name: fromVan.name, priceUnit: 10, qty: 2,
+          reason: reasons.firstWhere((r) => r.value == 'not_selling')),
+      ReturnLine(productId: tooMuch.id, name: tooMuch.name, priceUnit: 20, qty: 1,
+          reason: reasons.firstWhere((r) => r.value == 'damaged')),
+    ]);
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    final report = await sync.sync();
+    expect(report.failed, 0, reason: (await db.records(state: SyncState.failed)).map((r) => r.error).join('; '));
+
+    final serverOrder = (await client.searchRead('sale.order', domain: [
+      ['id', '=', (await db.record(order.uuid))!.serverId],
+    ], fields: ['beatpro_delivery_mode', 'picking_ids', 'user_id'])).single;
+    expect(serverOrder['beatpro_delivery_mode'], 'split');
+    expect((serverOrder['picking_ids'] as List).length, 2, reason: 'one delivery from the van, one from the warehouse');
+    expect((serverOrder['user_id'] as List).first, context.userId);
+
+    final serverReturn = (await client.searchRead('beatpro.shop.return', domain: [
+      ['id', '=', (await db.record(ret.uuid))!.serverId],
+    ], fields: ['state', 'amount_total', 'credit_note_id'])).single;
+    expect(serverReturn['state'], 'done');
+    expect(serverReturn['amount_total'], 40.0);
+    expect(serverReturn['credit_note_id'], isNot(false));
+
+    // Odoo's van count matches what the phone showed: 1 delivered, 2 back in.
+    final after = await repo.vanStock();
+    expect(after.leftOf(fromVan.id), inVan.first.left - 1 + 2);
+
+    // Day end: one short, with a note.
+    final counted = {for (final i in after.items) i.productId: i.left > 0 ? i.left : 0.0};
+    counted[fromVan.id] = counted[fromVan.id]! - 1;
+    expect(() => repo.sendUnload(counted), throwsArgumentError);
+    final unload = await repo.sendUnload(counted, note: 'One box torn');
+    await sync.sync();
+    final serverUnload = (await client.searchRead('beatpro.van.transfer', domain: [
+      ['id', '=', (await db.record(unload.uuid))!.serverId],
+    ], fields: ['state', 'kind', 'total_difference', 'note'])).single;
+    expect(serverUnload['kind'], 'unload');
+    expect(serverUnload['state'], 'sent');
+    expect(serverUnload['total_difference'], -1.0);
+    expect(serverUnload['note'], 'One box torn');
+    expect((await repo.vanStock()).serverUnload?['state'], 'sent');
+    await db.close();
+  }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
 }

@@ -42,6 +42,16 @@ Future<void> _loadFonts() async {
   await manrope.load();
 }
 
+Future<void> _loadImages(WidgetTester tester) async {
+  // Image files decode outside the test clock: wait for them before a screenshot.
+  await tester.runAsync(() async {
+    for (final e in find.byType(Image).evaluate()) {
+      await precacheImage((e.widget as Image).image, e);
+    }
+  });
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() async {
     sqfliteFfiInit();
@@ -75,6 +85,7 @@ void main() {
       await tester.pumpAndSettle();
       shot++;
       if (!saveScreens) return;
+      await _loadImages(tester);
       await expectLater(
         find.byKey(appKey),
         matchesGoldenFile('../docs/screenshots/${shot.toString().padLeft(2, '0')}-$name.png'),
@@ -240,6 +251,200 @@ void main() {
     expect(find.textContaining('Paid online'), findsOneWidget);
     // Nothing was recorded on the phone: the provider's payment is in Odoo.
     expect(odoo.uploaded['account.payment'], isNull);
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('a van day: load, deliver from the van, take goods back, unload', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..withVan = true;
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(GeoPoint(19.1155, 72.8722))),
+      httpClientProvider.overrideWithValue(odoo.client),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    final saveScreens = Platform.environment['BEATPRO_SCREENSHOTS'] != null;
+    Future<void> screen(String name) async {
+      tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).first).clearSnackBars();
+      await tester.pumpAndSettle();
+      if (!saveScreens) return;
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/$name.png'));
+    }
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+
+    // Morning: the van is empty; ask the storekeeper for today's suggested load.
+    await tester.scrollUntilVisible(find.text('MH 02 AB 4521'), 200);
+    expect(find.text('Empty · load the van before you leave'), findsOneWidget);
+    router.push('/van/load');
+    await tester.pumpAndSettle();
+    expect(find.text('36 cases'), findsOneWidget);
+    await screen('15-van-load');
+    await tester.tap(find.text('Send load request · 36 cases'));
+    await tester.pumpAndSettle();
+    final load = odoo.uploaded['beatpro.van.transfer.load']!.single;
+    expect((load['line_ids'] as List).length, 3);
+    expect((await repo.vanStock()).loadWaiting, isTrue);
+
+    // The storekeeper loads the van; the next sync brings the stock.
+    odoo.storekeeperLoads();
+    await container.read(syncControllerProvider.notifier).run();
+    router.push('/van');
+    await tester.pumpAndSettle();
+    expect(find.text('36 cases'), findsOneWidget);
+    expect(find.text('₹15,920.00 at sale price'), findsOneWidget);
+    await screen('16-van-stock');
+
+    // At Patel Kirana: 6 Parle-G from the van, 1 Surf Excel the van doesn't carry.
+    final visit = await repo.startVisit('srv:9');
+    container.read(dataVersionProvider.notifier).bump();
+    router.push('/order/new?customer=srv%3A9&visit=${visit.uuid}');
+    await tester.pumpAndSettle();
+    Finder inTile(String product, Finder f) => find.descendant(of: find.widgetWithText(ListTile, product), matching: f);
+    await tester.tap(inTile('Parle-G Biscuits (Box of 24)', find.widgetWithText(OutlinedButton, 'Add')));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 5; i++) {
+      await tester.tap(inTile('Parle-G Biscuits (Box of 24)', find.byTooltip('More')));
+      await tester.pump();
+    }
+    await tester.ensureVisible(find.text('Surf Excel 1kg (Case of 12)'));
+    await tester.pumpAndSettle();
+    await tester.tap(inTile('Surf Excel 1kg (Case of 12)', find.widgetWithText(OutlinedButton, 'Add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Review'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Van now, the rest from the warehouse'), 200,
+        scrollable: find.byType(Scrollable).last);
+    expect(find.textContaining('Not possible: Surf Excel'), findsOneWidget);
+    await screen('17-delivery-choice');
+    await tester.tap(find.text('Place order · deliver 1 item now'));
+    await tester.pumpAndSettle();
+    expect((await repo.vanStock()).leftOf(1), 12, reason: 'the van shows the boxes handed over straight away');
+
+    // The shop gives back 2 expired butter packs and 3 boxes of biscuits that don't sell.
+    router.push('/return/new?customer=srv%3A9&visit=${visit.uuid}');
+    await tester.pumpAndSettle();
+    Finder inCard(String product, Finder f) => find.descendant(of: find.widgetWithText(Card, product), matching: f);
+    await tester.tap(find.text('+ Add product'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Amul Butter 100g (Pack of 20)'));
+    await tester.pumpAndSettle();
+    await tester.tap(inCard('Amul Butter 100g (Pack of 20)', find.byTooltip('More')));
+    await tester.pump();
+    await tester.tap(inCard('Amul Butter 100g (Pack of 20)', find.text('Expired')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('+ Add product'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Parle-G Biscuits (Box of 24)').last);
+    await tester.pumpAndSettle();
+    await tester.tap(inCard('Parle-G Biscuits (Box of 24)', find.byTooltip('More')));
+    await tester.pump();
+    await tester.tap(inCard('Parle-G Biscuits (Box of 24)', find.byTooltip('More')));
+    await tester.pump();
+    await tester.tap(inCard('Parle-G Biscuits (Box of 24)', find.text('Not selling')));
+    await tester.pumpAndSettle();
+    expect(find.text('Goes back into the van, can be sold again'), findsOneWidget);
+    await screen('18-shop-return');
+    await tester.tap(find.text('Take back 5 items · ₹1,680.00 credit'));
+    await tester.pumpAndSettle();
+
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    await container.read(syncControllerProvider.notifier).run();
+    final order = odoo.uploaded['sale.order']!.single;
+    expect(order['beatpro_delivery_mode'], 'split');
+    final returned = (odoo.uploaded['beatpro.shop.return']!.single['line_ids'] as List)
+        .map((l) => (l as List)[2] as Map<String, dynamic>)
+        .toList();
+    expect([for (final l in returned) (l['product_id'], l['qty'], l['reason'], l['resellable'])],
+        [(4, 2.0, 'expired', false), (1, 3.0, 'not_selling', true)]);
+
+    // Evening: 15 boxes should be left (18 − 6 + 3); one is missing.
+    router.push('/van/unload');
+    await tester.pumpAndSettle();
+    final parleCount = find.descendant(
+        of: find.ancestor(of: find.text('Parle-G Biscuits (Box of 24)'), matching: find.byType(Container)).first,
+        matching: find.byType(TextField));
+    expect(tester.widget<TextField>(parleCount).controller!.text, '15');
+    await tester.enterText(parleCount, '14');
+    await tester.pumpAndSettle();
+    expect(find.text('1 short: Parle-G Biscuits (Box of 24)'), findsOneWidget);
+    expect(find.text('2 items'), findsOneWidget, reason: 'damaged returns go to the damaged area');
+    await tester.tap(find.text('Send unload · 32 cases'));
+    await tester.pumpAndSettle();
+    expect(odoo.uploaded['beatpro.van.transfer.unload'], isNull, reason: 'a shortage needs a note');
+    await tester.enterText(find.byType(TextField).last, 'One box torn, given to the shop as a free sample.');
+    await tester.pumpAndSettle();
+    await screen('19-van-unload');
+    await tester.tap(find.text('Send unload · 32 cases'));
+    await tester.pumpAndSettle();
+    await container.read(syncControllerProvider.notifier).run();
+    final unload = odoo.uploaded['beatpro.van.transfer.unload']!.single;
+    expect(unload['note'], 'One box torn, given to the shop as a free sample.');
+    final parle = (unload['line_ids'] as List).map((l) => (l as List)[2] as Map<String, dynamic>).firstWhere((l) => l['product_id'] == 1);
+    expect((parle['qty'], parle['qty_expected']), (14.0, 15.0));
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('a supervisor opens the Van Sales Dashboard', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..supervisor = true;
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'API key'), 'k' * 40);
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Van Sales Dashboard', skipOffstage: false), findsOneWidget, reason: 'a card on My Day');
+    container.read(routerProvider).push('/dashboard');
+    await tester.pumpAndSettle();
+    expect(find.text('₹75,484.00'), findsWidgets);
+    expect(find.text('↑ 12.5% vs last period'), findsOneWidget);
+    expect(find.text('↓ 2.0% vs last period'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/20-dashboard.png'));
+    }
+    await tester.tap(find.text('Month'));
+    await tester.pumpAndSettle();
+    expect(find.text('243'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Farah Khan: unload 1 short'), 300, scrollable: find.byType(Scrollable).last);
+    expect(find.text('72%'), findsOneWidget);
+    expect(odoo.calls.where((c) => c == 'beatpro.theme.get_sales_dashboard').length, 2);
 
     await tester.pumpWidget(const SizedBox());
     await db.close();

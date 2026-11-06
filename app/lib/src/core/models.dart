@@ -21,6 +21,21 @@ class AppContext {
   double get discountLimit => _num(json['discount_limit']);
   int? get warehouseId => json['warehouse_id'] as int?;
 
+  /// The Van Sales Dashboard is on this server and this user may open it (supervisors).
+  bool get hasSalesDashboard => json['sales_dashboard'] == true;
+
+  /// The rep's van, or null for reps without one.
+  VanInfo? get van => json['van'] is Map ? VanInfo((json['van'] as Map).cast<String, dynamic>()) : null;
+
+  List<ReturnReason> get returnReasons {
+    final raw = json['return_reasons'];
+    if (raw is! List) return ReturnReason.defaults;
+    return [
+      for (final r in raw.cast<Map<String, dynamic>>())
+        ReturnReason(r['value'] as String, r['label'] as String, r['resellable'] == true),
+    ];
+  }
+
   /// Payment methods set up in Odoo for reps. Servers from before this existed
   /// get the old fixed list.
   List<PaymentMethod> get paymentMethods {
@@ -216,7 +231,115 @@ class OpenInvoice {
 
 /// What kind of thing a [LocalRecord] is. Uploaded in this order, so that
 /// orders can point to visits and customers already in Odoo.
-enum RecordKind { customer, visit, order, payment, dayClose }
+enum RecordKind { customer, visit, order, payment, dayClose, shopReturn, vanTransfer }
+
+/// The order in which records go to Odoo: a morning load before the day's
+/// orders, goods taken back before the day-end unload, and the day close last.
+int uploadRank(LocalRecord r) => switch (r.kind) {
+      RecordKind.customer => 0,
+      RecordKind.visit => 1,
+      RecordKind.vanTransfer => r.data['kind'] == 'load' ? 2 : 7,
+      RecordKind.order => 3,
+      RecordKind.payment => 4,
+      RecordKind.shopReturn => 5,
+      RecordKind.dayClose => 8,
+    };
+
+/// How an order reaches the shop when the rep has a van.
+enum DeliveryMode {
+  van('van', 'Deliver now from the van'),
+  split('split', 'Van now, the rest from the warehouse'),
+  warehouse('warehouse', 'Main warehouse delivers everything');
+
+  const DeliveryMode(this.code, this.label);
+
+  final String code;
+  final String label;
+}
+
+/// The rep's van, from Odoo.
+class VanInfo {
+  VanInfo(this.json);
+
+  final Map<String, dynamic> json;
+
+  int get id => json['id'] as int;
+  String get name => json['name'] as String? ?? '';
+  String? get vehicle => json['vehicle'] is String ? json['vehicle'] as String : null;
+  String get mainWarehouse => json['main_warehouse'] as String? ?? 'Main warehouse';
+  bool get selfLoad => json['self_load'] == true;
+}
+
+/// Why a shop gives goods back, and whether they can be sold again.
+class ReturnReason {
+  const ReturnReason(this.value, this.label, this.resellable);
+
+  final String value;
+  final String label;
+  final bool resellable;
+
+  static const defaults = [
+    ReturnReason('damaged', 'Damaged', false),
+    ReturnReason('expired', 'Expired', false),
+    ReturnReason('not_selling', 'Not selling', true),
+    ReturnReason('wrong_item', 'Wrong item', true),
+    ReturnReason('other', 'Other', true),
+  ];
+}
+
+/// One product's stock for the van screen.
+class VanItem {
+  VanItem({
+    required this.productId,
+    required this.name,
+    this.loaded = 0,
+    this.sold = 0,
+    this.returned = 0,
+    this.left = 0,
+    this.mainQty = 0,
+    this.price = 0,
+  });
+
+  final int productId;
+  final String name;
+  double loaded;
+  double sold;
+  double returned;
+  double left;
+  double mainQty;
+  double price;
+
+  /// 'ok', 'low' or 'out', for the label next to the quantity.
+  String get status => left <= 0 ? 'out' : (loaded > 0 && left <= 0.25 * loaded ? 'low' : 'ok');
+
+  static VanItem fromOdoo(Map<String, dynamic> r) => VanItem(
+        productId: r['product_id'] as int,
+        name: r['name'] as String? ?? '',
+        loaded: _num(r['loaded']),
+        sold: _num(r['sold']),
+        returned: _num(r['returned']),
+        left: _num(r['left']),
+        mainQty: _num(r['main_qty']),
+        price: _num(r['price']),
+      );
+}
+
+/// What a shop bought lately, to take back.
+class ReturnCandidate {
+  ReturnCandidate({required this.productId, required this.name, required this.lastDate, required this.priceUnit});
+
+  final int productId;
+  final String name;
+  final String? lastDate;
+  final double priceUnit;
+
+  static ReturnCandidate fromOdoo(Map<String, dynamic> r) => ReturnCandidate(
+        productId: r['product_id'] as int,
+        name: r['name'] as String? ?? '',
+        lastDate: r['last_date'] is String ? r['last_date'] as String : null,
+        priceUnit: _num(r['price_unit']),
+      );
+}
 
 enum SyncState { pending, synced, failed }
 

@@ -357,7 +357,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               Text('Scan to pay ${_link!['invoice']}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
               Text(money((_link!['amount'] as num).toDouble()),
-                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: BeatproColors.navy)),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: BeatproColors.brand)),
               const SizedBox(height: 12),
               QrImageView(
                 data: _link!['link'] as String,
@@ -416,10 +416,10 @@ class _MethodTile extends StatelessWidget {
         selected: selected,
         button: true,
         child: Material(
-          color: selected ? BeatproColors.blueSoft : Colors.white,
+          color: selected ? BeatproColors.brandSoft : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: selected ? BeatproColors.navy : BeatproColors.line, width: selected ? 2 : 1),
+            side: BorderSide(color: selected ? BeatproColors.brand : BeatproColors.line, width: selected ? 2 : 1),
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
@@ -427,14 +427,14 @@ class _MethodTile extends StatelessWidget {
             child: SizedBox(
               height: 64,
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(_iconFor(method), size: 20, color: selected ? BeatproColors.navy : BeatproColors.ink),
+                Icon(_iconFor(method), size: 20, color: selected ? BeatproColors.brand : BeatproColors.ink),
                 const SizedBox(height: 2),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(method.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontWeight: FontWeight.w800, color: selected ? BeatproColors.navy : BeatproColors.ink)),
+                      style: TextStyle(fontWeight: FontWeight.w800, color: selected ? BeatproColors.brand : BeatproColors.ink)),
                 ),
               ]),
             ),

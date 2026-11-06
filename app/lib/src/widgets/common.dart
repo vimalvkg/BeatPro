@@ -220,8 +220,8 @@ class NumberMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = done ? BeatproColors.successDot : current ? BeatproColors.navy : BeatproColors.blueSoft;
-    final fg = done || current ? Colors.white : BeatproColors.navy;
+    final bg = done ? BeatproColors.successDot : current ? BeatproColors.brand : BeatproColors.brandSoft;
+    final fg = done || current ? Colors.white : BeatproColors.brand;
     return Container(
       width: size,
       height: size,
@@ -256,8 +256,8 @@ class ProgressRing extends StatelessWidget {
                 value: total == 0 ? 0 : (done / total).clamp(0, 1).toDouble(),
                 strokeWidth: 8,
                 strokeCap: StrokeCap.round,
-                backgroundColor: BeatproColors.blueSoft,
-                color: BeatproColors.navy,
+                backgroundColor: BeatproColors.brandSoft,
+                color: BeatproColors.brand,
               ),
             ),
             Text('$done/$total', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: BeatproColors.ink)),

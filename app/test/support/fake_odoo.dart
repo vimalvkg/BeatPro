@@ -12,6 +12,29 @@ class FakeOdoo {
   bool onlinePaid = false;
   int _nextId = 1000;
 
+  /// The rep has a van (MH 02 AB 4521), loaded from the main warehouse.
+  bool withVan = false;
+
+  /// The user is a supervisor with the Van Sales Dashboard.
+  bool supervisor = false;
+
+  /// The van's stock per product: loaded, sold, returned, left.
+  final van = <int, Map<String, double>>{};
+  Map<String, dynamic>? openLoad;
+  Map<String, dynamic>? unload;
+
+  /// The storekeeper confirms the waiting load request.
+  void storekeeperLoads() {
+    final load = uploaded['beatpro.van.transfer.load']!.last;
+    for (final l in (load['line_ids'] as List)) {
+      final vals = (l as List)[2] as Map<String, dynamic>;
+      final row = van[vals['product_id'] as int] ??= {'loaded': 0, 'sold': 0, 'returned': 0, 'left': 0};
+      row['loaded'] = row['loaded']! + (vals['qty'] as num);
+      row['left'] = row['left']! + (vals['qty'] as num);
+    }
+    openLoad = null;
+  }
+
   static const shops = [
     {'id': 8, 'name': 'Sharma General Store', 'city': 'Andheri East', 'phone': '+91 98200 10000', 'lat': 19.1136, 'lng': 72.8697},
     {'id': 9, 'name': 'Patel Kirana', 'city': 'Andheri East', 'phone': '+91 98200 10001', 'lat': 19.1155, 'lng': 72.8722},
@@ -64,6 +87,17 @@ class FakeOdoo {
             {'id': 33, 'name': 'Cheque', 'journal': 'Cheques', 'kind': 'cheque', 'reference': 'cheque', 'hand_in': true},
           ],
           'online_providers': ['Razorpay'],
+          if (withVan) ...{
+            'van': {'id': 3, 'name': 'Van 1 · Ravi Kumar', 'vehicle': 'MH 02 AB 4521', 'main_warehouse': 'Main warehouse', 'self_load': false},
+            'return_reasons': [
+              {'value': 'damaged', 'label': 'Damaged', 'resellable': false},
+              {'value': 'expired', 'label': 'Expired', 'resellable': false},
+              {'value': 'not_selling', 'label': 'Not selling', 'resellable': true},
+              {'value': 'wrong_item', 'label': 'Wrong item', 'resellable': true},
+              {'value': 'other', 'label': 'Other', 'resellable': true},
+            ],
+          },
+          if (supervisor) 'sales_dashboard': true,
           'warehouse_id': 1,
           'server_time': '2026-10-29 06:00:00',
         };
@@ -121,11 +155,127 @@ class FakeOdoo {
             'overdue': true,
           },
         ];
+      case 'beatpro.theme.get_sales_dashboard':
+        final week = body['period'] == 'week';
+        return {
+          'period': body['period'],
+          'route_id': body['route_id'],
+          'routes': [
+            {'id': 1, 'name': 'Andheri East'},
+            {'id': 2, 'name': 'Powai'},
+          ],
+          'greeting_name': 'Meena Shah',
+          'company': 'Mumbai Distributors Pvt Ltd',
+          'kpis': [
+            {'key': 'sales', 'label': 'Total sales', 'value': week ? '₹75,484.00' : '₹4,86,240.00', 'trend': 12.5, 'spark': [0, 10, 8, 30, 12, 18, 24], 'icon': 'fa-line-chart'},
+            {'key': 'orders', 'label': 'Orders', 'value': week ? '5' : '243', 'trend': 8.7, 'spark': [0, 1, 1, 3, 0, 0, 0], 'icon': 'fa-shopping-bag'},
+            {'key': 'shops', 'label': 'Active shops', 'value': '4', 'trend': -2.0, 'spark': [0, 1, 1, 3, 0, 0, 0], 'icon': 'fa-users'},
+            {'key': 'collected', 'label': 'Collected', 'value': '₹34,600.00', 'trend': null, 'spark': [0, 10, 8, 30, 12, 18, 24], 'icon': 'fa-database'},
+          ],
+          'chart': [
+            for (final (i, d) in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexed)
+              {'label': d, 'amount': [8200, 12400, 9800, 21000, 11600, 7400, 5084][i].toDouble(), 'count': [1, 1, 0, 2, 1, 0, 0][i]},
+          ],
+          'chart_max_amount': 21000.0,
+          'chart_max_count': 2,
+          'categories': [
+            {'name': 'Biscuits', 'share': 35},
+            {'name': 'Staples', 'share': 30},
+            {'name': 'Dairy', 'share': 20},
+            {'name': 'Others', 'share': 15},
+          ],
+          'sales_total': '₹75,484.00',
+          'top_shops': [
+            {'id': 9, 'name': 'Patel Kirana', 'amount': '₹33,312.00'},
+            {'id': 8, 'name': 'Sharma General Store', 'amount': '₹20,112.00'},
+          ],
+          'routes_sales': [
+            {'name': 'Andheri East', 'amount': '₹38,612.00', 'pct': 100},
+            {'name': 'Powai', 'amount': '₹26,872.00', 'pct': 70},
+          ],
+          'collected': '₹34,600.00',
+          'due': '₹13,500.00',
+          'collect_total': '₹48,100.00',
+          'collected_pct': 72,
+          'activity': [
+            {'kind': 'order', 'text': 'Order S00243 · Patel Kirana · ₹9,824.00', 'time': '06 Nov, 04:25 PM'},
+            {'kind': 'payment', 'text': '₹1,200.00 collected · Sharma General Store', 'time': '06 Nov, 03:50 PM'},
+            {'kind': 'alert', 'text': 'Farah Khan: unload 1 short', 'time': '06 Nov, 03:30 PM'},
+          ],
+        };
+      case 'beatpro.van.transfer.beatpro_van_stock':
+        Map<String, dynamic> product(int id) => products.firstWhere((p) => p['id'] == id);
+        return {
+          'has_van': true,
+          'van_items': [
+            for (final e in van.entries)
+              {'product_id': e.key, 'name': product(e.key)['name'], ...e.value, 'main_qty': product(e.key)['qty'], 'price': product(e.key)['price']},
+          ],
+          'main_items': [
+            for (final p in products)
+              if ((p['qty'] as double) > 0)
+                {'product_id': p['id'], 'name': p['name'], 'loaded': 0, 'sold': 0, 'returned': 0, 'left': 0, 'main_qty': p['qty'], 'price': p['price']},
+          ],
+          'open_load': openLoad ?? false,
+          'unload': unload ?? false,
+        };
+      case 'beatpro.van.transfer.beatpro_load_suggestion':
+        return [
+          {'product_id': 1, 'name': products[0]['name'], 'qty': 18, 'main_qty': 120},
+          {'product_id': 3, 'name': products[2]['name'], 'qty': 10, 'main_qty': 64},
+          {'product_id': 4, 'name': products[3]['name'], 'qty': 8, 'main_qty': 35},
+        ];
+      case 'beatpro.shop.return.beatpro_return_candidates':
+        return [
+          {'product_id': 4, 'name': products[3]['name'], 'last_date': '2026-10-22', 'price_unit': 480.0, 'bought': 4},
+          {'product_id': 1, 'name': products[0]['name'], 'last_date': '2026-10-29', 'price_unit': 240.0, 'bought': 6},
+        ];
+      case 'beatpro.van.transfer.beatpro_submit_transfers':
+        return {
+          for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
+            v['mobile_uuid']: () {
+              _record('$model.${v['kind']}', v);
+              final id = _nextId++;
+              final name = v['kind'] == 'load' ? 'LOAD/2026/00004' : 'UNLOAD/2026/00001';
+              if (v['kind'] == 'load') {
+                openLoad = {'id': id, 'name': name, 'state': 'sent'};
+              } else {
+                unload = {'id': id, 'name': name, 'state': 'sent'};
+              }
+              return {'id': id, 'name': name, 'state': 'sent'};
+            }(),
+        };
+      case 'beatpro.shop.return.beatpro_submit_returns':
+        return {
+          for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
+            v['mobile_uuid']: () {
+              _record(model, v);
+              for (final l in (v['line_ids'] as List)) {
+                final vals = (l as List)[2] as Map<String, dynamic>;
+                if (vals['resellable'] != true) continue;
+                final row = van[vals['product_id'] as int] ??= {'loaded': 0, 'sold': 0, 'returned': 0, 'left': 0};
+                row['returned'] = row['returned']! + (vals['qty'] as num);
+                row['left'] = row['left']! + (vals['qty'] as num);
+              }
+              return {'id': _nextId++, 'name': 'RET/2026/00001', 'state': 'done', 'amount_total': 1680.0, 'credit_note': 'RINV/2026/00003'};
+            }(),
+        };
       case 'sale.order.beatpro_submit_orders':
         return {
           for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
             v['mobile_uuid']: () {
               _record(model, v);
+              final mode = v['beatpro_delivery_mode'];
+              if (mode == 'van' || mode == 'split') {
+                for (final l in (v['order_line'] as List)) {
+                  final vals = (l as List)[2] as Map<String, dynamic>;
+                  final row = van[vals['product_id'] as int];
+                  final qty = (vals['product_uom_qty'] as num).toDouble();
+                  if (row == null || (mode == 'split' && row['left']! < qty)) continue;
+                  row['sold'] = row['sold']! + qty;
+                  row['left'] = row['left']! - qty;
+                }
+              }
               return {'id': _nextId++, 'name': 'S0004${_nextId % 10}', 'state': 'sale', 'approval': false, 'amount_total': 1321.6};
             }(),
         };

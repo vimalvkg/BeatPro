@@ -39,7 +39,7 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(padding: EdgeInsets.zero, children: [
           // Blue band with the day's title.
           Container(
-            color: BeatproColors.navy,
+            decoration: const BoxDecoration(gradient: BeatproColors.bandGradient),
             padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 14, 8, 64),
             child: Row(children: [
               Expanded(
@@ -47,7 +47,7 @@ class HomeScreen extends ConsumerWidget {
                   const Text('My Day', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                   Text(
                     [DateFormat.EEEE().format(DateTime.now()), if (routeNames.isNotEmpty) routeNames].join(' · '),
-                    style: const TextStyle(color: BeatproColors.onNavy, fontSize: 13),
+                    style: const TextStyle(color: BeatproColors.onBrand, fontSize: 13),
                   ),
                 ]),
               ),
@@ -72,7 +72,7 @@ class HomeScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [BoxShadow(color: Color(0x1A10243A), blurRadius: 18, offset: Offset(0, 6))],
+                  boxShadow: const [BoxShadow(color: Color(0x1A4A0E14), blurRadius: 18, offset: Offset(0, 6))],
                 ),
                 child: Row(children: [
                   ProgressRing(done: done, total: planned),
@@ -130,6 +130,20 @@ class HomeScreen extends ConsumerWidget {
                     message: 'Your supervisor sets your routes in Odoo. Pull down to sync.',
                   ),
                 ),
+              const _VanCard(),
+              if (appContext?.hasSalesDashboard ?? false)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.insights_outlined, color: BeatproColors.brand),
+                      title: const Text('Van Sales Dashboard', style: TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: const Text("The team's sales, shops, routes and collections"),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push('/dashboard'),
+                    ),
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                 child: Row(children: [
@@ -171,6 +185,40 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+/// The rep's van at a glance, for reps with a van.
+class _VanCard extends ConsumerWidget {
+  const _VanCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stock = ref.watch(vanStockProvider).value;
+    if (stock == null || !stock.hasVan) return const SizedBox.shrink();
+    final money = ref.watch(moneyProvider);
+    final String status;
+    if (stock.todayUnload != null || stock.serverUnload != null) {
+      status = 'Unload sent';
+    } else if (stock.loadWaiting) {
+      status = 'Load request sent · waiting for the storekeeper';
+    } else if (stock.loaded == 0 && stock.inVan == 0) {
+      status = 'Empty · load the van before you leave';
+    } else {
+      status = '${formatQty(stock.inVan)} cases · ${money(stock.value)}';
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Card(
+        child: ListTile(
+          leading: const Icon(Icons.local_shipping_outlined, color: BeatproColors.brand),
+          title: Text(stock.van?.vehicle ?? 'My van', style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(status),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/van'),
+        ),
+      ),
+    );
+  }
+}
+
 class _NextCard extends ConsumerWidget {
   const _NextCard({required this.view, required this.number, required this.isCurrent});
 
@@ -188,7 +236,7 @@ class _NextCard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: BeatproColors.navy, width: 2),
+        border: Border.all(color: BeatproColors.brand, width: 2),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -248,7 +296,7 @@ class _SquareButton extends StatelessWidget {
         child: OutlinedButton(
           onPressed: onTap,
           style: OutlinedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(52, 52)),
-          child: Icon(icon, color: BeatproColors.navy, semanticLabel: label),
+          child: Icon(icon, color: BeatproColors.brand, semanticLabel: label),
         ),
       );
 }
@@ -269,7 +317,7 @@ class StopCard extends ConsumerWidget {
         : view.inProgress
             ? ('In progress', BeatproColors.amberSoft, BeatproColors.amberInk)
             : isNext
-                ? ('Next', BeatproColors.blueSoft, BeatproColors.navy)
+                ? ('Next', BeatproColors.brandSoft, BeatproColors.brand)
                 : ('To visit', BeatproColors.lineSoft, const Color(0xFF4A5A6B));
     return Material(
       color: Colors.white,

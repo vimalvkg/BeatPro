@@ -1,25 +1,35 @@
 import 'package:flutter/material.dart';
 
-/// BeatPro colours: deep route blue with a marker amber, as in the app icon
-/// and the BeatPro screens in Odoo.
+/// BeatPro Van Sales colours: maroon with a marker amber, the same as the
+/// BeatPro Theme in Odoo.
 class BeatproColors {
-  static const navy = Color(0xFF184878);
-  static const ink = Color(0xFF10243A);
-  static const ground = Color(0xFFF4F6F9);
-  static const line = Color(0xFFDCE3EB);
-  static const lineSoft = Color(0xFFEDF1F5);
-  static const muted = Color(0xFF5B6B7C);
-  static const blueSoft = Color(0xFFE6EEF7);
-  static const onNavy = Color(0xFFC9D8E8);
-  static const amber = Color(0xFFF2B233);
+  static const brand = Color(0xFF7B1C24);
+  static const brandDeep = Color(0xFF5A1018);
+  static const red = Color(0xFFB3262E);
+  static const ink = Color(0xFF2A1215);
+  static const ground = Color(0xFFF8F3F3);
+  static const line = Color(0xFFEADCDD);
+  static const lineSoft = Color(0xFFF3E8E9);
+  static const muted = Color(0xFF6E5A5C);
+  static const brandSoft = Color(0xFFFBEDEE);
+  static const onBrand = Color(0xFFF1D9DB);
+  static const amber = Color(0xFFF2B84B);
   static const amberInk = Color(0xFF7A4F00);
   static const amberSoft = Color(0xFFFFF6E0);
   static const success = Color(0xFF1F6B45);
   static const successDot = Color(0xFF2E8B57);
   static const successSoft = Color(0xFFE3F2EA);
   static const warning = Color(0xFFB26A00);
-  static const danger = Color(0xFF8C1D18);
+  static const danger = Color(0xFFA3242B);
   static const dangerSoft = Color(0xFFFBE9E7);
+
+  /// The maroon band behind page headers.
+  static const bandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [brandDeep, brand, red],
+    stops: [0, 0.6, 1],
+  );
 }
 
 const _font = 'Manrope';
@@ -27,9 +37,9 @@ const _font = 'Manrope';
 ThemeData beatproTheme(Brightness brightness) {
   final light = brightness == Brightness.light;
   final scheme = ColorScheme.fromSeed(
-    seedColor: BeatproColors.navy,
+    seedColor: BeatproColors.brand,
     brightness: brightness,
-    primary: light ? BeatproColors.navy : const Color(0xFF9CC4F0),
+    primary: light ? BeatproColors.brand : const Color(0xFFF0A6AD),
     secondary: BeatproColors.amber,
     surface: light ? Colors.white : null,
     onSurface: light ? BeatproColors.ink : null,
@@ -92,7 +102,7 @@ ThemeData beatproTheme(Brightness brightness) {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: scheme.surface,
-      indicatorColor: light ? BeatproColors.blueSoft : null,
+      indicatorColor: light ? BeatproColors.brandSoft : null,
       labelTextStyle: WidgetStatePropertyAll(const TextStyle(fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w700)),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(

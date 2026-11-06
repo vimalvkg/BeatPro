@@ -162,6 +162,11 @@ final recordsProvider = FutureProvider<List<LocalRecord>>((ref) async {
   return (await db.records()).reversed.toList();
 });
 
+final vanStockProvider = FutureProvider<VanStockView>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).vanStock();
+});
+
 final todayCloseProvider = FutureProvider<LocalRecord?>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).todayClose();

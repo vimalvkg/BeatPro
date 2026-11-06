@@ -89,9 +89,9 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
             // What to hand in.
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(color: BeatproColors.ink, borderRadius: BorderRadius.circular(18)),
+              decoration: BoxDecoration(gradient: BeatproColors.bandGradient, borderRadius: BorderRadius.circular(18)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Hand in to the office', style: TextStyle(color: BeatproColors.onNavy, fontSize: 13, fontWeight: FontWeight.w700)),
+                const Text('Hand in to the office', style: TextStyle(color: BeatproColors.onBrand, fontSize: 13, fontWeight: FontWeight.w700)),
                 Text(money(cash + cheque),
                     style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800, height: 1.15)),
                 const SizedBox(height: 12),
@@ -170,9 +170,9 @@ class _HandInPart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(color: BeatproColors.onNavy, fontSize: 12, fontWeight: FontWeight.w700)),
+        Text(label, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 12, fontWeight: FontWeight.w700)),
         Text(amount, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-        if (note != null) Text(note!, style: const TextStyle(color: BeatproColors.onNavy, fontSize: 12)),
+        if (note != null) Text(note!, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 12)),
       ]);
 }
 

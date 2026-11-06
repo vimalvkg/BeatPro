@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/models.dart';
+import '../core/repository.dart';
 import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
@@ -26,6 +27,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   Map<int, double> _prices = {};
   final Map<int, CartLine> _cart = {};
   String _search = '';
+  VanStockView? _stock;
   bool _loading = true;
   bool _saving = false;
 
@@ -40,10 +42,12 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final customer = await db.customer(widget.customerKey);
     final products = await db.products();
     final prices = await db.pricesFor(customer?.pricelistId);
+    final stock = await ref.read(repositoryProvider).vanStock();
     if (mounted) {
       setState(() {
         _products = products;
         _prices = prices;
+        _stock = stock;
         _loading = false;
       });
     }
@@ -76,11 +80,15 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   }
 
   Future<void> _openCart() async {
-    final confirmed = await showModalBottomSheet<String?>(
+    final confirmed = await showModalBottomSheet<_CartResult?>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _CartSheet(lines: _cart.values.toList(), onChanged: () => setState(() {})),
+      builder: (_) => _CartSheet(
+        lines: _cart.values.toList(),
+        stock: _stock?.hasVan == true ? _stock : null,
+        onChanged: () => setState(() {}),
+      ),
     );
     if (confirmed == null) return;
     setState(() => _saving = true);
@@ -89,7 +97,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             customerKey: widget.customerKey,
             visitUuid: widget.visitUuid,
             lines: _cart.values.toList(),
-            note: confirmed.isEmpty ? null : confirmed,
+            note: confirmed.note.isEmpty ? null : confirmed.note,
+            delivery: confirmed.delivery,
           );
       ref.read(dataVersionProvider.notifier).bump();
       if (widget.visitUuid == null) unawaited(ref.read(syncControllerProvider.notifier).run());
@@ -142,14 +151,18 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
                   itemBuilder: (context, i) {
                     final p = visible[i];
                     final qty = _cart[p.id]?.qty ?? 0;
+                    final inVan = _stock?.hasVan == true ? _stock!.leftOf(p.id) : null;
+                    final have = inVan ?? p.qtyAvailable;
                     return ListTile(
                       title: Text(p.name),
                       subtitle: Row(children: [
                         Text(money(_priceOf(p)), style: const TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(width: 8),
                         StatusChip(
-                          p.qtyAvailable > 0 ? '${formatQty(p.qtyAvailable)} in stock' : 'Out of stock',
-                          color: p.qtyAvailable > 0 ? BeatproColors.success : BeatproColors.danger,
+                          have > 0
+                              ? '${formatQty(have)} ${inVan != null ? 'in van' : 'in stock'}'
+                              : (inVan != null ? '0 in van' : 'Out of stock'),
+                          color: have > 0 ? BeatproColors.success : BeatproColors.danger,
                         ),
                       ]),
                       trailing: _QtyStepper(qty: qty, onChanged: (q) => _setQty(p, q)),
@@ -203,11 +216,21 @@ class _QtyStepper extends StatelessWidget {
   }
 }
 
+class _CartResult {
+  const _CartResult(this.note, this.delivery);
+
+  final String note;
+  final DeliveryMode? delivery;
+}
+
 class _CartSheet extends ConsumerStatefulWidget {
-  const _CartSheet({required this.lines, required this.onChanged});
+  const _CartSheet({required this.lines, required this.onChanged, this.stock});
 
   final List<CartLine> lines;
   final VoidCallback onChanged;
+
+  /// The van's stock, for reps with a van: they choose how the order is delivered.
+  final VanStockView? stock;
 
   @override
   ConsumerState<_CartSheet> createState() => _CartSheetState();
@@ -215,6 +238,44 @@ class _CartSheet extends ConsumerStatefulWidget {
 
 class _CartSheetState extends ConsumerState<_CartSheet> {
   final _note = TextEditingController();
+  DeliveryMode? _delivery;
+
+  bool get _vanHasAll => widget.lines.every((l) => (widget.stock?.leftOf(l.product.id) ?? 0) >= l.qty);
+  bool get _vanHasSome => widget.lines.any((l) => (widget.stock?.leftOf(l.product.id) ?? 0) >= l.qty);
+
+  DeliveryMode? get _mode {
+    if (widget.stock == null) return null;
+    final picked = _delivery ?? (_vanHasAll ? DeliveryMode.van : (_vanHasSome ? DeliveryMode.split : DeliveryMode.warehouse));
+    return picked == DeliveryMode.van && !_vanHasAll ? DeliveryMode.split : picked;
+  }
+
+  String _optionText(DeliveryMode mode) {
+    final stock = widget.stock!;
+    final main = stock.van?.mainWarehouse ?? 'the main warehouse';
+    final short = [for (final l in widget.lines) if (stock.leftOf(l.product.id) < l.qty) l.product.name];
+    final now = [for (final l in widget.lines) if (stock.leftOf(l.product.id) >= l.qty) l.product.name];
+    return switch (mode) {
+      DeliveryMode.van => short.isEmpty
+          ? 'Hand everything over now.'
+          : 'Not possible: ${short.join(', ')} ${short.length == 1 ? 'is' : 'are'} short in the van.',
+      DeliveryMode.split => now.isEmpty
+          ? 'Nothing in this order is in the van.'
+          : short.isEmpty
+              ? 'Everything is in the van.'
+              : '${now.join(', ')} handed over now. ${short.join(', ')} delivered by $main.',
+      DeliveryMode.warehouse => 'Delivered by $main. The order is still yours: it counts in your sales.',
+    };
+  }
+
+  String _ctaFor(DeliveryMode? mode, String total) {
+    if (mode == null) return 'Place order · $total';
+    final nowCount = Repository.vanLinesFor(mode, widget.lines, widget.stock!).length;
+    return switch (mode) {
+      DeliveryMode.van => 'Deliver now · $total',
+      DeliveryMode.split => 'Place order · deliver $nowCount item${nowCount == 1 ? '' : 's'} now',
+      DeliveryMode.warehouse => 'Place order for warehouse delivery',
+    };
+  }
 
   @override
   void dispose() {
@@ -270,8 +331,21 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
             for (final l in widget.lines)
               ListTile(
                 title: Text(l.product.name),
-                subtitle: Text('${formatQty(l.qty)} × ${money(l.unitPrice)}'
-                    '${l.discount > 0 ? ' · ${formatQty(l.discount)}% off' : ''}'),
+                subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${formatQty(l.qty)} × ${money(l.unitPrice)}'
+                      '${l.discount > 0 ? ' · ${formatQty(l.discount)}% off' : ''}'),
+                  if (widget.stock != null)
+                    Text(
+                      widget.stock!.leftOf(l.product.id) >= l.qty
+                          ? '${formatQty(l.qty)} of ${formatQty(widget.stock!.leftOf(l.product.id))} in van'
+                          : '${formatQty(widget.stock!.leftOf(l.product.id))} in van · warehouse has ${formatQty(widget.stock!.mainOf(l.product.id))}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: widget.stock!.leftOf(l.product.id) >= l.qty ? BeatproColors.success : BeatproColors.danger,
+                      ),
+                    ),
+                ]),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   Text(money(l.subtotal), style: const TextStyle(fontWeight: FontWeight.w600)),
                   IconButton(tooltip: 'Discount', icon: const Icon(Icons.percent, size: 20), onPressed: () => _editDiscount(l)),
@@ -297,6 +371,20 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
                   ),
                 ),
               ),
+            if (widget.stock != null) ...[
+              const Eyebrow('How will it be delivered?'),
+              for (final mode in DeliveryMode.values)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: _DeliveryOption(
+                    title: mode.label,
+                    text: _optionText(mode),
+                    selected: _mode == mode,
+                    enabled: mode != DeliveryMode.van || _vanHasAll,
+                    onTap: () => setState(() => _delivery = mode),
+                  ),
+                ),
+            ],
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note for the order (optional)')),
@@ -309,8 +397,8 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () => Navigator.pop(context, _note.text.trim()),
-                child: Text('Place order · ${money(totals.total)}'),
+                onPressed: () => Navigator.pop(context, _CartResult(_note.text.trim(), _mode)),
+                child: Text(_ctaFor(_mode, money(totals.total))),
               ),
             ),
           ),
@@ -318,6 +406,61 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
       ]),
     );
   }
+}
+
+class _DeliveryOption extends StatelessWidget {
+  const _DeliveryOption({
+    required this.title,
+    required this.text,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String title;
+  final String text;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        inMutuallyExclusiveGroup: true,
+        checked: selected,
+        enabled: enabled,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: enabled ? onTap : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: selected ? BeatproColors.brandSoft : (enabled ? Colors.white : BeatproColors.ground),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: selected ? BeatproColors.brand : BeatproColors.line, width: selected ? 2 : 1),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 20,
+                height: 20,
+                margin: const EdgeInsets.only(top: 2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: selected ? BeatproColors.brand : const Color(0xFFB9A6A8), width: selected ? 6 : 2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: enabled ? null : BeatproColors.muted)),
+                  const SizedBox(height: 2),
+                  Text(text, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
 }
 
 class _TotalRow extends StatelessWidget {

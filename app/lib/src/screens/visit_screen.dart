@@ -92,9 +92,11 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
     final money = ref.watch(moneyProvider);
     final visitValue = ref.watch(_visitProvider(widget.visitUuid));
     final orders = ref.watch(ordersProvider).value ?? const <LocalRecord>[];
-    final payments = (ref.watch(recordsProvider).value ?? const <LocalRecord>[])
-        .where((r) => r.kind == RecordKind.payment && r.data['visitUuid'] == widget.visitUuid)
-        .toList();
+    final records = ref.watch(recordsProvider).value ?? const <LocalRecord>[];
+    final payments =
+        records.where((r) => r.kind == RecordKind.payment && r.data['visitUuid'] == widget.visitUuid).toList();
+    final returns =
+        records.where((r) => r.kind == RecordKind.shopReturn && r.data['visitUuid'] == widget.visitUuid).toList();
 
     return AsyncBody(
       value: visitValue,
@@ -138,7 +140,8 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: inProgress ? BeatproColors.navy : BeatproColors.ink,
+                gradient: inProgress ? BeatproColors.bandGradient : null,
+                color: inProgress ? null : BeatproColors.ink,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -172,7 +175,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                   const Spacer(),
                   Text(
                     inProgress ? 'since ${formatTime(checkIn)}' : (result?.label ?? ''),
-                    style: const TextStyle(fontSize: 13, color: BeatproColors.onNavy),
+                    style: const TextStyle(fontSize: 13, color: BeatproColors.onBrand),
                   ),
                 ]),
                 const SizedBox(height: 12),
@@ -186,13 +189,13 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                         fontFeatures: [FontFeature.tabularFigures()],
                       )),
                   const SizedBox(width: 8),
-                  const Text('at the shop', style: TextStyle(color: BeatproColors.onNavy, fontSize: 14)),
+                  const Text('at the shop', style: TextStyle(color: BeatproColors.onBrand, fontSize: 14)),
                 ]),
                 const SizedBox(height: 12),
                 Row(children: [
-                  const Icon(Icons.location_on_outlined, size: 16, color: BeatproColors.onNavy),
+                  const Icon(Icons.location_on_outlined, size: 16, color: BeatproColors.onBrand),
                   const SizedBox(width: 6),
-                  Expanded(child: Text(location, style: const TextStyle(color: BeatproColors.onNavy, fontSize: 13))),
+                  Expanded(child: Text(location, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 13))),
                 ]),
               ]),
             ),
@@ -218,6 +221,15 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                 ),
               ),
             ]),
+            if (inProgress) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                onPressed: () => context.push('/return/new?customer=${Uri.encodeComponent(customerKey)}&visit=${visit.uuid}'),
+                icon: const Icon(Icons.undo),
+                label: const Text('Take back goods'),
+              ),
+            ],
             const SizedBox(height: 14),
             // Customer at a glance.
             Card(
@@ -236,7 +248,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
               ),
             ),
             const Eyebrow('In this visit', padding: EdgeInsets.fromLTRB(0, 20, 0, 8)),
-            if (visitOrders.isEmpty && payments.isEmpty)
+            if (visitOrders.isEmpty && payments.isEmpty && returns.isEmpty)
               const Text('No order or payment yet.', style: TextStyle(color: BeatproColors.muted))
             else
               Card(
@@ -260,6 +272,14 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                           ? 'Settles ${(p.data['invoiceIds'] as List).length} invoice(s)'
                           : 'Advance on account',
                       amount: money((p.data['amount'] as num).toDouble()),
+                    ),
+                  for (final r in returns)
+                    _Item(
+                      icon: Icons.undo,
+                      title: 'Goods taken back ${(r.data['name'] as String?) ?? ''}'.trim(),
+                      subtitle: '${formatQty((r.data['lines'] as List).fold<num>(0, (s, l) => s + ((l as Map)['qty'] as num)))} items · '
+                          '${r.state == SyncState.synced ? 'credit note ${r.data['creditNote'] ?? 'made'}' : 'Waiting to sync'}',
+                      amount: '− ${money((r.data['total'] as num).toDouble())}',
                     ),
                 ]),
               ),
@@ -307,10 +327,10 @@ class _Tile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: warm ? BeatproColors.amberSoft : BeatproColors.blueSoft,
+                  color: warm ? BeatproColors.amberSoft : BeatproColors.brandSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: warm ? const Color(0xFF8A5A00) : BeatproColors.navy),
+                child: Icon(icon, color: warm ? const Color(0xFF8A5A00) : BeatproColors.brand),
               ),
               Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
             ]),
@@ -352,10 +372,10 @@ class _Item extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: paid ? BeatproColors.successSoft : BeatproColors.blueSoft,
+            color: paid ? BeatproColors.successSoft : BeatproColors.brandSoft,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 18, color: paid ? BeatproColors.success : BeatproColors.navy),
+          child: Icon(icon, size: 18, color: paid ? BeatproColors.success : BeatproColors.brand),
         ),
         title: Text(title),
         subtitle: Text(subtitle),
@@ -437,10 +457,10 @@ class _Choice extends StatelessWidget {
         selected: selected,
         button: true,
         child: Material(
-          color: selected ? BeatproColors.blueSoft : Colors.white,
+          color: selected ? BeatproColors.brandSoft : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: selected ? BeatproColors.navy : BeatproColors.line, width: selected ? 2 : 1),
+            side: BorderSide(color: selected ? BeatproColors.brand : BeatproColors.line, width: selected ? 2 : 1),
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -450,7 +470,7 @@ class _Choice extends StatelessWidget {
               child: Center(
                 child: Text(label,
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.w700, color: selected ? BeatproColors.navy : BeatproColors.ink)),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: selected ? BeatproColors.brand : BeatproColors.ink)),
               ),
             ),
           ),

@@ -70,6 +70,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # BeatPro logo and van drawing (own artwork, same as the BeatPro Theme in Odoo).
+  assets:
+    - assets/images/
+
   # Manrope, SIL Open Font License (assets/fonts/OFL.txt).
   fonts:
     - family: Manrope

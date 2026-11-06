@@ -6,15 +6,18 @@ import 'providers.dart';
 import 'screens/add_customer_screen.dart';
 import 'screens/customer_detail_screen.dart';
 import 'screens/customers_screen.dart';
+import 'screens/dashboard_screen.dart';
 import 'screens/day_close_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/order_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/payment_screen.dart';
+import 'screens/return_screen.dart';
 import 'screens/route_screen.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/sync_screen.dart';
+import 'screens/van_screens.dart';
 import 'screens/visit_screen.dart';
 import 'theme.dart';
 
@@ -74,6 +77,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           visitUuid: state.uri.queryParameters['visit'],
         ),
       ),
+      GoRoute(
+        path: '/return/new',
+        builder: (_, state) => ShopReturnScreen(
+          customerKey: state.uri.queryParameters['customer']!,
+          visitUuid: state.uri.queryParameters['visit'],
+        ),
+      ),
+      GoRoute(path: '/van', builder: (_, _) => const VanStockScreen()),
+      GoRoute(path: '/van/load', builder: (_, _) => const VanLoadScreen()),
+      GoRoute(path: '/van/unload', builder: (_, _) => const VanUnloadScreen()),
+      GoRoute(path: '/dashboard', builder: (_, _) => const DashboardScreen()),
       GoRoute(path: '/sync', builder: (_, _) => const SyncScreen()),
       GoRoute(path: '/day-close', builder: (_, _) => const DayCloseScreen()),
     ],

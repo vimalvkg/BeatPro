@@ -122,6 +122,24 @@ class SyncService {
         ),
     ];
 
+    // Van sales: the van's stock, today's load suggestion, and what each shop
+    // on today's route bought lately (to take goods back offline).
+    Object? vanStock;
+    Object? loadSuggestion;
+    if (app.van != null) {
+      vanStock = await client.call('beatpro.van.transfer', 'beatpro_van_stock');
+      loadSuggestion = await client.call('beatpro.van.transfer', 'beatpro_load_suggestion');
+    }
+    final candidates = <String, Object?>{};
+    if (context.containsKey('return_reasons')) {
+      for (final partnerId in {for (final s in plan) s['partner_id'] as int}) {
+        candidates['$partnerId'] =
+            await client.call('beatpro.shop.return', 'beatpro_return_candidates', kwargs: {'partner_id': partnerId});
+      }
+    }
+    await db.setValue('van_stock', vanStock == null ? null : jsonEncode(vanStock));
+    await db.setValue('load_suggestion', loadSuggestion == null ? null : jsonEncode(loadSuggestion));
+    await db.setValue('return_candidates', jsonEncode(candidates));
     await db.setValue('context', jsonEncode(context));
     await db.replaceDownloaded(
       customers: customers,
@@ -139,7 +157,7 @@ class SyncService {
       ...await db.records(state: SyncState.pending),
       ...await db.records(state: SyncState.failed),
     ]..sort((a, b) {
-        final byKind = a.kind.index.compareTo(b.kind.index);
+        final byKind = uploadRank(a).compareTo(uploadRank(b));
         return byKind != 0 ? byKind : a.createdAt.compareTo(b.createdAt);
       });
 
@@ -227,6 +245,7 @@ class SyncService {
               'partner_id': partnerId,
               'beatpro_visit_id': visitId ?? false,
               'note': r.data['note'] ?? false,
+              if (r.data['deliveryMode'] != null) 'beatpro_delivery_mode': r.data['deliveryMode'],
               'order_line': [
                 for (final l in (r.data['lines'] as List).cast<Map<String, dynamic>>())
                   [
@@ -283,6 +302,79 @@ class SyncService {
         await _markSynced(r, result[r.uuid] as int);
         return true;
 
+      case RecordKind.shopReturn:
+        final partnerId = await _customerId(r.data['customerKey'] as String);
+        if (partnerId == null) return false;
+        final visitUuid = r.data['visitUuid'] as String?;
+        int? visitId;
+        if (visitUuid != null) {
+          visitId = await _serverIdOf(visitUuid);
+          if (visitId == null) return false;
+        }
+        final result = await client.call('beatpro.shop.return', 'beatpro_submit_returns', kwargs: {
+          'vals_list': [
+            {
+              'mobile_uuid': r.uuid,
+              'partner_id': partnerId,
+              'visit_id': visitId ?? false,
+              'date': r.data['date'],
+              'line_ids': [
+                for (final l in (r.data['lines'] as List).cast<Map<String, dynamic>>())
+                  [
+                    0,
+                    0,
+                    {
+                      'product_id': l['productId'],
+                      'qty': l['qty'],
+                      'reason': l['reason'],
+                      'resellable': l['resellable'],
+                      'price_unit': l['priceUnit'],
+                    },
+                  ],
+              ],
+            },
+          ],
+        }) as Map<String, dynamic>;
+        final info = result[r.uuid] as Map<String, dynamic>;
+        await db.saveRecord(r.copyWith(
+          state: SyncState.synced,
+          serverId: info['id'] as int,
+          data: {...r.data, 'name': info['name'], 'creditNote': info['credit_note'] == false ? null : info['credit_note']},
+        ));
+        return true;
+
+      case RecordKind.vanTransfer:
+        if (r.data['kind'] == 'unload') {
+          // Count against Odoo's figures only once the day's sales and returns are in.
+          final others = await db.records(state: SyncState.pending);
+          if (others.any((o) => uploadRank(o) < uploadRank(r))) return false;
+        }
+        final result = await client.call('beatpro.van.transfer', 'beatpro_submit_transfers', kwargs: {
+          'vals_list': [
+            {
+              'mobile_uuid': r.uuid,
+              'kind': r.data['kind'],
+              'date': r.data['date'],
+              'note': r.data['note'] ?? false,
+              'line_ids': [
+                for (final l in (r.data['lines'] as List).cast<Map<String, dynamic>>())
+                  [
+                    0,
+                    0,
+                    {'product_id': l['productId'], 'qty': l['qty'], 'qty_expected': l['expected'] ?? 0},
+                  ],
+              ],
+            },
+          ],
+        }) as Map<String, dynamic>;
+        final info = result[r.uuid] as Map<String, dynamic>;
+        await db.saveRecord(r.copyWith(
+          state: SyncState.synced,
+          serverId: info['id'] as int,
+          data: {...r.data, 'name': info['name'], 'odooState': info['state']},
+        ));
+        return true;
+
       case RecordKind.dayClose:
         // Wait until the day's visits, orders and payments are all in Odoo.
         final others = await db.records(state: SyncState.pending);
@@ -304,6 +396,13 @@ class SyncService {
         'account.payment',
         'beatpro_payment_link',
         kwargs: {'invoice_id': invoiceId, 'amount': ?amount},
+      ) as Map<String, dynamic>);
+
+  /// The Van Sales Dashboard figures, for supervisors. Needs signal.
+  Future<Map<String, dynamic>> salesDashboard({String period = 'week', int? routeId}) async => (await client.call(
+        'beatpro.theme',
+        'get_sales_dashboard',
+        kwargs: {'period': period, 'route_id': routeId ?? false},
       ) as Map<String, dynamic>);
 
   /// Whether an invoice has been paid, e.g. after an online payment.

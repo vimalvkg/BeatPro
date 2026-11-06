@@ -8,6 +8,10 @@ does is saved on the phone and sent to Odoo when there's signal.
 | --- | --- | --- | --- | --- | --- |
 | ![](docs/screenshots/02-home.png) | ![](docs/screenshots/03-route.png) | ![](docs/screenshots/10-visit-with-order.png) | ![](docs/screenshots/06-catalog.png) | ![](docs/screenshots/09-payment.png) | ![](docs/screenshots/12-day-close.png) |
 
+| Load the van | Van stock | Delivery choice | Take back goods | Unload the van | Supervisor dashboard |
+| --- | --- | --- | --- | --- | --- |
+| ![](docs/screenshots/15-van-load.png) | ![](docs/screenshots/16-van-stock.png) | ![](docs/screenshots/17-delivery-choice.png) | ![](docs/screenshots/18-shop-return.png) | ![](docs/screenshots/19-van-unload.png) | ![](docs/screenshots/20-dashboard.png) |
+
 ## What a rep can do
 
 - **Sign in** with the Odoo address and an API key (Odoo: profile > Security > New API Key).
@@ -28,13 +32,27 @@ does is saved on the phone and sent to Odoo when there's signal.
   - **Pay online**, when an online payment provider (Razorpay, Stripe…) is enabled in Odoo: a QR
     code and shareable link for one invoice; the customer pays on their phone and **Check payment**
     confirms Odoo marked the invoice paid. Needs signal.
+- **Van sales**, for reps with a van in Odoo:
+  - **Load the van**: today's suggested load (from the route's shops' last orders), sent to the
+    storekeeper, or loaded straight away for reps who load their own van.
+  - **Stock**: what is in the van now (loaded, delivered, taken back, left) and what the main
+    warehouse has. Counts what the rep did offline.
+  - **Delivery choice** on each order: from the van now, the van now and the rest from the main
+    warehouse, or all from the main warehouse. The order is the rep's sale every way.
+  - **Take back goods** during a visit, with a reason: resellable goods go back into the van,
+    damaged and expired goods to the damaged area; the shop gets a credit note in Odoo.
+  - **Unload the van** at day end: count what is left; a difference needs a note.
+- **Van Sales Dashboard**, for supervisors when the BeatPro Theme is installed in Odoo: sales,
+  orders, active shops and collections against the previous period, sales by day, category,
+  shop and route, collected against still due, and recent activity. Needs signal.
 - **New customer** with a GPS pin.
 - **My orders** with Odoo's status (confirmed, waiting for approval).
 - **Close the day**: the cash and cheques to hand in, bank and UPI payments already in the bank, visits and orders, a recap
   of each shop and the distance travelled.
 - **Sync** screen: what's waiting, what failed and why.
 
-The app uses the Manrope typeface (SIL Open Font License, `assets/fonts/OFL.txt`), the same as the
+The app uses the BeatPro Van Sales colours (maroon, `lib/src/theme.dart`), logo, app icon and van
+drawing (`assets/images/`), the same as the BeatPro Theme in Odoo. The app uses the Manrope typeface (SIL Open Font License, `assets/fonts/OFL.txt`), the same as the
 BeatPro screens in Odoo.
 
 ## How sync works

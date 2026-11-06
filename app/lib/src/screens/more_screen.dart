@@ -27,6 +27,20 @@ class MoreScreen extends ConsumerWidget {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push('/sync'),
         ),
+        if (appContext?.hasSalesDashboard ?? false)
+          ListTile(
+            leading: const Icon(Icons.insights_outlined),
+            title: const Text('Van Sales Dashboard'),
+            subtitle: const Text('Sales, shops, routes and collections · needs signal'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/dashboard'),
+          ),
+        ListTile(
+          leading: const Icon(Icons.inventory_2_outlined),
+          title: Text(appContext?.van != null ? 'My van and stock' : 'Stock'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/van'),
+        ),
         ListTile(
           leading: const Icon(Icons.nightlight_outlined),
           title: const Text('Close the day'),
