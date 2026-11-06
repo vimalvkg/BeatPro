@@ -1,6 +1,8 @@
+import json
+
 from odoo import fields
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.tests import Form, new_test_user, tagged
+from odoo.tests import Form, HttpCase, new_test_user, tagged
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
@@ -417,3 +419,44 @@ class TestBeatpro(AccountTestInvoicingCommon):
         self.assertIn('access_token=', wizard.online_link)
         self.assertTrue(wizard.online_qr)
 
+
+
+@tagged('post_install', '-at_install')
+class TestBeatproAppLogin(HttpCase):
+
+    def _login(self, **params):
+        response = self.url_open(
+            '/beatpro/app/login',
+            data=json.dumps({'jsonrpc': '2.0', 'method': 'call', 'params': params}),
+            headers={'Content-Type': 'application/json'},
+        )
+        return response.json()['result']
+
+    def test_app_signs_in_with_login_and_password(self):
+        rep = new_test_user(self.env, login='app_rep', password='app_rep_pw1',
+                            groups='beatpro_field_sales.group_beatpro_rep')
+        result = self._login(login='app_rep', password='app_rep_pw1', db=self.env.cr.dbname, device='Pixel 8')
+        key = result['api_key']
+        self.assertTrue(result['expires'])
+
+        # The key works with Odoo's JSON-2 API, as the rep.
+        context = self.url_open(
+            '/json/2/res.users/beatpro_app_context', data='{}',
+            headers={'Authorization': 'bearer ' + key, 'Content-Type': 'application/json',
+                     'X-Odoo-Database': self.env.cr.dbname},
+        ).json()
+        self.assertEqual(context['user_id'], rep.id)
+
+        # Signing in again on the same phone replaces its key.
+        again = self._login(login='app_rep', password='app_rep_pw1', db=self.env.cr.dbname, device='Pixel 8')
+        self.assertNotEqual(again['api_key'], key)
+        self.assertEqual(self.env['res.users.apikeys'].sudo().search_count(
+            [('user_id', '=', rep.id), ('name', '=', 'BeatPro app · Pixel 8')]), 1)
+
+    def test_app_sign_in_refusals(self):
+        new_test_user(self.env, login='app_rep2', password='app_rep_pw2', groups='beatpro_field_sales.group_beatpro_rep')
+        new_test_user(self.env, login='not_rep', password='not_rep_pw1', groups='base.group_user')
+        db = self.env.cr.dbname
+        self.assertEqual(self._login(login='app_rep2', password='wrong', db=db), {'error': 'Wrong login or password.'})
+        self.assertIn('not a BeatPro rep', self._login(login='not_rep', password='not_rep_pw1', db=db)['error'])
+        self.assertIn('no database', self._login(login='app_rep2', password='app_rep_pw2', db='nope')['error'])

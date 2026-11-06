@@ -87,8 +87,15 @@ invoice paid. Online payments need the server's portal payments setting turned o
 
 ## Mobile app API
 
-The app signs in with the rep's login and an API key (user profile > Security > New API Key)
-and calls `POST /json/2/<model>/<method>` with `Authorization: bearer <key>`.
+The rep signs in to the app with their Odoo login and password. The app posts them to
+`/beatpro/app/login` (JSON-RPC: `login`, `password`, `db`, `device`); Odoo checks them like its own
+sign-in page (with the same protection against repeated attempts) and returns an API key for
+that phone, named "BeatPro app · <phone>" on the user's profile (Security tab), where it can be
+revoked. Keys last 365 days (system parameter `beatpro_field_sales.app_key_days`); signing in
+again on the same phone replaces its key. Users with two-step sign-in, and non-reps, are refused
+(two-step users can paste an API key from their profile instead).
+
+The app then calls `POST /json/2/<model>/<method>` with `Authorization: bearer <key>`.
 
 | Model / method | Returns |
 | --- | --- |
