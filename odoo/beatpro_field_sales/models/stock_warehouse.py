@@ -11,6 +11,12 @@ class StockWarehouse(models.Model):
              "morning and unloaded back at day end.")
     beatpro_vehicle = fields.Char(string="Vehicle Number")
     beatpro_rep_ids = fields.One2many('res.users', 'beatpro_van_warehouse_id', string="Reps")
+    beatpro_invoice_journal_id = fields.Many2one(
+        'account.journal', string="Van Invoice Series", copy=False,
+        domain="[('type', '=', 'sale')]",
+        help="Invoices made at the shop from this van are numbered in this journal's own "
+             "series (for example VAN1/2026/00001), so the rep's phone can number them "
+             "without signal.")
     beatpro_damaged_location_id = fields.Many2one(
         'stock.location', string="Damaged Stock Location", copy=False,
         help="Where damaged and expired goods taken back from shops are kept. It is not "
@@ -38,6 +44,30 @@ class StockWarehouse(models.Model):
                 'company_id': warehouse.company_id.id,
             })
         return warehouse.beatpro_damaged_location_id
+
+    def _beatpro_invoice_journal(self):
+        """The van's own invoice journal, created the first time it is needed."""
+        self.ensure_one()
+        van = self.sudo()
+        if not van.beatpro_invoice_journal_id:
+            Journal = self.env['account.journal'].sudo()
+            sales = Journal.search([*Journal._check_company_domain(van.company_id), ('type', '=', 'sale')], limit=1)
+            code = (van.code or 'VAN')[:5].upper()
+            existing = set(Journal.with_context(active_test=False).search(
+                Journal._check_company_domain(van.company_id)).mapped('code'))
+            n = 1
+            while code in existing:
+                code = ('V%s' % n)[:5]
+                n += 1
+            van.beatpro_invoice_journal_id = Journal.create({
+                'name': self.env._("Van invoices · %s", van.beatpro_vehicle or van.name),
+                'code': code,
+                'type': 'sale',
+                'company_id': van.company_id.id,
+                'default_account_id': sales.default_account_id.id,
+                'sequence': (sales.sequence or 10) + 1,
+            })
+        return van.beatpro_invoice_journal_id
 
     @api.model
     def beatpro_create_van(self, user_id, vehicle=False):

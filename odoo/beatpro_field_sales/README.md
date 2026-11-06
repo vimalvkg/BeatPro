@@ -65,6 +65,28 @@ Set each rep's discount limit, van warehouse and *Loads Own Van* on the **BeatPr
    receives the counted stock into the main warehouse. A difference waits for a supervisor to
    **Approve Write-off**, which empties the van.
 
+## Invoicing at the shop (UAE VAT)
+
+BeatPro is set up for the UAE: install Odoo's **United Arab Emirates - Accounting** (`l10n_ae`)
+for the UAE chart of accounts and the 5% VAT taxes, enter your company's **TRN** in its Tax ID,
+and the customers' TRN on their contact.
+
+With **Settings > BeatPro > Invoice van deliveries at the shop** on (default):
+
+- When a van order is confirmed, Odoo posts the tax invoice for what was handed over from the
+  van (in a split order, only the van part; the warehouse part is invoiced later as usual).
+- Each van has its own invoice series, a sales journal made the first time it's needed (shown on
+  the van's warehouse form): for example `VAN1/2026/00001`. The app numbers invoices in this
+  series without signal, and Odoo keeps that number when the order syncs. If the number was used
+  meanwhile, Odoo gives the next free one and the app shows it.
+- **Print Slip** (on the invoice and on the sales order) prints the invoice for a thermal printer,
+  80 mm or 58 mm (**Thermal paper width** setting); the slip is as long as its content. It is in
+  English and Arabic, with both TRNs, VAT 5% per line, totals in AED, the amount in words, the
+  previous and new balance and a signature line. Customers without a TRN get a **Simplified Tax
+  Invoice**. The slips are also in the Print menu of any customer invoice.
+  PDFs need wkhtmltopdf on the Odoo server (as for all Odoo PDFs) and a font with Arabic letters
+  (for example `fonts-dejavu`).
+
 ## Field collections
 
 **Money received in hand.** Reps choose from the incoming payment methods of your cash and bank
@@ -99,12 +121,12 @@ The app then calls `POST /json/2/<model>/<method>` with `Authorization: bearer <
 
 | Model / method | Returns |
 | --- | --- |
-| `res.users` / `beatpro_app_context` | Rep, company, currency, discount limit, warehouse, payment methods for reps, enabled online providers |
+| `res.users` / `beatpro_app_context` | Rep, company, currency, discount limit, warehouse, payment methods for reps, enabled online providers, van, and `van_invoice` (series, next number, paper width, company TRN) |
 | `beatpro.route` / `beatpro_today_plan` | Today's customers in visit order |
 | `product.pricelist` / `beatpro_prices(pricelist_ids, product_ids)` | `{pricelist: {product: unit price}}` for offline pricing |
 | `res.partner` / `beatpro_open_invoices(partner_ids)` | Unpaid invoices to collect against |
 | `<model>` / `beatpro_upsert(vals_list)` | `{mobile_uuid: id}`; records already received aren't created again (`res.partner`, `beatpro.visit`, `beatpro.day.close`) |
-| `sale.order` / `beatpro_submit_orders(vals_list)` | Creates and confirms orders, or leaves them waiting for discount approval |
+| `sale.order` / `beatpro_submit_orders(vals_list)` | Creates and confirms orders, or leaves them waiting for discount approval. With `beatpro_van_invoice_name` (and `beatpro_van_invoice_date`), also posts the invoice for the van delivery with that number; returns it under `invoice` |
 | `account.payment` / `beatpro_register_payment(vals_list)` | Records, posts and matches collections on a `payment_method_line_id` from the app context |
 | `account.payment` / `beatpro_payment_link(invoice_id, amount)` | Link for the customer to pay an invoice online |
 | `account.payment` / `beatpro_invoice_status(invoice_ids)` | Whether invoices are paid, to follow an online payment |

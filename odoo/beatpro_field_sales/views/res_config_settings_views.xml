@@ -16,8 +16,16 @@
                             <button name="%(payment.action_payment_provider)d" type="action" string="Payment Providers" icon="oi-arrow-right" class="btn-link"/>
                         </setting>
                     </block>
+                    <block title="Invoicing at the shop" name="beatpro_van_invoicing">
+                        <setting string="Invoice van deliveries at the shop" help="Reps post the tax invoice for what they hand over from the van and print it on a thermal printer or share it. Each van numbers its invoices in its own series (VAN1/2026/00001), so it works without signal. Warehouse deliveries are invoiced by the office as usual.">
+                            <field name="beatpro_van_invoice"/>
+                        </setting>
+                        <setting string="Thermal paper width" help="The slip printed by reps and from Odoo's Print menu. Customers without a TRN get a simplified tax invoice.">
+                            <field name="beatpro_slip_width" widget="radio"/>
+                        </setting>
+                    </block>
                     <block title="Reps" name="beatpro_reps">
-                        <setting string="Mobile app access" help="Reps sign in to the BeatPro app with their Odoo login and an API key from their profile (Security tab). Set each rep's discount limit on the BeatPro tab of their user."/>
+                        <setting string="Mobile app access" help="Reps sign in to the BeatPro app with their Odoo email and password; Odoo then gives each phone its own API key, listed on the user's profile (Security tab) where it can be revoked. Set each rep's discount limit on the BeatPro tab of their user."/>
                     </block>
                 </app>
             </xpath>

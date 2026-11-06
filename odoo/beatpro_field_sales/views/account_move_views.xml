@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_beatpro_slip" model="ir.ui.view">
+        <field name="name">account.move.form.beatpro.slip</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_beatpro_print_slip" type="object" string="Print Slip" icon="fa-print"
+                        invisible="state != 'posted' or move_type not in ('out_invoice', 'out_refund')"/>
+            </xpath>
+            <xpath expr="//field[@name='invoice_user_id']" position="after">
+                <field name="beatpro_van_id" readonly="1" invisible="not beatpro_van_id"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

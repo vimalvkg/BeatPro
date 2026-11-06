@@ -59,9 +59,37 @@ class ResUsers(models.Model):
                 'main_warehouse': self.env['stock.warehouse']._beatpro_main(company).name,
                 'self_load': user.beatpro_self_load,
             } or False,
+            'van_invoice': self._beatpro_van_invoice_context(),
             'return_reasons': [{'value': key, 'label': label, 'resellable': key not in NOT_RESELLABLE}
                                for key, label in RETURN_REASONS],
             'warehouse_id': (user.beatpro_van_warehouse_id or self.env['stock.warehouse'].search(
                 [('company_id', '=', company.id)], limit=1)).id,
             'server_time': fields.Datetime.to_string(fields.Datetime.now()),
         }
+
+    @api.model
+    def _beatpro_van_invoice_context(self):
+        """The van's invoice series, so the phone numbers invoices without signal."""
+        user = self.env.user
+        van = user.beatpro_van_warehouse_id
+        company = self.env.company
+        if not van or not company.beatpro_van_invoice:
+            return False
+        journal = van._beatpro_invoice_journal()
+        today = fields.Date.context_today(self)
+        prefix, number = self.env['account.move']._beatpro_next_number(journal, today)
+        partner = company.partner_id
+        return {
+            'journal': journal.code,
+            'year': today.year,
+            'next': number,
+            'padding': 5,
+            'paper': company.beatpro_slip_width,
+            'company': {
+                'name': company.name,
+                'trn': company.vat or '',
+                'address': ', '.join(filter(None, [partner.street, partner.city, partner.country_id.name])),
+                'phone': partner.phone or '',
+            },
+        }
+

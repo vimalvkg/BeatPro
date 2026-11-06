@@ -30,6 +30,15 @@ class SaleOrder(models.Model):
         help="How a rep with a van delivers this order. The order counts as the rep's sale "
              "whichever way it is delivered.")
     beatpro_has_van = fields.Boolean(compute='_compute_beatpro_has_van')
+    beatpro_van_invoice_name = fields.Char(
+        string="Van Invoice Number", copy=False,
+        help="The number the rep's phone gave the invoice made at the shop.")
+    beatpro_van_invoice_ids = fields.Many2many(
+        'account.move', compute='_compute_beatpro_van_invoice_ids', string="Invoices Made at the Shop")
+
+    def _compute_beatpro_van_invoice_ids(self):
+        for order in self:
+            order.beatpro_van_invoice_ids = order.sudo().invoice_ids.filtered('beatpro_van_id')
 
     @api.model
     def _beatpro_default_delivery_mode(self):
@@ -81,7 +90,77 @@ class SaleOrder(models.Model):
         self._beatpro_prepare_delivery()
         result = super().action_confirm()
         self._beatpro_deliver_from_van()
+        if not self.env.context.get('beatpro_from_app'):
+            # From the app the invoice comes with the number the phone gave it.
+            for order in self.filtered(lambda o: o.company_id.beatpro_van_invoice):
+                order._beatpro_invoice_van_delivery()
         return result
+
+    def _beatpro_van_lines(self):
+        """Lines handed over from the van and not invoiced yet, with the quantity to invoice."""
+        self.ensure_one()
+        van = self.user_id.beatpro_van_warehouse_id
+        if not van or self.beatpro_delivery_mode not in ('van', 'split'):
+            return []
+        result = []
+        for line in self.order_line.filtered(lambda l: not l.display_type and l.warehouse_id == van):
+            qty = line.qty_delivered - line.qty_invoiced if line.product_id.is_storable else line.product_uom_qty - line.qty_invoiced
+            if qty > 0:
+                result.append((line, qty))
+        return result
+
+    def _beatpro_invoice_van_delivery(self, name=None, invoice_date=None):
+        """Post the tax invoice for what the rep handed over from the van, in the van's
+        own series. ``name`` is the number the phone gave it; when another invoice already
+        has it, Odoo gives the next free number instead.
+
+        :return: the posted invoice, or an empty recordset when there is nothing to invoice
+        """
+        self.ensure_one()
+        Move = self.env['account.move'].sudo()
+        order = self.sudo()
+        van = order.user_id.beatpro_van_warehouse_id
+        existing = order.invoice_ids.filtered(lambda m: m.beatpro_van_id and m.state != 'cancel')
+        if name and existing.filtered(lambda m: m.name == name):
+            return existing.filtered(lambda m: m.name == name)
+        lines = order._beatpro_van_lines()
+        if not lines:
+            return existing[:1]
+        journal = van._beatpro_invoice_journal()
+        vals = order._prepare_invoice()
+        vals.update({
+            'journal_id': journal.id,
+            'beatpro_van_id': van.id,
+            'invoice_user_id': order.user_id.id,
+            'invoice_date': invoice_date or fields.Date.context_today(order),
+            'invoice_line_ids': [Command.create(line._prepare_invoice_line(quantity=qty)) for line, qty in lines],
+        })
+        if name and not Move.search_count([('journal_id', '=', journal.id), ('name', '=', name)]):
+            vals['name'] = name
+        invoice = Move.with_company(order.company_id).create(vals)
+        invoice.action_post()
+        order.beatpro_van_invoice_name = invoice.name
+        return invoice
+
+    def _beatpro_invoice_info(self):
+        self.ensure_one()
+        invoice = self.sudo().invoice_ids.filtered(lambda m: m.beatpro_van_id and m.state == 'posted')[:1]
+        return invoice and {
+            'id': invoice.id,
+            'name': invoice.name,
+            'amount_untaxed': invoice.amount_untaxed,
+            'amount_tax': invoice.amount_tax,
+            'amount_total': invoice.amount_total,
+            'simplified': invoice._beatpro_is_simplified(),
+        } or False
+
+    def action_beatpro_print_slip(self):
+        """Print the invoice made at the shop on a thermal printer."""
+        self.ensure_one()
+        invoice = self.sudo().invoice_ids.filtered(lambda m: m.beatpro_van_id and m.state == 'posted')[:1]
+        if not invoice:
+            raise UserError(self.env._("There is no invoice made at the shop for this order."))
+        return invoice.action_beatpro_print_slip()
 
     def _beatpro_over_discount_limit(self):
         """True when the current user is a BeatPro rep (not a supervisor) and a line
@@ -130,6 +209,8 @@ class SaleOrder(models.Model):
         :return: ``{mobile_uuid: {'id', 'name', 'state', 'approval', 'amount_total'}}``
         """
         self = self.with_context(beatpro_from_app=True)
+        # The invoice date the phone printed is not an order field.
+        dates = {v['mobile_uuid']: v.pop('beatpro_van_invoice_date', None) for v in vals_list}
         ids_by_uuid = self.beatpro_upsert(vals_list)
         orders = self.browse([order_id for order_id in ids_by_uuid.values()])
         for order in orders:
@@ -139,6 +220,8 @@ class SaleOrder(models.Model):
                 order.action_beatpro_request_approval()
             else:
                 order.action_confirm()
+                if order.beatpro_van_invoice_name and order.company_id.beatpro_van_invoice:
+                    order._beatpro_invoice_van_delivery(order.beatpro_van_invoice_name, dates.get(order.mobile_uuid))
         return {
             order.mobile_uuid: {
                 'id': order.id,
@@ -148,5 +231,6 @@ class SaleOrder(models.Model):
                 'amount_total': order.amount_total,
                 'delivery_mode': order.beatpro_delivery_mode or False,
                 'delivered_now': order.beatpro_delivery_mode in ('van', 'split') and order.state == 'sale',
+                'invoice': order._beatpro_invoice_info(),
             } for order in orders.sudo()
         }

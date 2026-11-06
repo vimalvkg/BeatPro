@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Thermal paper: the width is the roll; the height is set per slip to fit its content. -->
+    <record id="paperformat_slip_80" model="report.paperformat">
+        <field name="name">Thermal slip 80 mm</field>
+        <field name="format">custom</field>
+        <field name="page_width">80</field>
+        <field name="page_height">200</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">3</field>
+        <field name="margin_bottom">3</field>
+        <field name="margin_left">3</field>
+        <field name="margin_right">3</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+        <field name="disable_shrinking" eval="True"/>
+    </record>
+    <record id="paperformat_slip_58" model="report.paperformat">
+        <field name="name">Thermal slip 58 mm</field>
+        <field name="format">custom</field>
+        <field name="page_width">58</field>
+        <field name="page_height">200</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">2</field>
+        <field name="margin_bottom">3</field>
+        <field name="margin_left">2</field>
+        <field name="margin_right">2</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+        <field name="disable_shrinking" eval="True"/>
+    </record>
+
+    <record id="action_report_invoice_slip_80" model="ir.actions.report">
+        <field name="name">Invoice slip (80 mm thermal)</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">beatpro_field_sales.report_invoice_slip_80</field>
+        <field name="report_file">beatpro_field_sales.report_invoice_slip_80</field>
+        <field name="print_report_name">'Slip - %s' % object.name</field>
+        <field name="paperformat_id" ref="paperformat_slip_80"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="action_report_invoice_slip_58" model="ir.actions.report">
+        <field name="name">Invoice slip (58 mm thermal)</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">beatpro_field_sales.report_invoice_slip_58</field>
+        <field name="report_file">beatpro_field_sales.report_invoice_slip_58</field>
+        <field name="print_report_name">'Slip - %s' % object.name</field>
+        <field name="paperformat_id" ref="paperformat_slip_58"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="invoice_slip_body">
+        <t t-set="c" t-value="o.company_id"/>
+        <t t-set="d" t-value="o._beatpro_slip_data()"/>
+        <t t-set="cur" t-value="o.currency_id"/>
+        <div t-attf-class="bp-slip bp-slip-{{width}}">
+            <div class="c b big" t-esc="c.name.upper()"/>
+            <div class="c">
+                <t t-esc="', '.join(p for p in [c.partner_id.street, c.partner_id.city, c.partner_id.country_id.name] if p)"/><br/>
+                <t t-if="c.vat">TRN <t t-esc="c.vat"/><br/></t>
+                <t t-if="c.partner_id.phone">Tel <t t-esc="c.partner_id.phone"/></t>
+            </div>
+            <div class="c b mt" t-esc="d['title']"/>
+            <div class="c b ar" t-esc="d['title_ar']"/>
+            <div class="mt">
+                <div class="row"><span>Inv</span><span t-esc="o.name"/></div>
+                <div class="row"><span>Date</span><span t-esc="d['date']"/></div>
+                <div class="row" t-if="d['van']"><span>Van</span><span t-esc="d['van']"/></div>
+            </div>
+            <div class="rule"/>
+            <div>
+                <div class="b" t-esc="o.commercial_partner_id.name.upper()"/>
+                <div t-if="o.commercial_partner_id.city" t-esc="o.commercial_partner_id.city"/>
+                <div t-if="o.commercial_partner_id.vat">TRN <t t-esc="o.commercial_partner_id.vat"/></div>
+            </div>
+            <div class="rule"/>
+            <div class="row b"><span>Item</span><span>Qty x Price · Amount</span></div>
+            <div class="rule"/>
+            <t t-foreach="d['lines']" t-as="l">
+                <div class="item">
+                    <div t-esc="l['name']"/>
+                    <div class="row"><span>VAT <t t-esc="l['vat']"/></span>
+                        <span><t t-esc="l['qty']"/> x <t t-esc="'%.2f' % l['price']"/> · <t t-esc="'%.2f' % l['amount']"/></span></div>
+                </div>
+            </t>
+            <div class="rule"/>
+            <div class="row"><span>Total excl. VAT</span><span t-esc="'%.2f' % o.amount_untaxed"/></div>
+            <div class="row"><span>VAT</span><span t-esc="'%.2f' % o.amount_tax"/></div>
+            <div class="row b big mt"><span>TOTAL <t t-esc="cur.name"/></span><span t-esc="'%.2f' % o.amount_total"/></div>
+            <div class="row ar"><span>الإجمالي شامل الضريبة</span><span class="ltr" t-esc="'%.2f' % o.amount_total"/></div>
+            <div class="small" t-esc="d['words']"/>
+            <div class="rule"/>
+            <div class="row"><span>Previous balance</span><span t-esc="'%.2f' % d['previous']"/></div>
+            <div class="row b"><span>Balance due <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['balance']"/></div>
+            <div class="rule"/>
+            <div class="mt">Received by: ________________<br/>Signature &amp; stamp</div>
+            <div class="c mt">Thank you for your business<br/><span class="ar">شكراً لتعاملكم معنا</span></div>
+        </div>
+    </template>
+
+    <template id="invoice_slip_style">
+        <style>
+            .bp-slip { font-family: "DejaVu Sans Mono", "Courier New", monospace; color: #000; line-height: 1.35; }
+            .bp-slip-80 { font-size: 11px; }
+            .bp-slip-58 { font-size: 9px; }
+            .bp-slip .c { text-align: center; }
+            .bp-slip .b { font-weight: bold; }
+            .bp-slip .big { font-size: 1.2em; }
+            .bp-slip .mt { margin-top: 6px; }
+            .bp-slip .small { font-size: 0.85em; }
+            .bp-slip .ar { font-family: "DejaVu Sans", sans-serif; direction: rtl; }
+            .bp-slip .ltr { direction: ltr; }
+            .bp-slip .row { display: -webkit-box; display: flex; -webkit-box-pack: justify; justify-content: space-between; }
+            .bp-slip .row > span + span { text-align: right; }
+            .bp-slip .item { margin-bottom: 3px; page-break-inside: avoid; }
+            .bp-slip .rule { border-top: 1px dashed #000; margin: 5px 0; }
+        </style>
+    </template>
+
+    <template id="report_invoice_slip_80">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <!-- One "article" per invoice: Odoo makes each a document of its own in the PDF. -->
+                <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" t-att-data-oe-lang="o.env.lang">
+                    <t t-call="beatpro_field_sales.invoice_slip_style"/>
+                    <t t-call="beatpro_field_sales.invoice_slip_body"><t t-set="width" t-value="'80'"/></t>
+                </div>
+            </t>
+        </t>
+    </template>
+    <template id="report_invoice_slip_58">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <!-- One "article" per invoice: Odoo makes each a document of its own in the PDF. -->
+                <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" t-att-data-oe-lang="o.env.lang">
+                    <t t-call="beatpro_field_sales.invoice_slip_style"/>
+                    <t t-call="beatpro_field_sales.invoice_slip_body"><t t-set="width" t-value="'58'"/></t>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

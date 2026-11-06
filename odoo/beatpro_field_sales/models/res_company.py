@@ -1,9 +1,19 @@
-from odoo import models
+from odoo import fields, models
 from odoo.exceptions import UserError
 
 
 class ResCompany(models.Model):
     _inherit = 'res.company'
+
+    beatpro_van_invoice = fields.Boolean(
+        string="Invoice van deliveries at the shop", default=True,
+        help="Reps create and post the tax invoice for what they hand over from the van, "
+             "and print it on a thermal printer or share it. Warehouse deliveries are "
+             "invoiced by the office as usual.")
+    beatpro_slip_width = fields.Selection([
+        ('80', "80 mm (3 inch)"),
+        ('58', "58 mm (2 inch)"),
+    ], string="Thermal paper width", default='80', required=True)
 
     def _beatpro_payment_methods(self):
         """Payment methods reps can record money with: the incoming payment methods of

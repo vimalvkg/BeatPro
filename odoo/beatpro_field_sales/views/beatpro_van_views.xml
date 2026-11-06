@@ -155,6 +155,7 @@
                 <field name="beatpro_is_van"/>
                 <field name="beatpro_vehicle" invisible="not beatpro_is_van"/>
                 <field name="beatpro_rep_ids" widget="many2many_tags" invisible="not beatpro_is_van" readonly="1"/>
+                <field name="beatpro_invoice_journal_id" invisible="not beatpro_is_van"/>
             </field>
         </field>
     </record>

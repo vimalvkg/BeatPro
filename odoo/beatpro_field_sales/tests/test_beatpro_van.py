@@ -256,3 +256,89 @@ class TestBeatproVan(AccountTestInvoicingCommon):
         self.assertEqual(self.env['beatpro.van.transfer'].with_user(self.rep).beatpro_submit_transfers([{
             'mobile_uuid': 'unload-1', 'kind': 'unload', 'line_ids': [],
         }])['unload-1']['id'], unload.id)
+
+
+@tagged('post_install', '-at_install')
+class TestBeatproVanInvoice(TestBeatproVan):
+    """Tax invoices made at the shop for van deliveries (UAE VAT 5%)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.vat5 = cls.env['account.tax'].create({
+            'name': 'VAT 5%', 'amount': 5.0, 'amount_type': 'percent', 'type_tax_use': 'sale',
+            'company_id': cls.env.company.id,
+        })
+        (cls.biscuits | cls.salt).taxes_id = cls.vat5
+        cls.env.company.vat = '100234567800003'
+        cls.shop.vat = '100987654300003'
+
+    def test_van_delivery_is_invoiced_in_the_van_series(self):
+        self._loaded_van()
+        order = self._order('split', {self.biscuits: 6, self.salt: 40})
+        invoice = order.sudo().invoice_ids
+        self.assertEqual(len(invoice), 1)
+        self.assertEqual(invoice.state, 'posted')
+        self.assertEqual(invoice.journal_id, self.van.beatpro_invoice_journal_id)
+        self.assertTrue(invoice.name.startswith(invoice.journal_id.code + '/'))
+        self.assertEqual(invoice.beatpro_van_id, self.van)
+        # Only what the van handed over: 6 biscuits at 240, plus 5% VAT. Salt comes from the warehouse later.
+        self.assertEqual(invoice.invoice_line_ids.product_id, self.biscuits)
+        self.assertAlmostEqual(invoice.amount_untaxed, 1440.0)
+        self.assertAlmostEqual(invoice.amount_tax, 72.0)
+        self.assertFalse(invoice._beatpro_is_simplified())
+        self.assertEqual(order.beatpro_van_invoice_name, invoice.name)
+
+        # Switched off: no invoice at the shop.
+        self.env.company.beatpro_van_invoice = False
+        self.assertFalse(self._order('van', {self.biscuits: 1}).sudo().invoice_ids)
+
+    def test_app_numbers_invoices_offline(self):
+        self._loaded_van()
+        series = self.env['res.users'].with_user(self.rep).beatpro_app_context()['van_invoice']
+        self.assertEqual(series['next'], 1)
+        self.assertEqual(series['company']['trn'], '100234567800003')
+        name = '%s/%s/%05d' % (series['journal'], series['year'], series['next'])
+
+        def submit(uuid, number):
+            return self.env['sale.order'].with_user(self.rep).beatpro_submit_orders([{
+                'mobile_uuid': uuid, 'partner_id': self.shop.id, 'beatpro_delivery_mode': 'van',
+                'beatpro_van_invoice_name': number,
+                'beatpro_van_invoice_date': fields.Date.to_string(fields.Date.today()),
+                'order_line': [Command.create({'product_id': self.biscuits.id, 'product_uom_qty': 2})],
+            }])[uuid]
+
+        result = submit('inv-order-1', name)
+        self.assertEqual(result['invoice']['name'], name, 'Odoo keeps the number printed on the slip')
+        self.assertAlmostEqual(result['invoice']['amount_total'], 504.0)
+        # A retry does not make a second invoice.
+        self.assertEqual(submit('inv-order-1', name)['invoice']['id'], result['invoice']['id'])
+        self.assertEqual(self.env['res.users'].with_user(self.rep).beatpro_app_context()['van_invoice']['next'], 2)
+        # A number already used (e.g. by an invoice made in Odoo meanwhile) gets the next free one.
+        clash = submit('inv-order-2', name)
+        self.assertNotEqual(clash['invoice']['name'], name)
+        self.assertTrue(clash['invoice']['name'].startswith(series['journal'] + '/'))
+
+    def test_thermal_slip(self):
+        self._loaded_van()
+        invoice = self._order('van', {self.biscuits: 6, self.salt: 2}).sudo().invoice_ids
+        html = self.env['ir.actions.report']._render_qweb_html(
+            'beatpro_field_sales.report_invoice_slip_80', invoice.ids)[0].decode()
+        for text in ('TAX INVOICE', 'فاتورة ضريبية', 'TRN 100234567800003', 'TRN 100987654300003',
+                     'VAT 5%', invoice.name, 'Received by'):
+            self.assertIn(text, html)
+        self.shop.vat = False
+        html58 = self.env['ir.actions.report']._render_qweb_html(
+            'beatpro_field_sales.report_invoice_slip_58', invoice.ids)[0].decode()
+        self.assertIn('SIMPLIFIED TAX INVOICE', html58)
+        self.assertIn('bp-slip-58', html58)
+
+        # The PDF is as long as the slip, on 80 mm paper.
+        report = self.env['ir.actions.report'].with_context(beatpro_slip_height_mm=168)
+        args = report._build_wkhtmltopdf_args(self.env.ref('beatpro_field_sales.paperformat_slip_80'), False)
+        self.assertEqual(args[args.index('--page-width') + 1], '80mm')
+        self.assertEqual(args[args.index('--page-height') + 1], '168mm')
+        self.assertEqual(self.env['account.move']._beatpro_slip_height_mm(invoice, '80'), 105 + 9 * 2)
+
+        action = invoice.action_beatpro_print_slip()
+        self.assertEqual(action['report_name'], 'beatpro_field_sales.report_invoice_slip_80')
