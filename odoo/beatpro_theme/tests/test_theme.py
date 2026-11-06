@@ -70,6 +70,10 @@ class TestBeatproTheme(AccountTestInvoicingCommon):
         with self.assertRaises(AccessError):
             self.env['beatpro.theme'].with_user(self.rep).get_sales_dashboard()
 
+        # The app shows the dashboard to the users who may open it.
+        self.assertTrue(self.env['res.users'].with_user(self.supervisor).beatpro_app_context()['sales_dashboard'])
+        self.assertFalse(self.env['res.users'].with_user(self.rep).beatpro_app_context()['sales_dashboard'])
+
     def test_emails_have_no_odoo_promotion(self):
         for xmlid in ('mail.mail_notification_layout', 'mail.mail_notification_light'):
             arch = etree.tostring(self.env.ref(xmlid)._get_combined_arch(), encoding='unicode')
