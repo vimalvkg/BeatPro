@@ -10,6 +10,7 @@ import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/scanner.dart';
 
 // -- Van stock ----------------------------------------------------------------
 
@@ -325,6 +326,14 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
 
   double get _total => _qty.values.fold(0.0, (a, b) => a + b);
 
+  /// A scanned barcode: one more of that product in the load.
+  ScanFeedback _scanned(String code) {
+    final p = productForCode(_products.values, code);
+    if (p == null) return ScanFeedback('No product with barcode $code. Sync to update the products.', ok: false);
+    setState(() => _qty[p.id] = (_qty[p.id] ?? 0) + 1);
+    return ScanFeedback('Added ${p.name} · ${formatQty(_qty[p.id]!)} to load');
+  }
+
   Future<void> _addProduct() async {
     final picked = await pickProduct(context, _products.values.where((p) => !_qty.containsKey(p.id)).toList());
     if (picked != null) setState(() => _qty[picked.id] = 1);
@@ -382,6 +391,7 @@ class _VanLoadScreenState extends ConsumerState<VanLoadScreen> {
                 ),
               Row(children: [
                 const Expanded(child: Eyebrow('Products to load', padding: EdgeInsets.fromLTRB(0, 20, 0, 8))),
+                ScanButton(title: 'Scan products to load', onCode: _scanned),
                 TextButton(onPressed: _addProduct, child: const Text('+ Add product')),
               ]),
               if (_qty.isEmpty)
@@ -438,6 +448,11 @@ class VanUnloadScreen extends ConsumerStatefulWidget {
 
 class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
   VanStockView? _stock;
+  List<Product> _products = [];
+
+  /// Products counted by scanning: their first scan replaces the expected
+  /// quantity filled in, each later scan adds one.
+  final Set<int> _scanCounted = {};
   final Map<int, TextEditingController> _counted = {};
   final _note = TextEditingController();
   int _damaged = 0;
@@ -461,6 +476,7 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
   Future<void> _load() async {
     final repo = ref.read(repositoryProvider);
     final stock = await repo.vanStock();
+    final products = await repo.db.products();
     final returns = await repo.db.records(kind: RecordKind.shopReturn, since: repo.startOfToday.toUtc());
     var damaged = 0.0;
     for (final r in returns) {
@@ -471,6 +487,7 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
     if (!mounted) return;
     setState(() {
       _stock = stock;
+      _products = products;
       _damaged = damaged.round();
       for (final i in _expectedItems) {
         _counted[i.productId] = TextEditingController(text: formatQty(_expected(i)))..addListener(() => setState(() {}));
@@ -481,6 +498,19 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
   List<VanItem> get _expectedItems => _stock?.items.where((i) => i.left != 0 || i.loaded != 0).toList() ?? [];
   double _expected(VanItem i) => i.left > 0 ? i.left : 0;
   double _countOf(VanItem i) => double.tryParse(_counted[i.productId]?.text.trim() ?? '') ?? 0;
+
+  /// Count by scanning each box left in the van.
+  ScanFeedback _scanned(String code) {
+    final p = productForCode(_products, code);
+    if (p == null) return ScanFeedback('No product with barcode $code. Sync to update the products.', ok: false);
+    final item = _expectedItems.where((i) => i.productId == p.id).firstOrNull;
+    if (item == null) {
+      return ScanFeedback("${p.name} isn't expected in the van. Put it aside and tell the storekeeper.", ok: false);
+    }
+    final now = _scanCounted.add(p.id) ? 1.0 : _countOf(item) + 1;
+    _counted[p.id]!.text = formatQty(now);
+    return ScanFeedback('${p.name} · counted ${formatQty(now)} of ${formatQty(_expected(item))}');
+  }
 
   Future<void> _send() async {
     setState(() => _saving = true);
@@ -516,6 +546,7 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
           Text("Count what's left · back to ${stock?.van?.mainWarehouse ?? 'main warehouse'}",
               style: Theme.of(context).textTheme.bodySmall),
         ]),
+        actions: [if (stock != null) ScanButton(title: 'Count by scanning', onCode: _scanned)],
       ),
       body: stock == null
           ? const Center(child: CircularProgressIndicator())

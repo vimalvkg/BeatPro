@@ -11,6 +11,7 @@ import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/scanner.dart';
 import 'van_screens.dart';
 
 /// Goods a shop gives back, with a reason. Goods that can be sold again go
@@ -27,6 +28,8 @@ class ShopReturnScreen extends ConsumerStatefulWidget {
 
 class _ShopReturnScreenState extends ConsumerState<ShopReturnScreen> {
   List<ReturnCandidate> _candidates = [];
+  List<Product> _products = [];
+  List<ReturnReason> _reasons = ReturnReason.defaults;
   final List<ReturnLine> _lines = [];
   bool _saving = false;
 
@@ -37,8 +40,15 @@ class _ShopReturnScreenState extends ConsumerState<ShopReturnScreen> {
   }
 
   Future<void> _load() async {
-    final candidates = await ref.read(repositoryProvider).returnCandidates(widget.customerKey);
-    if (mounted) setState(() => _candidates = candidates);
+    final repo = ref.read(repositoryProvider);
+    final candidates = await repo.returnCandidates(widget.customerKey);
+    final products = await repo.db.products();
+    if (mounted) {
+      setState(() {
+        _candidates = candidates;
+        _products = products;
+      });
+    }
   }
 
   Future<void> _add(List<ReturnReason> reasons) async {
@@ -57,6 +67,26 @@ class _ShopReturnScreenState extends ConsumerState<ShopReturnScreen> {
           lastDate: picked.lastDate,
           reason: reasons.first,
         )));
+  }
+
+  /// A scanned barcode: one more of that product taken back (reason: the first one, change it on the card).
+  ScanFeedback _scanned(String code) {
+    final p = productForCode(_products, code);
+    if (p == null) return ScanFeedback('No product with barcode $code. Sync to update the products.', ok: false);
+    final line = _lines.where((l) => l.productId == p.id).firstOrNull;
+    if (line != null) {
+      setState(() => line.qty += 1);
+      return ScanFeedback('${p.name} · ${formatQty(line.qty)} taken back');
+    }
+    final c = _candidates.where((c) => c.productId == p.id).firstOrNull;
+    setState(() => _lines.add(ReturnLine(
+          productId: p.id,
+          name: p.name,
+          priceUnit: c?.priceUnit ?? p.listPrice,
+          lastDate: c?.lastDate,
+          reason: _reasons.first,
+        )));
+    return ScanFeedback('Added ${p.name} · choose the reason on its card');
   }
 
   static String _date(String iso) => DateFormat('d MMM').format(DateTime.parse(iso));
@@ -87,12 +117,14 @@ class _ShopReturnScreenState extends ConsumerState<ShopReturnScreen> {
     final money = ref.watch(moneyProvider);
     final customer = ref.watch(customerProvider(widget.customerKey)).value;
     final reasons = ref.watch(appContextProvider).value?.returnReasons ?? ReturnReason.defaults;
+    _reasons = reasons;
     final hasVan = ref.watch(appContextProvider).value?.van != null;
     final count = _lines.fold(0.0, (s, l) => s + l.qty);
     final credit = _lines.fold(0.0, (s, l) => s + l.subtotal);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.close), tooltip: 'Close', onPressed: () => context.pop()),
+        actions: [ScanButton(title: 'Scan goods taken back', onCode: _scanned)],
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Take back goods'),
           Text(customer?.name ?? '', style: Theme.of(context).textTheme.bodySmall),

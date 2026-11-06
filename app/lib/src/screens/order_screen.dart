@@ -10,6 +10,7 @@ import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/scanner.dart';
 
 /// Product catalogue with the customer's prices, and the cart.
 class OrderScreen extends ConsumerStatefulWidget {
@@ -54,6 +55,32 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
   }
 
   double _priceOf(Product p) => _prices[p.id] ?? p.listPrice;
+
+  final _searchField = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchField.dispose();
+    super.dispose();
+  }
+
+  /// A scanned barcode (camera or handheld scanner): one more of that product.
+  ScanFeedback _scanned(String code) {
+    final p = productForCode(_products, code);
+    if (p == null) return ScanFeedback('No product with barcode $code. Sync to update the products.', ok: false);
+    final qty = (_cart[p.id]?.qty ?? 0) + 1;
+    _setQty(p, qty);
+    return ScanFeedback('Added ${p.name} · ${formatQty(qty)} in the order');
+  }
+
+  /// Handheld scanners type the barcode into the search box and press Enter.
+  void _searchSubmitted(String value) {
+    if (productForCode(_products, value) == null) return;
+    final feedback = _scanned(value);
+    _searchField.clear();
+    setState(() => _search = '');
+    showMessage(context, feedback.message);
+  }
 
   void _setQty(Product p, double qty) => setState(() {
         if (qty <= 0) {
@@ -116,7 +143,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
     final customer = ref.watch(customerProvider(widget.customerKey)).value;
     final visible = _search.isEmpty
         ? _products
-        : _products.where((p) => p.name.toLowerCase().contains(_search) || (p.code ?? '').toLowerCase().contains(_search)).toList();
+        : _products.where((p) => p.name.toLowerCase().contains(_search) || (p.code ?? '').toLowerCase().contains(_search) || (p.barcode ?? '').contains(_search)).toList();
     final totals = OrderTotals.of(_cart.values);
     final count = _cart.values.fold<double>(0, (s, l) => s + l.qty);
 
@@ -127,6 +154,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           Text(customer?.name ?? '', style: Theme.of(context).textTheme.bodySmall),
         ]),
         actions: [
+          ScanButton(title: 'Scan products', onCode: _scanned),
           IconButton(tooltip: 'Repeat last order', onPressed: _repeatLastOrder, icon: const Icon(Icons.replay)),
         ],
         bottom: PreferredSize(
@@ -134,8 +162,11 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search products', isDense: true),
+              controller: _searchField,
+              decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search), hintText: 'Search or scan products', isDense: true),
               onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
+              onSubmitted: _searchSubmitted,
             ),
           ),
         ),

@@ -50,6 +50,10 @@ does is saved on the phone and sent to Odoo when there's signal.
 - **Van Sales Dashboard**, for supervisors when the BeatPro Theme is installed in Odoo: sales,
   orders, active shops and collections against the previous period, sales by day, category,
   shop and route, collected against still due, and recent activity. Needs signal.
+- **Barcode scanning** on New order, Load the van, Take back goods and Unload the van: the scan button
+  opens the camera and keeps scanning; each scan adds the product (by its Barcode in Odoo, or its
+  Internal Reference) or one more of it. On Unload, scanning counts the boxes left. Handheld and
+  Bluetooth scanners work too: they type the code into the search box and press Enter. Works offline.
 - **New customer** with a GPS pin.
 - **My orders** with Odoo's status (confirmed, waiting for approval).
 - **Close the day**: the cash and cheques to hand in, bank and UPI payments already in the bank, visits and orders, a recap

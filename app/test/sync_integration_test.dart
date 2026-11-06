@@ -53,6 +53,12 @@ void main() {
     expect(products, isNotEmpty);
     expect(context.paymentMethods, isNotEmpty, reason: 'payment methods come from Odoo');
 
+    // Product barcodes come from Odoo, so scanning finds the product offline.
+    final withBarcode = products.where((p) => p.barcode != null).toList();
+    if (withBarcode.isNotEmpty) {
+      expect(productForCode(products, withBarcode.first.barcode!)?.id, withBarcode.first.id);
+    }
+
     // Visit the first shop: order, collect against its invoices, check out.
     final stop = plan.first;
     final visit = await repo.startVisit(stop.customer.key, routeId: stop.stop.routeId, at: const GeoPoint(19.1136, 72.8697));

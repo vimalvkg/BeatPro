@@ -17,7 +17,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:beatpro/src/widgets/scanner.dart';
+
 import 'support/fake_odoo.dart';
+import 'support/fake_scanner.dart';
 
 Future<void> _loadFonts() async {
   final root = Platform.environment['FLUTTER_ROOT'];
@@ -462,6 +465,107 @@ void main() {
     await tester.scrollUntilVisible(find.text('Farah Khan: unload 1 short'), 300, scrollable: find.byType(Scrollable).last);
     expect(find.text('72%'), findsOneWidget);
     expect(odoo.calls.where((c) => c == 'beatpro.theme.get_sales_dashboard').length, 2);
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('scanning barcodes adds products to orders, loads, returns and counts', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..withVan = true;
+    final scanner = FakeBarcodeScanner();
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+      barcodeScannerProvider.overrideWithValue(scanner),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://mumbai.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+
+    // Morning load: scan two boxes of Maggi and one unknown code.
+    router.push('/van/load');
+    await tester.pumpAndSettle();
+    scanner.queue.addAll(['8901058851298', '8901058851298', '0000000000000']);
+    await tester.tap(find.byTooltip('Scan barcodes'));
+    await tester.pumpAndSettle();
+    expect(scanner.titles.last, 'Scan products to load');
+    expect(scanner.feedback.map((f) => f.ok), [true, true, false]);
+    expect(scanner.feedback.last.message, contains('No product with barcode 0000000000000'));
+    expect(find.text('Send load request · 38 cases'), findsOneWidget, reason: '36 suggested + 2 scanned');
+    await tester.tap(find.text('Send load request · 38 cases'));
+    await tester.pumpAndSettle();
+    final loadLines = (odoo.uploaded['beatpro.van.transfer.load']!.single['line_ids'] as List)
+        .map((l) => (l as List)[2] as Map<String, dynamic>);
+    expect(loadLines.firstWhere((l) => l['product_id'] == 2)['qty'], 2.0);
+    odoo.storekeeperLoads();
+    await container.read(syncControllerProvider.notifier).run();
+
+    // An order: scan Parle-G three times with the camera, then a handheld scanner types Tata Salt's code.
+    final visit = await repo.startVisit('srv:9');
+    router.push('/order/new?customer=srv%3A9&visit=${visit.uuid}');
+    await tester.pumpAndSettle();
+    scanner.queue.addAll(['8901719101038', '8901719101038', '8901719101038']);
+    await tester.tap(find.byTooltip('Scan barcodes'));
+    await tester.pumpAndSettle();
+    expect(scanner.feedback.last.message, 'Added Parle-G Biscuits (Box of 24) · 3 in the order');
+    await tester.enterText(find.widgetWithText(TextField, 'Search or scan products'), '8904043901015');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('Added Tata Salt 1kg (Bag of 10) · 1 in the order'), findsOneWidget);
+    expect(find.text('4 items'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/21-scanned-order.png'));
+    }
+    await tester.tap(find.textContaining('Review'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Deliver now ·'));
+    await tester.pumpAndSettle();
+
+    // Goods taken back: scanning the same pack twice makes one line of 2.
+    router.push('/return/new?customer=srv%3A9&visit=${visit.uuid}');
+    await tester.pumpAndSettle();
+    scanner.queue.addAll(['AB20', '8901262150064']);
+    await tester.tap(find.byTooltip('Scan barcodes'));
+    await tester.pumpAndSettle();
+    expect(scanner.feedback.last.message, 'Amul Butter 100g (Pack of 20) · 2 taken back');
+    expect(find.text('Take back 2 items · ₹960.00 credit'), findsOneWidget);
+    await tester.tap(find.text('Take back 2 items · ₹960.00 credit'));
+    await tester.pumpAndSettle();
+    await repo.checkOut(visit.uuid, result: VisitResult.order);
+    await container.read(syncControllerProvider.notifier).run();
+    final order = odoo.uploaded['sale.order']!.single;
+    expect([for (final l in order['order_line'] as List) ((l as List)[2] as Map)['product_uom_qty']], [3, 1]);
+
+    // Day end: count Maggi by scanning (2 left, scanned 2) — the first scan replaces what was filled in.
+    router.push('/van/unload');
+    await tester.pumpAndSettle();
+    scanner.queue.addAll(['8901058851298', '8901058851298']);
+    await tester.tap(find.byTooltip('Scan barcodes'));
+    await tester.pumpAndSettle();
+    expect(scanner.titles.last, 'Count by scanning');
+    expect(scanner.feedback.last.message, 'Maggi Noodles (Case of 48) · counted 2 of 2');
+    scanner.queue.add('8901030704116');
+    await tester.tap(find.byTooltip('Scan barcodes'));
+    await tester.pumpAndSettle();
+    expect(scanner.feedback.last.ok, isFalse, reason: "Surf Excel isn't in the van");
 
     await tester.pumpWidget(const SizedBox());
     await db.close();

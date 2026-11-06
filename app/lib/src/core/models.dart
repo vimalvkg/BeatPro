@@ -126,6 +126,7 @@ class Product {
     required this.listPrice,
     required this.qtyAvailable,
     this.code,
+    this.barcode,
     this.uom,
     this.category,
     this.taxPercent = 0,
@@ -136,6 +137,9 @@ class Product {
   final double listPrice;
   final double qtyAvailable;
   final String? code;
+
+  /// The product's barcode in Odoo, for scanning.
+  final String? barcode;
   final String? uom;
   final String? category;
   final double taxPercent;
@@ -146,6 +150,7 @@ class Product {
         listPrice: _num(r['lst_price']),
         qtyAvailable: _num(r['qty_available']),
         code: _str(r['default_code']),
+        barcode: _str(r['barcode']),
         uom: r['uom_id'] is List ? (r['uom_id'] as List)[1] as String : null,
         category: r['categ_id'] is List ? (r['categ_id'] as List)[1] as String : null,
         taxPercent: taxPercent,
@@ -157,6 +162,7 @@ class Product {
         'listPrice': listPrice,
         'qtyAvailable': qtyAvailable,
         'code': code,
+        'barcode': barcode,
         'uom': uom,
         'category': category,
         'taxPercent': taxPercent,
@@ -168,6 +174,7 @@ class Product {
         listPrice: _num(j['listPrice']),
         qtyAvailable: _num(j['qtyAvailable']),
         code: j['code'] as String?,
+        barcode: j['barcode'] as String?,
         uom: j['uom'] as String?,
         category: j['category'] as String?,
         taxPercent: _num(j['taxPercent']),
@@ -322,6 +329,15 @@ class VanItem {
         mainQty: _num(r['main_qty']),
         price: _num(r['price']),
       );
+}
+
+/// Finds the product a scanned code belongs to: its barcode first, then its
+/// internal reference. Scanners and people add spaces, so they are ignored.
+Product? productForCode(Iterable<Product> products, String code) {
+  final c = code.trim();
+  if (c.isEmpty) return null;
+  return products.where((p) => p.barcode != null && p.barcode!.trim() == c).firstOrNull ??
+      products.where((p) => p.code != null && p.code!.trim().toLowerCase() == c.toLowerCase()).firstOrNull;
 }
 
 /// What a shop bought lately, to take back.

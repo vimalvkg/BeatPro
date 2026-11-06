@@ -70,7 +70,7 @@ class SyncService {
       domain: [
         ['sale_ok', '=', true],
       ],
-      fields: ['display_name', 'lst_price', 'qty_available', 'default_code', 'uom_id', 'categ_id', 'taxes_id'],
+      fields: ['display_name', 'lst_price', 'qty_available', 'default_code', 'barcode', 'uom_id', 'categ_id', 'taxes_id'],
       order: 'name',
       context: {if (app.warehouseId != null) 'warehouse_id': app.warehouseId},
     );

@@ -43,11 +43,11 @@ class FakeOdoo {
   ];
 
   static const products = [
-    {'id': 1, 'name': 'Parle-G Biscuits (Box of 24)', 'price': 240.0, 'qty': 120.0},
-    {'id': 2, 'name': 'Maggi Noodles (Case of 48)', 'price': 576.0, 'qty': 80.0},
-    {'id': 3, 'name': 'Tata Salt 1kg (Bag of 10)', 'price': 280.0, 'qty': 0.0},
-    {'id': 4, 'name': 'Amul Butter 100g (Pack of 20)', 'price': 1100.0, 'qty': 35.0},
-    {'id': 5, 'name': 'Surf Excel 1kg (Case of 12)', 'price': 1560.0, 'qty': 18.0},
+    {'id': 1, 'name': 'Parle-G Biscuits (Box of 24)', 'price': 240.0, 'qty': 120.0, 'barcode': '8901719101038', 'code': 'PG24'},
+    {'id': 2, 'name': 'Maggi Noodles (Case of 48)', 'price': 576.0, 'qty': 80.0, 'barcode': '8901058851298', 'code': 'MG48'},
+    {'id': 3, 'name': 'Tata Salt 1kg (Bag of 10)', 'price': 280.0, 'qty': 0.0, 'barcode': '8904043901015', 'code': 'TS10'},
+    {'id': 4, 'name': 'Amul Butter 100g (Pack of 20)', 'price': 1100.0, 'qty': 35.0, 'barcode': '8901262150064', 'code': 'AB20'},
+    {'id': 5, 'name': 'Surf Excel 1kg (Case of 12)', 'price': 1560.0, 'qty': 18.0, 'barcode': '8901030704116', 'code': 'SE12'},
   ];
 
   http.Client get client => MockClient(_handle);
@@ -144,7 +144,8 @@ class FakeOdoo {
               'display_name': p['name'],
               'lst_price': p['price'],
               'qty_available': p['qty'],
-              'default_code': false,
+              'default_code': p['code'],
+              'barcode': p['barcode'],
               'uom_id': [1, 'Units'],
               'categ_id': [1, 'All'],
               'taxes_id': [1],
