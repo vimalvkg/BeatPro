@@ -12,6 +12,8 @@
                 <button name="action_beatpro_approve" type="object" string="Approve Discount" class="btn-primary"
                         invisible="beatpro_approval_state != 'waiting'"
                         groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                <button name="action_beatpro_apply_schemes" type="object" string="Apply Schemes"
+                        invisible="state not in ('draft', 'sent')"/>
                 <field name="beatpro_van_invoice_ids" invisible="1"/>
                 <button name="action_beatpro_print_slip" type="object" string="Print Invoice Slip"
                         icon="fa-print" invisible="not beatpro_van_invoice_ids"/>
@@ -20,11 +22,20 @@
                 <div class="alert alert-warning mb-0" role="alert" invisible="beatpro_approval_state != 'waiting'">
                     This order's discount is above the rep's limit. A supervisor must approve it.
                 </div>
+                <field name="beatpro_overdue_warning" invisible="1"/>
+                <div class="alert alert-warning mb-0" role="alert" invisible="not beatpro_overdue_warning">
+                    <field name="beatpro_overdue_warning" readonly="1"/>
+                </div>
             </xpath>
             <group name="sales_person" position="inside">
                 <field name="beatpro_visit_id" readonly="1" invisible="not beatpro_visit_id"/>
                 <field name="beatpro_approval_state" readonly="1" invisible="not beatpro_approval_state"/>
+                <field name="beatpro_saved" invisible="not beatpro_saved"/>
             </group>
+            <xpath expr="//field[@name='order_line']/list/field[@name='discount']" position="after">
+                <field name="beatpro_scheme_id" optional="show" readonly="1"/>
+                <field name="beatpro_free" column_invisible="1"/>
+            </xpath>
         </field>
     </record>
 

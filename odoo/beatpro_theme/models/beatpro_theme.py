@@ -22,6 +22,7 @@ SIDEBAR = [
     ('vans', "Vans", 'fa-truck', ['beatpro_field_sales.action_beatpro_van_desk',
                                   'beatpro_field_sales.action_beatpro_my_van']),
     ('products', "Products", 'fa-cube', ['sale.product_template_action']),
+    ('schemes', "Schemes", 'fa-gift', ['beatpro_field_sales.action_beatpro_scheme']),
     ('returns', "Returns", 'fa-undo', ['beatpro_field_sales.action_beatpro_shop_return']),
     ('invoices', "Invoices", 'fa-money', ['account.action_move_out_invoice_type']),
     ('reports', "Reports", 'fa-bar-chart', ['sale.action_order_report_all']),

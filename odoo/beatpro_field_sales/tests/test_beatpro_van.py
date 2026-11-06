@@ -338,7 +338,7 @@ class TestBeatproVanInvoice(TestBeatproVan):
         args = report._build_wkhtmltopdf_args(self.env.ref('beatpro_field_sales.paperformat_slip_80'), False)
         self.assertEqual(args[args.index('--page-width') + 1], '80mm')
         self.assertEqual(args[args.index('--page-height') + 1], '168mm')
-        self.assertEqual(self.env['account.move']._beatpro_slip_height_mm(invoice, '80'), 105 + 9 * 2)
+        self.assertEqual(self.env['account.move']._beatpro_slip_height_mm(invoice, '80'), 105 + 9 * 3)
 
         action = invoice.action_beatpro_print_slip()
         self.assertEqual(action['report_name'], 'beatpro_field_sales.report_invoice_slip_80')

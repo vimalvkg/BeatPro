@@ -20,3 +20,7 @@ access_beatpro_shop_return_stock,beatpro.shop.return storekeeper,model_beatpro_s
 access_beatpro_shop_return_line_rep,beatpro.shop.return.line rep,model_beatpro_shop_return_line,group_beatpro_rep,1,1,1,1
 access_beatpro_shop_return_line_stock,beatpro.shop.return.line storekeeper,model_beatpro_shop_return_line,stock.group_stock_user,1,0,0,0
 access_account_payment_beatpro_rep,account.payment beatpro rep,account.model_account_payment,group_beatpro_rep,1,0,0,0
+access_beatpro_scheme_rep,beatpro.scheme rep,model_beatpro_scheme,group_beatpro_rep,1,0,0,0
+access_beatpro_scheme_supervisor,beatpro.scheme supervisor,model_beatpro_scheme,group_beatpro_supervisor,1,1,1,1
+access_beatpro_scheme_salesman,beatpro.scheme salesman,model_beatpro_scheme,sales_team.group_sale_salesman,1,0,0,0
+access_beatpro_scheme_sale_manager,beatpro.scheme sales manager,model_beatpro_scheme,sales_team.group_sale_manager,1,1,1,1

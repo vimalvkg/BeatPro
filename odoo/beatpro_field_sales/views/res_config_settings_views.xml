@@ -24,6 +24,18 @@
                             <field name="beatpro_slip_width" widget="radio"/>
                         </setting>
                     </block>
+                    <block title="Schemes and credit" name="beatpro_schemes_credit">
+                        <setting string="Schemes" help="Free goods (buy 10 cases, get 1 free) and discounts from a quantity. Reps' phones apply them by themselves, also without signal, and Odoo applies them again when the order arrives. Quantity prices (slabs) come from price lists.">
+                            <button name="%(beatpro_field_sales.action_beatpro_scheme)d" type="action" string="Schemes" icon="oi-arrow-right" class="btn-link"/>
+                        </setting>
+                        <setting string="Credit limit warnings" help="Reps see a warning when a shop owes more than its credit limit or has an overdue invoice. They can still take the order. Set each customer's limit on its Accounting tab.">
+                            <field name="account_use_credit_limit"/>
+                            <div class="mt-2" invisible="not account_use_credit_limit">
+                                <label for="account_default_credit_limit" string="Default limit"/>
+                                <field name="account_default_credit_limit" class="ms-2 w-auto"/>
+                            </div>
+                        </setting>
+                    </block>
                     <block title="Reps" name="beatpro_reps">
                         <setting string="Mobile app access" help="Reps sign in to the BeatPro app with their Odoo email and password; Odoo then gives each phone its own API key, listed on the user's profile (Security tab) where it can be revoked. Set each rep's discount limit on the BeatPro tab of their user."/>
                     </block>

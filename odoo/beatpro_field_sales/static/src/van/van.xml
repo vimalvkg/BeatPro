@@ -57,7 +57,7 @@
                                     <div class="bp-small bp-muted" t-else="">Delivered by <t t-esc="d.main_name"/></div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="bp-van-qty" t-esc="fmt(state.tab === 'van' ? i.left : i.main_qty)"/>
+                                    <div class="bp-van-qty" t-esc="state.tab === 'van' ? (i.left_text or fmt(i.left)) : (i.main_text or fmt(i.main_qty))"/>
                                     <t t-if="state.tab === 'van'" t-set="tg" t-value="tag(i)"/>
                                     <span t-if="tg" t-att-class="'bp-pill ' + tg.cls" t-esc="tg.label"/>
                                 </div>

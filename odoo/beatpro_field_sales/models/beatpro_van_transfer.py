@@ -418,6 +418,8 @@ class BeatproVanTransfer(models.Model):
                 'name': product.display_name,
                 'loaded': row['loaded'], 'sold': row['sold'], 'returned': row['returned'], 'left': row['left'],
                 'main_qty': main_stock.get(product, 0.0),
+                'left_text': product._beatpro_pack_text(row['left']),
+                'main_text': product._beatpro_pack_text(main_stock.get(product, 0.0)),
                 'price': product.lst_price,
                 'status': status,
             })
@@ -535,7 +537,13 @@ class BeatproVanTransferLine(models.Model):
     qty_expected = fields.Float(string="Expected", digits='Product Unit', readonly=True,
                                 help="What should be in the van, from its stock records.")
     qty_difference = fields.Float(string="Difference", compute='_compute_difference', digits='Product Unit')
+    qty_text = fields.Char(string="In Cases", compute='_compute_qty_text')
     has_difference = fields.Boolean(compute='_compute_difference')
+
+    @api.depends('qty', 'product_id')
+    def _compute_qty_text(self):
+        for line in self:
+            line.qty_text = line.product_id and line.product_id._beatpro_pack_text(line.qty) or False
 
     @api.depends('qty', 'qty_expected', 'kind')
     def _compute_difference(self):

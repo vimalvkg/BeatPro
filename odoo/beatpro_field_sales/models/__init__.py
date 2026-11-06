@@ -14,5 +14,7 @@ from . import res_config_settings
 from . import account_move
 from . import ir_actions_report
 from . import product_pricelist
+from . import product_product
+from . import beatpro_scheme
 from . import beatpro_dashboard
 from . import account_payment_method_line

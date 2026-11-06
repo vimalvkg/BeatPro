@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beatpro_scheme_form" model="ir.ui.view">
+        <field name="name">beatpro.scheme.form</field>
+        <field name="model">beatpro.scheme</field>
+        <field name="arch" type="xml">
+            <form string="Scheme">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Oreo: buy 10 cases, get 1 free"/></h1>
+                    </div>
+                    <group>
+                        <group string="The shop buys">
+                            <field name="kind" widget="radio" options="{'horizontal': true}"/>
+                            <field name="product_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            <label for="min_qty"/>
+                            <div class="o_row">
+                                <field name="min_qty"/>
+                                <field name="uom_id" options="{'no_create': True}" groups="uom.group_uom"/>
+                            </div>
+                        </group>
+                        <group string="The shop gets">
+                            <field name="free_product_id" invisible="kind != 'free_goods'" options="{'no_create': True}"
+                                   placeholder="The product bought"/>
+                            <label for="free_qty" invisible="kind != 'free_goods'"/>
+                            <div class="o_row" invisible="kind != 'free_goods'">
+                                <field name="free_qty"/>
+                                <field name="free_uom_id" options="{'no_create': True}" placeholder="Same unit" groups="uom.group_uom"/>
+                            </div>
+                            <field name="discount" invisible="kind != 'discount'"/>
+                            <field name="rule" string="In short"/>
+                        </group>
+                        <group string="When">
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <p class="text-muted">
+                        Reps' phones apply running schemes by themselves, also without signal, and Odoo
+                        applies them again when the order arrives. Free goods are a line at no charge and
+                        leave the van with the order. For prices that drop from a quantity (slabs), add
+                        a minimum quantity to the price list instead.
+                    </p>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_scheme_list" model="ir.ui.view">
+        <field name="name">beatpro.scheme.list</field>
+        <field name="model">beatpro.scheme</field>
+        <field name="arch" type="xml">
+            <list string="Schemes">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="kind" widget="badge" decoration-warning="kind == 'free_goods'" decoration-info="kind == 'discount'"/>
+                <field name="rule"/>
+                <field name="date_from"/>
+                <field name="date_to"/>
+                <field name="order_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_scheme_search" model="ir.ui.view">
+        <field name="name">beatpro.scheme.search</field>
+        <field name="model">beatpro.scheme</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="product_ids"/>
+                <filter name="running" string="Running Today"
+                        domain="['|', ('date_from', '=', False), ('date_from', '&lt;=', context_today().strftime('%Y-%m-%d')),
+                                 '|', ('date_to', '=', False), ('date_to', '&gt;=', context_today().strftime('%Y-%m-%d'))]"/>
+                <separator/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_scheme" model="ir.actions.act_window">
+        <field name="name">Schemes</field>
+        <field name="res_model">beatpro.scheme</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a scheme</p>
+            <p>Give shops free goods (buy 10 cases, get 1 free) or a discount when they buy enough.
+                Reps' phones apply schemes by themselves.</p>
+        </field>
+    </record>
+</odoo>

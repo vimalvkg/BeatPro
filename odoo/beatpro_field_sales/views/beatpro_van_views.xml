@@ -62,6 +62,7 @@
                             <field name="qty" string="Counted" column_invisible="parent.kind != 'unload'"/>
                             <field name="qty" string="To Load" column_invisible="parent.kind == 'unload'"/>
                             <field name="qty_difference" column_invisible="parent.kind != 'unload'"/>
+                            <field name="qty_text" optional="show"/>
                             <field name="uom_id" groups="uom.group_uom"/>
                         </list>
                     </field>

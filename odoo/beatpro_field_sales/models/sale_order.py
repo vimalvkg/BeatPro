@@ -1,3 +1,4 @@
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
 from odoo.fields import Command
@@ -35,6 +36,68 @@ class SaleOrder(models.Model):
         help="The number the rep's phone gave the invoice made at the shop.")
     beatpro_van_invoice_ids = fields.Many2many(
         'account.move', compute='_compute_beatpro_van_invoice_ids', string="Invoices Made at the Shop")
+
+    beatpro_overdue_warning = fields.Text(compute='_compute_beatpro_overdue_warning')
+    beatpro_saved = fields.Monetary(
+        string="Shop Saves", compute='_compute_beatpro_saved',
+        help="Free goods, scheme discounts and quantity prices, against the price for one.")
+
+    @api.depends('partner_id', 'company_id')
+    def _compute_beatpro_overdue_warning(self):
+        for order in self:
+            overdue = order.partner_id and order.state in ('draft', 'sent') and \
+                order.partner_id._beatpro_oldest_overdue(order.company_id)
+            order.beatpro_overdue_warning = overdue and self.env._(
+                "%(partner)s has an invoice overdue for %(days)s days: %(invoice)s, %(amount)s still to pay.",
+                partner=order.partner_id.commercial_partner_id.name, days=overdue['days'],
+                invoice=overdue['name'], amount=overdue['amount_text']) or False
+
+    @api.depends('order_line.price_subtotal', 'order_line.product_uom_qty', 'pricelist_id')
+    def _compute_beatpro_saved(self):
+        for order in self:
+            order.beatpro_saved = sum(line._beatpro_saved() for line in order.order_line)
+
+    def _beatpro_apply_schemes(self):
+        """Add the free goods and scheme discounts the order earns.
+
+        Run again whenever the lines change: earlier free lines and scheme discounts are
+        worked out afresh. A scheme counts if it runs on the order date, so an order taken
+        offline keeps the schemes of the day it was taken.
+        """
+        Scheme = self.env['beatpro.scheme'].sudo()
+        for order in self.filtered(lambda o: o.state in ('draft', 'sent')):
+            lines = order.order_line.filtered(lambda l: not l.display_type)
+            lines.filtered('beatpro_free').unlink()
+            lines = lines.exists()
+            lines.filtered('beatpro_scheme_id').write({'discount': 0.0, 'beatpro_scheme_id': False})
+            day = fields.Date.context_today(order, order.date_order) if order.date_order else fields.Date.context_today(order)
+            sequence = max(lines.mapped('sequence'), default=10)
+            for scheme in Scheme._beatpro_running(order.company_id, day):
+                matching, times = scheme._beatpro_reward(lines)
+                if not times:
+                    continue
+                if scheme.kind == 'discount':
+                    for line in matching.filtered(lambda l: l.discount < scheme.discount):
+                        line.write({'discount': scheme.discount, 'beatpro_scheme_id': scheme.id})
+                    continue
+                sequence += 1
+                product = scheme._free_product()
+                self.env['sale.order.line'].create({
+                    'order_id': order.id,
+                    'sequence': sequence,
+                    'product_id': product.id,
+                    'product_uom_qty': scheme.free_qty * times,
+                    'product_uom_id': scheme._free_uom().id,
+                    'discount': 100.0,
+                    'beatpro_scheme_id': scheme.id,
+                    'beatpro_free': True,
+                    'name': self.env._("%(product)s · FREE (%(scheme)s)", product=product.display_name, scheme=scheme.name),
+                })
+        return True
+
+    def action_beatpro_apply_schemes(self):
+        self._beatpro_apply_schemes()
+        return True
 
     def _compute_beatpro_van_invoice_ids(self):
         for order in self:
@@ -87,6 +150,7 @@ class SaleOrder(models.Model):
                 validate(pickings)
 
     def action_confirm(self):
+        self._beatpro_apply_schemes()
         self._beatpro_prepare_delivery()
         result = super().action_confirm()
         self._beatpro_deliver_from_van()
@@ -173,7 +237,8 @@ class SaleOrder(models.Model):
         ):
             return False
         limit = user.beatpro_discount_limit
-        return any(line.discount > limit for line in self.order_line if not line.display_type)
+        # Scheme discounts and free goods are the company's offers, not the rep's.
+        return any(line.discount > limit for line in self.order_line if not line.display_type and not line.beatpro_scheme_id)
 
     def _confirmation_error_message(self):
         error = super()._confirmation_error_message()
@@ -216,6 +281,7 @@ class SaleOrder(models.Model):
         for order in orders:
             if order.state not in ('draft', 'sent') or order.beatpro_approval_state:
                 continue
+            order._beatpro_apply_schemes()
             if order._beatpro_over_discount_limit():
                 order.action_beatpro_request_approval()
             else:
@@ -229,8 +295,32 @@ class SaleOrder(models.Model):
                 'state': order.state,
                 'approval': order.beatpro_approval_state or False,
                 'amount_total': order.amount_total,
+                'saved': order.beatpro_saved,
                 'delivery_mode': order.beatpro_delivery_mode or False,
                 'delivered_now': order.beatpro_delivery_mode in ('van', 'split') and order.state == 'sale',
                 'invoice': order._beatpro_invoice_info(),
             } for order in orders.sudo()
         }
+
+
+class SaleOrderLine(models.Model):
+    _inherit = 'sale.order.line'
+
+    beatpro_scheme_id = fields.Many2one('beatpro.scheme', string="Scheme", readonly=True, copy=False,
+                                        index='btree_not_null', ondelete='set null')
+    beatpro_free = fields.Boolean(string="Free Goods", readonly=True, copy=False)
+
+    def _beatpro_list_price(self):
+        """The price for buying one, in the line's unit, before quantity prices."""
+        self.ensure_one()
+        pricelist = self.order_id.pricelist_id
+        if not pricelist:
+            return self.price_unit
+        return pricelist._get_product_price(self.product_id, 1.0, uom=self.product_uom_id,
+                                            date=self.order_id.date_order)
+
+    def _beatpro_saved(self):
+        if self.display_type or not self.product_id or not self.product_uom_qty:
+            return 0.0
+        saved = self._beatpro_list_price() * self.product_uom_qty - self.price_subtotal
+        return saved if self.currency_id.compare_amounts(saved, 0.0) > 0 else 0.0

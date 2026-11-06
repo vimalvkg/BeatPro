@@ -26,6 +26,8 @@
               groups="beatpro_field_sales.group_beatpro_supervisor"/>
     <menuitem id="menu_beatpro_approvals" name="Discount Approvals" parent="menu_beatpro_supervisor"
               action="action_beatpro_orders_approval" sequence="10"/>
+    <menuitem id="menu_beatpro_schemes" name="Schemes" parent="menu_beatpro_supervisor"
+              action="action_beatpro_scheme" sequence="15"/>
     <menuitem id="menu_beatpro_visit_analysis" name="Visit Analysis" parent="menu_beatpro_supervisor"
               action="action_beatpro_visit_analysis" sequence="20"/>
     <menuitem id="menu_beatpro_van_desk" name="Vans" parent="menu_beatpro_supervisor"

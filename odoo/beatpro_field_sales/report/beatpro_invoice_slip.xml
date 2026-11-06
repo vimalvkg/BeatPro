@@ -85,7 +85,7 @@
             <t t-foreach="d['lines']" t-as="l">
                 <div class="item">
                     <div t-esc="l['name']"/>
-                    <div class="row"><span>VAT <t t-esc="l['vat']"/></span>
+                    <div class="row"><span t-esc="l['note']"/>
                         <span><t t-esc="l['qty']"/> x <t t-esc="'%.2f' % l['price']"/> · <t t-esc="'%.2f' % l['amount']"/></span></div>
                 </div>
             </t>
@@ -95,6 +95,10 @@
             <div class="row b big mt"><span>TOTAL <t t-esc="cur.name"/></span><span t-esc="'%.2f' % o.amount_total"/></div>
             <div class="row ar"><span>الإجمالي شامل الضريبة</span><span class="ltr" t-esc="'%.2f' % o.amount_total"/></div>
             <div class="small" t-esc="d['words']"/>
+            <t t-if="d['saved'] &gt;= 0.01">
+                <div class="rule"/>
+                <div class="row b"><span>You saved <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['saved']"/></div>
+            </t>
             <div class="rule"/>
             <div class="row"><span>Previous balance</span><span t-esc="'%.2f' % d['previous']"/></div>
             <div class="row b"><span>Balance due <t t-esc="cur.name"/></span><span t-esc="'%.2f' % d['balance']"/></div>

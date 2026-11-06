@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.tools import formatLang
 
 
 class ResPartner(models.Model):
@@ -54,3 +55,56 @@ class ResPartner(models.Model):
             'amount_due': inv.amount_residual,
             'overdue': bool(inv.invoice_date_due and inv.invoice_date_due < today),
         } for inv in invoices]
+
+    def _beatpro_oldest_overdue(self, company=None):
+        """The customer's oldest overdue invoice, or False.
+
+        :return: ``{'name', 'days', 'amount', 'amount_text', 'total'}``, where total is
+            everything overdue
+        """
+        self.ensure_one()
+        company = company or self.env.company
+        today = fields.Date.context_today(self)
+        invoices = self.env['account.move'].sudo().search([
+            ('commercial_partner_id', '=', self.commercial_partner_id.id),
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', 'in', ('not_paid', 'partial')),
+            ('company_id', '=', company.id),
+            ('invoice_date_due', '<', today),
+        ], order='invoice_date_due, id')
+        if not invoices:
+            return False
+        oldest = invoices[0]
+        return {
+            'name': oldest.name,
+            'days': (today - oldest.invoice_date_due).days,
+            'amount': oldest.amount_residual,
+            'amount_text': formatLang(self.env, oldest.amount_residual, currency_obj=oldest.currency_id),
+            'total': sum(invoices.mapped('amount_residual')),
+        }
+
+    @api.model
+    def beatpro_credit(self, partner_ids):
+        """How much each customer owes, their credit limit and overdue invoices, so the
+        app can warn the rep before taking an order. Nothing is blocked.
+
+        :return: ``{partner_id: {'limit', 'owed', 'overdue_name', 'overdue_days', 'overdue_amount'}}``
+            (ids as strings); a limit of 0 means no limit
+        """
+        partners = self.browse(partner_ids)
+        partners.check_access('read')
+        company = self.env.company
+        use_limit = company.account_use_credit_limit
+        result = {}
+        for partner in partners:
+            commercial = partner.commercial_partner_id.sudo().with_company(company)
+            overdue = partner._beatpro_oldest_overdue(company)
+            result[str(partner.id)] = {
+                'limit': commercial.credit_limit if use_limit else 0.0,
+                'owed': commercial.credit + (commercial.credit_to_invoice if use_limit else 0.0),
+                'overdue_name': overdue and overdue['name'],
+                'overdue_days': overdue and overdue['days'] or 0,
+                'overdue_amount': overdue and overdue['total'] or 0.0,
+            }
+        return result
