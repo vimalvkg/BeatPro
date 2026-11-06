@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,7 +21,15 @@ typedef ScanHandler = ScanFeedback Function(String code);
 
 /// Scans barcodes one after another until the rep taps Done.
 abstract class BarcodeScanner {
-  Future<void> scan(BuildContext context, {required String title, required ScanHandler onCode});
+  /// False where there is no camera scanner (the desktop test build): the
+  /// search box still takes typed or handheld-scanned barcodes.
+  bool get available => true;
+
+  Future<void> scan(
+    BuildContext context, {
+    required String title,
+    required ScanHandler onCode,
+  });
 }
 
 /// The phone's camera.
@@ -27,18 +37,34 @@ class CameraBarcodeScanner implements BarcodeScanner {
   const CameraBarcodeScanner();
 
   @override
-  Future<void> scan(BuildContext context, {required String title, required ScanHandler onCode}) =>
-      Navigator.of(context).push(MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => _ScanScreen(title: title, onCode: onCode),
-      ));
+  bool get available =>
+      Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+
+  @override
+  Future<void> scan(
+    BuildContext context, {
+    required String title,
+    required ScanHandler onCode,
+  }) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => _ScanScreen(title: title, onCode: onCode),
+    ),
+  );
 }
 
-final barcodeScannerProvider = Provider<BarcodeScanner>((ref) => const CameraBarcodeScanner());
+final barcodeScannerProvider = Provider<BarcodeScanner>(
+  (ref) => const CameraBarcodeScanner(),
+);
 
 /// The scan button used on the order, load, take back and unload screens.
 class ScanButton extends ConsumerWidget {
-  const ScanButton({super.key, required this.title, required this.onCode, this.afterScan});
+  const ScanButton({
+    super.key,
+    required this.title,
+    required this.onCode,
+    this.afterScan,
+  });
 
   final String title;
   final ScanHandler onCode;
@@ -47,14 +73,19 @@ class ScanButton extends ConsumerWidget {
   final VoidCallback? afterScan;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => IconButton(
-        tooltip: 'Scan barcodes',
-        icon: const Icon(Icons.qr_code_scanner),
-        onPressed: () async {
-          await ref.read(barcodeScannerProvider).scan(context, title: title, onCode: onCode);
-          afterScan?.call();
-        },
-      );
+  Widget build(BuildContext context, WidgetRef ref) =>
+      !ref.watch(barcodeScannerProvider).available
+      ? const SizedBox.shrink()
+      : IconButton(
+          tooltip: 'Scan barcodes',
+          icon: const Icon(Icons.qr_code_scanner),
+          onPressed: () async {
+            await ref
+                .read(barcodeScannerProvider)
+                .scan(context, title: title, onCode: onCode);
+            afterScan?.call();
+          },
+        );
 }
 
 class _ScanScreen extends StatefulWidget {
@@ -95,12 +126,16 @@ class _ScanScreenState extends State<_ScanScreen> {
   }
 
   void _onDetect(BarcodeCapture capture) {
-    final code = capture.barcodes.map((b) => b.rawValue).whereType<String>().firstOrNull;
+    final code = capture.barcodes
+        .map((b) => b.rawValue)
+        .whereType<String>()
+        .firstOrNull;
     if (code == null) return;
     // The camera sees the same box many times a second: count it once,
     // then again only after a short pause (the next box).
     final now = DateTime.now();
-    if (code == _lastCode && now.difference(_lastAt) < const Duration(milliseconds: 1500)) {
+    if (code == _lastCode &&
+        now.difference(_lastAt) < const Duration(milliseconds: 1500)) {
       _lastAt = now;
       return;
     }
@@ -133,70 +168,84 @@ class _ScanScreenState extends State<_ScanScreen> {
           ),
         ],
       ),
-      body: Stack(children: [
-        MobileScanner(
-          controller: _controller,
-          onDetect: _onDetect,
-          errorBuilder: (context, error) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                error.errorCode == MobileScannerErrorCode.permissionDenied
-                    ? 'Allow BeatPro to use the camera in the phone settings to scan barcodes.'
-                    : "The camera couldn't start. Type the barcode in the search box instead.",
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-        ),
-        // Aim here.
-        Center(
-          child: Container(
-            width: 260,
-            height: 160,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white, width: 3),
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 16,
-          child: SafeArea(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Semantics(
-                liveRegion: true,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: last == null
-                        ? Colors.black54
-                        : last.ok
-                            ? BeatproColors.successSoft
-                            : BeatproColors.dangerSoft,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    last?.message ?? 'Point the camera at a product barcode. Keep scanning; tap Done when finished.',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: last == null ? Colors.white : (last.ok ? BeatproColors.success : BeatproColors.danger),
-                    ),
-                  ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+            errorBuilder: (context, error) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  error.errorCode == MobileScannerErrorCode.permissionDenied
+                      ? 'Allow BeatPro to use the camera in the phone settings to scan barcodes.'
+                      : "The camera couldn't start. Type the barcode in the search box instead.",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(_count == 0 ? 'Done' : 'Done · $_count scanned'),
-              ),
-            ]),
+            ),
           ),
-        ),
-      ]),
+          // Aim here.
+          Center(
+            child: Container(
+              width: 260,
+              height: 160,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white, width: 3),
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Semantics(
+                    liveRegion: true,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: last == null
+                            ? Colors.black54
+                            : last.ok
+                            ? BeatproColors.successSoft
+                            : BeatproColors.dangerSoft,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        last?.message ?? 'Point the camera at a product barcode. Keep scanning; tap Done when finished.',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: last == null
+                              ? Colors.white
+                              : (last.ok
+                                    ? BeatproColors.success
+                                    : BeatproColors.danger),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      _count == 0 ? 'Done' : 'Done · $_count scanned',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

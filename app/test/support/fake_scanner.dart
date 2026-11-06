@@ -8,6 +8,9 @@ class FakeBarcodeScanner implements BarcodeScanner {
   final titles = <String>[];
 
   @override
+  bool get available => true;
+
+  @override
   Future<void> scan(BuildContext context, {required String title, required ScanHandler onCode}) async {
     titles.add(title);
     while (queue.isNotEmpty) {
