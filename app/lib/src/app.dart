@@ -13,6 +13,7 @@ import 'screens/invoice_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/order_screen.dart';
 import 'screens/orders_screen.dart';
+import 'screens/growth_screens.dart';
 import 'screens/payment_screen.dart';
 import 'screens/printer_screen.dart';
 import 'screens/return_screen.dart';
@@ -65,6 +66,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/visit/:uuid', builder: (_, state) => VisitScreen(visitUuid: state.pathParameters['uuid']!)),
+      GoRoute(path: '/visit/:uuid/photos', builder: (_, state) => VisitPhotosScreen(visitUuid: state.pathParameters['uuid']!)),
+      GoRoute(
+        path: '/visit/:uuid/survey/:id',
+        builder: (_, state) => SurveyScreen(
+          visitUuid: state.pathParameters['uuid']!,
+          surveyId: int.parse(state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(path: '/target', builder: (_, _) => const TargetScreen()),
       GoRoute(
         path: '/order/new',
         builder: (_, state) => OrderScreen(

@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:uuid/uuid.dart';
 
+import 'growth.dart';
 import 'invoice.dart';
 import 'local_db.dart';
 import 'models.dart';
@@ -220,6 +223,7 @@ class Repository {
       },
     );
     await db.saveRecord(visit);
+    if (at != null) await queueLocation(at);
     return visit;
   }
 
@@ -249,6 +253,142 @@ class Repository {
     });
     await db.saveRecord(updated);
     return updated;
+  }
+
+  // -- Targets, shelf photos and surveys, location ---------------------------------
+
+  /// The rep's target this month, or null for reps on monthly salary only.
+  Future<MyTarget?> myTarget() async {
+    final raw = await db.getValue('my_target');
+    final json = raw == null ? null : jsonDecode(raw);
+    return json is Map ? MyTarget(json.cast<String, dynamic>()) : null;
+  }
+
+  Future<Map<String, dynamic>> _surveyData() async {
+    final raw = await db.getValue('surveys');
+    final json = raw == null ? null : jsonDecode(raw);
+    return json is Map ? json.cast<String, dynamic>() : const {};
+  }
+
+  /// Surveys due at a shop on today's plan.
+  Future<List<Survey>> surveysFor(String customerKey) async {
+    final data = await _surveyData();
+    final ids = ((data['due'] as Map?)?[customerKey.replaceFirst('srv:', '')] as List?)?.cast<int>() ?? const [];
+    return [
+      for (final s in ((data['surveys'] as List?) ?? const []).cast<Map<String, dynamic>>())
+        if (ids.contains(s['id'])) Survey(s),
+    ];
+  }
+
+  /// What a shelf photo can be of.
+  Future<List<String>> photoTags() async =>
+      ((await _surveyData())['photo_tags'] as List?)?.cast<String>() ??
+      const ['Main shelf', 'Display stand', 'Competitor', 'Out of stock', 'Price label'];
+
+  /// Keeps a shelf photo on the phone until it syncs with its visit.
+  Future<LocalRecord> addPhoto({
+    required String visitUuid,
+    required Uint8List bytes,
+    required String tag,
+    required Directory dir,
+    GeoPoint? at,
+  }) async {
+    final uuid = _uuid.v4();
+    await dir.create(recursive: true);
+    final file = File('${dir.path}/$uuid.jpg');
+    await file.writeAsBytes(bytes, flush: true);
+    final record = LocalRecord(
+      uuid: uuid,
+      kind: RecordKind.photo,
+      createdAt: now,
+      data: {
+        'visitUuid': visitUuid,
+        'path': file.path,
+        'tag': tag,
+        'takenAt': now.toUtc().toIso8601String(),
+        'lat': at?.latitude,
+        'lng': at?.longitude,
+      },
+    );
+    await db.saveRecord(record);
+    return record;
+  }
+
+  Future<List<LocalRecord>> photosFor(String visitUuid) async =>
+      (await db.records(kind: RecordKind.photo)).where((r) => r.data['visitUuid'] == visitUuid).toList();
+
+  Future<void> deletePhoto(String uuid) async {
+    final record = await db.record(uuid);
+    if (record == null || record.state == SyncState.synced) return;
+    final file = File(record.data['path'] as String);
+    if (await file.exists()) await file.delete();
+    await db.deleteRecord(uuid);
+  }
+
+  /// Saves a visit's answers to a survey, replacing earlier answers not yet sent.
+  Future<LocalRecord> saveSurveyAnswers({
+    required String visitUuid,
+    required Survey survey,
+    required Map<int, Object?> answers,
+  }) async {
+    final missing = [for (final q in survey.questions) if (q.required && (answers[q.id] == null || answers[q.id] == '')) q.name];
+    if (missing.isNotEmpty) throw ArgumentError('Answer: ${missing.join(', ')}');
+    final existing = (await db.records(kind: RecordKind.surveyAnswer))
+        .where((r) => r.data['visitUuid'] == visitUuid && r.data['surveyId'] == survey.id && r.state != SyncState.synced)
+        .firstOrNull;
+    final record = LocalRecord(
+      uuid: existing?.uuid ?? _uuid.v4(),
+      kind: RecordKind.surveyAnswer,
+      createdAt: existing?.createdAt ?? now,
+      data: {
+        'visitUuid': visitUuid,
+        'surveyId': survey.id,
+        'surveyName': survey.name,
+        'answers': {for (final e in answers.entries) '${e.key}': e.value},
+      },
+    );
+    await db.saveRecord(record);
+    return record;
+  }
+
+  Future<Map<int, Object?>> answersFor(String visitUuid, int surveyId) async {
+    final record = (await db.records(kind: RecordKind.surveyAnswer))
+        .where((r) => r.data['visitUuid'] == visitUuid && r.data['surveyId'] == surveyId)
+        .lastOrNull;
+    final raw = (record?.data['answers'] as Map?) ?? const {};
+    return {for (final e in raw.entries) int.parse(e.key as String): e.value};
+  }
+
+  /// The rep is working: they checked in somewhere today and haven't closed the day.
+  Future<bool> workingNow() async {
+    if (await todayClose() != null) return false;
+    final visits = await db.records(kind: RecordKind.visit, since: startOfToday.toUtc());
+    return visits.isNotEmpty;
+  }
+
+  /// Keeps a position for the supervisor's Live Map until the next sync.
+  Future<void> queueLocation(GeoPoint at, {double? accuracy}) async {
+    if ((await appContext())?.trackLocation != true) return;
+    final queue = await locationQueue();
+    queue.add({
+      'mobile_uuid': _uuid.v4(),
+      'at': now.toUtc().toIso8601String().replaceFirst('T', ' ').split('.').first,
+      'latitude': at.latitude,
+      'longitude': at.longitude,
+      'accuracy': accuracy ?? 0,
+    });
+    // A day without signal is about 150 points; keep at most two days.
+    await db.setValue('location_queue', jsonEncode(queue.length > 300 ? queue.sublist(queue.length - 300) : queue));
+  }
+
+  Future<List<Map<String, dynamic>>> locationQueue() async {
+    final raw = await db.getValue('location_queue');
+    return raw == null ? [] : (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> dropSentLocations(Set<String> uuids) async {
+    final left = (await locationQueue()).where((p) => !uuids.contains(p['mobile_uuid'])).toList();
+    await db.setValue('location_queue', jsonEncode(left));
   }
 
   // -- Orders ---------------------------------------------------------------

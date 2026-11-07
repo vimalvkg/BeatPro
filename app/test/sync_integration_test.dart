@@ -6,8 +6,10 @@
 //
 // Skipped when BEATPRO_ODOO_URL isn't set.
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:beatpro/src/core/local_db.dart';
+import 'package:beatpro/src/core/growth.dart';
 import 'package:beatpro/src/core/invoice.dart';
 import 'package:beatpro/src/core/models.dart';
 import 'package:beatpro/src/core/odoo_client.dart';
@@ -319,6 +321,58 @@ void main() {
     final first = cased.first;
     final need = Repository.piecesNeeded([...lines, ...free])[first.id]!;
     expect(after.leftOf(first.id), closeTo(stock.leftOf(first.id) - need, 0.001));
+    await db.close();
+  }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
+
+  // Needs a rep with a shop survey due on today's route and location sharing on.
+  test('shelf photos, survey answers and positions reach Odoo', () async {
+    final client = OdooClient(await credentials());
+    sqfliteFfiInit();
+    final db = await LocalDb.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+    final repo = Repository(db);
+    final sync = SyncService(db, client);
+    await sync.download();
+    final context = (await repo.appContext())!;
+    expect(context.trackLocation, isTrue, reason: 'turn on location sharing for this rep');
+    Survey? survey;
+    String? shop;
+    for (final stop in await repo.todayPlan()) {
+      final due = await repo.surveysFor(stop.customer.key);
+      if (due.isNotEmpty) {
+        survey = due.first;
+        shop = stop.customer.key;
+        break;
+      }
+    }
+    expect(survey, isNotNull, reason: 'give this rep a shop survey');
+    final visit = await repo.startVisit(shop!, at: const GeoPoint(25.2399, 55.3046));
+    final dir = await Directory.systemTemp.createTemp('beatpro_live');
+    // A 1x1 PNG: Odoo checks that photos are images.
+    final pixel = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/58BAwAI/AL+hc2rNAAAAABJRU5ErkJggg==');
+    final photo = await repo.addPhoto(visitUuid: visit.uuid, bytes: pixel, tag: 'Main shelf', dir: dir);
+    await repo.saveSurveyAnswers(visitUuid: visit.uuid, survey: survey!, answers: {
+      for (final q in survey.questions)
+        q.id: switch (q.kind) {
+          'yes_no' => true,
+          'number' || 'price' => '4',
+          'choice' => q.choices.first,
+          _ => 'Live test',
+        },
+    });
+    await repo.checkOut(visit.uuid, result: VisitResult.noOrder, noOrderReason: 'enough_stock');
+    final report = await sync.sync();
+    expect(report.failed, 0, reason: (await db.records(state: SyncState.failed)).map((r) => r.error).join('; '));
+    final visitId = (await db.record(visit.uuid))!.serverId;
+    final photos = await client.searchRead('beatpro.visit.photo', domain: [
+      ['mobile_uuid', '=', photo.uuid],
+    ], fields: ['visit_id', 'tag']);
+    expect((photos.single['visit_id'] as List).first, visitId);
+    final answers = await client.searchRead('beatpro.survey.answer', domain: [
+      ['visit_id', '=', visitId],
+    ], fields: ['value']);
+    expect(answers.length, survey.questions.length);
+    expect(await repo.locationQueue(), isEmpty, reason: 'positions sent');
+    await dir.delete(recursive: true);
     await db.close();
   }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
 }

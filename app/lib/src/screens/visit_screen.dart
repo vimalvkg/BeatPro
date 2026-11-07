@@ -10,6 +10,7 @@ import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'growth_screens.dart';
 
 final _visitProvider = FutureProvider.family<LocalRecord?, String>((ref, uuid) {
   ref.watch(dataVersionProvider);
@@ -230,6 +231,7 @@ class _VisitScreenState extends ConsumerState<VisitScreen> {
                 label: const Text('Take back goods'),
               ),
             ],
+            VisitExtras(visit: visit),
             const SizedBox(height: 14),
             // Customer at a glance.
             Card(

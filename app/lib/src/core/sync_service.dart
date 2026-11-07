@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'local_db.dart';
 import 'models.dart';
@@ -133,6 +134,11 @@ class SyncService {
         if (info is Map) customers[i] = c.withCredit(CreditInfo.fromOdoo(info.cast<String, dynamic>()));
       }
     }
+    // The rep's target (reps on salary + incentive only) and shop surveys.
+    final myTarget = app.onIncentive ? await _optional(() => client.call('beatpro.target', 'beatpro_my_target')) : null;
+    final surveys = await _optional(() => client.call('beatpro.survey', 'beatpro_surveys'));
+    await db.setValue('my_target', myTarget is Map ? jsonEncode(myTarget) : null);
+    await db.setValue('surveys', surveys is Map ? jsonEncode(surveys) : null);
     await db.setValue('price_breaks', breaks == null ? null : jsonEncode(breaks));
     await db.setValue('schemes', schemes == null ? null : jsonEncode(schemes));
 
@@ -210,6 +216,19 @@ class SyncService {
         report.failed++;
         await db.saveRecord(current.copyWith(state: SyncState.failed, error: e.message));
       }
+    }
+    await _uploadLocations();
+  }
+
+  /// Positions for the supervisor's Live Map, in batches.
+  Future<void> _uploadLocations() async {
+    final repo = Repository(db);
+    final queue = await repo.locationQueue();
+    for (var i = 0; i < queue.length; i += 200) {
+      final batch = queue.sublist(i, i + 200 > queue.length ? queue.length : i + 200);
+      final sent = await _optional(() => client.call('beatpro.location', 'beatpro_submit_locations', kwargs: {'points': batch}));
+      if (sent == null) return; // An older BeatPro module: keep them for later.
+      await repo.dropSentLocations({for (final p in batch) p['mobile_uuid'] as String});
     }
   }
 
@@ -358,6 +377,53 @@ class SyncService {
           ],
         }) as Map<String, dynamic>;
         await _markSynced(r, result[r.uuid] as int);
+        return true;
+
+      case RecordKind.photo:
+        final visitId = await _serverIdOf(r.data['visitUuid'] as String);
+        if (visitId == null) return false;
+        final file = File(r.data['path'] as String);
+        if (await file.exists()) {
+          await client.call('beatpro.visit', 'beatpro_submit_extras', kwargs: {
+            'vals_list': [
+              {
+                'visit_id': visitId,
+                'photos': [
+                  {
+                    'mobile_uuid': r.uuid,
+                    'image': base64Encode(await file.readAsBytes()),
+                    'tag': r.data['tag'],
+                    'taken_at': (r.data['takenAt'] as String).replaceFirst('T', ' ').split('.').first,
+                    'latitude': r.data['lat'] ?? 0,
+                    'longitude': r.data['lng'] ?? 0,
+                  },
+                ],
+                'answers': [],
+              },
+            ],
+          });
+          // Odoo has it now: free the space on the phone.
+          await file.delete();
+        }
+        await _markSynced(r, visitId);
+        return true;
+
+      case RecordKind.surveyAnswer:
+        final visitId = await _serverIdOf(r.data['visitUuid'] as String);
+        if (visitId == null) return false;
+        await client.call('beatpro.visit', 'beatpro_submit_extras', kwargs: {
+          'vals_list': [
+            {
+              'visit_id': visitId,
+              'photos': [],
+              'answers': [
+                for (final e in ((r.data['answers'] as Map?) ?? const {}).entries)
+                  {'survey_id': r.data['surveyId'], 'question_id': int.parse(e.key as String), 'value': e.value},
+              ],
+            },
+          ],
+        });
+        await _markSynced(r, visitId);
         return true;
 
       case RecordKind.shopReturn:

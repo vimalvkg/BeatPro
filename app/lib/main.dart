@@ -29,5 +29,7 @@ Future<void> main() async {
   if (container.read(sessionProvider) != null) {
     container.read(syncControllerProvider.notifier).run();
   }
+  // Positions for the supervisor's Live Map, while the rep works.
+  container.read(locationTrackerProvider).start();
   runApp(UncontrolledProviderScope(container: container, child: const BeatproApp()));
 }

@@ -21,6 +21,13 @@ class AppContext {
   double get discountLimit => _num(json['discount_limit']);
   int? get warehouseId => json['warehouse_id'] as int?;
 
+  /// Paid on salary + targets and incentive: the app shows the rep's target.
+  bool get onIncentive => json['pay_type'] == 'incentive';
+
+  /// Send the rep's position while they work, for the supervisor's Live Map.
+  bool get trackLocation => json['track_location'] == true;
+  int get locationMinutes => (json['location_minutes'] as num?)?.toInt() ?? 5;
+
   /// The Van Sales Dashboard is on this server and this user may open it (supervisors).
   bool get hasSalesDashboard => json['sales_dashboard'] == true;
 
@@ -421,7 +428,7 @@ class OpenInvoice {
 
 /// What kind of thing a [LocalRecord] is. Uploaded in this order, so that
 /// orders can point to visits and customers already in Odoo.
-enum RecordKind { customer, visit, order, payment, dayClose, shopReturn, vanTransfer }
+enum RecordKind { customer, visit, order, payment, dayClose, shopReturn, vanTransfer, photo, surveyAnswer }
 
 /// The order in which records go to Odoo: a morning load before the day's
 /// orders, goods taken back before the day-end unload, and the day close last.
@@ -433,6 +440,8 @@ int uploadRank(LocalRecord r) => switch (r.kind) {
       // Goods taken back first: a payment can use their credit note.
       RecordKind.shopReturn => 4,
       RecordKind.payment => 5,
+      // Photos and survey answers go with their visit, once it is in Odoo.
+      RecordKind.photo || RecordKind.surveyAnswer => 6,
       RecordKind.dayClose => 8,
     };
 

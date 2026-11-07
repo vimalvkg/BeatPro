@@ -2,6 +2,7 @@
 //
 // To save a picture of each screen to docs/screenshots/:
 //   BEATPRO_SCREENSHOTS=1 flutter test test/app_flow_test.dart --update-goldens
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:beatpro/src/app.dart';
@@ -20,6 +21,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:beatpro/src/widgets/scanner.dart';
 
 import 'support/fake_odoo.dart';
+import 'support/fake_photos.dart';
 import 'support/fake_printer.dart';
 import 'support/fake_scanner.dart';
 
@@ -877,6 +879,123 @@ void main() {
     expect(sent['amount'], 283.2);
     expect(sent['order_uuids'], [order.uuid]);
     expect(sent['return_uuids'], [taken.uuid]);
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('target and incentive, shelf photos, shop survey and location for the live map', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..withGrowth = true;
+    final camera = FakePhotoService();
+    final photoDir = (await tester.runAsync(() => Directory.systemTemp.createTemp('beatpro_photos')))!;
+    addTearDown(() => tester.runAsync(() => photoDir.delete(recursive: true)));
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(GeoPoint(25.2399, 55.3046))),
+      httpClientProvider.overrideWithValue(odoo.client),
+      photoServiceProvider.overrideWithValue(camera),
+      photoDirProvider.overrideWith((ref) async => photoDir),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+
+    // Paid on salary + incentive: the month's target on Home.
+    expect(find.text('My target · November'), findsOneWidget);
+    expect(find.text('71%'), findsOneWidget);
+    expect(find.textContaining('Your location is shared with your supervisor'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/27-target-home.png'));
+    }
+    await tester.ensureVisible(find.text('My target · November'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('My target · November'));
+    await tester.pumpAndSettle();
+    expect(find.text('From AED 10,000.00'), findsOneWidget);
+    expect(find.text('2% on each part'), findsOneWidget);
+    expect(find.text('132 / 200 cs'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/28-target.png'));
+    }
+    router.pop();
+    await tester.pumpAndSettle();
+
+    // At Patel Kirana: the monthly shelf check is due, with two shelf photos.
+    final visit = await repo.startVisit('srv:9', at: const GeoPoint(25.2399, 55.3046));
+    router.push('/visit/${visit.uuid}');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Shelf photos 0/2'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Shelf photos 0/2'));
+    await tester.pumpAndSettle();
+    expect(find.text('Needed at this shop: 2 of main shelf'), findsOneWidget);
+    for (var i = 0; i < 2; i++) {
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Take photo of main shelf'));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('2 of 2 needed taken'), findsOneWidget);
+    expect(find.text('Done'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/29-shelf-photos.png'));
+    }
+    router.pop();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Monthly shelf check'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save answers'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Answer: Is our display stand in place?'), findsOneWidget, reason: 'required questions');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Yes'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField).first, '6');
+    await tester.tap(find.text('Eye level'));
+    await tester.pump();
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/30-survey.png'));
+    }
+    await tester.tap(find.text('Save answers'));
+    await tester.pumpAndSettle();
+    expect(find.text('Answers saved. They are sent with the visit.'), findsOneWidget);
+
+    // Positions wait on the phone while working; check-in added one, the timer adds more.
+    final tracker = container.read(locationTrackerProvider);
+    expect(await tester.runAsync(tracker.tick), isTrue);
+    expect((await repo.locationQueue()).length, 2);
+
+    // Sync: photos and answers go with the visit, then the positions.
+    await repo.checkOut(visit.uuid, result: VisitResult.noOrder, noOrderReason: 'enough_stock');
+    await tester.runAsync(() => container.read(syncControllerProvider.notifier).run());
+    await tester.pumpAndSettle();
+    final extras = odoo.uploaded['beatpro.visit.extras']!;
+    final photos = [for (final e in extras) ...(e['photos'] as List).cast<Map>()];
+    expect(photos, hasLength(2));
+    expect(photos.first['tag'], 'Main shelf');
+    expect(base64Decode(photos.first['image'] as String).sublist(0, 2), [0xFF, 0xD8]);
+    final answers = [for (final e in extras) ...(e['answers'] as List).cast<Map>()];
+    expect({for (final a in answers) a['question_id']: a['value']}, {41: true, 42: '6', 43: 'Eye level'});
+    expect(odoo.uploaded['beatpro.location'], hasLength(2));
+    expect(await repo.locationQueue(), isEmpty);
+    expect(photoDir.listSync(), isEmpty, reason: 'photos leave the phone once Odoo has them');
 
     await tester.pumpWidget(const SizedBox());
     await db.close();

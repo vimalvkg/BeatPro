@@ -26,6 +26,10 @@ class FakeOdoo {
   /// over its credit limit with an overdue invoice.
   bool withSchemes = false;
 
+  /// The rep is paid on salary + incentive (with a target), shares their location,
+  /// and Patel Kirana has a monthly shelf check due.
+  bool withGrowth = false;
+
   /// The van's stock per product: loaded, sold, returned, left.
   final van = <int, Map<String, double>>{};
   Map<String, dynamic>? openLoad;
@@ -105,6 +109,9 @@ class FakeOdoo {
           'is_rep': true,
           'is_supervisor': false,
           'discount_limit': 5.0,
+          'pay_type': withGrowth ? 'incentive' : 'salary',
+          'track_location': withGrowth,
+          'location_minutes': 5,
           'payment_methods': [
             {'id': 31, 'name': 'Cash', 'journal': 'Field Cash', 'kind': 'cash', 'reference': 'none', 'hand_in': true},
             {'id': 32, 'name': 'Bank transfer', 'journal': 'Bank', 'kind': 'bank', 'reference': 'reference', 'hand_in': false},
@@ -214,6 +221,59 @@ class FakeOdoo {
               'rule': 'Buy 10 Case of 24, get 1 Case of 24 Parle-G free',
             },
         ];
+      case 'beatpro.target.beatpro_my_target':
+        return withGrowth
+            ? {
+                'id': 1, 'month': '2026-11-01', 'month_label': 'November', 'target': 60000.0, 'achieved': 42300.0,
+                'progress': 70.5, 'earned': 1615.0, 'projected': 55100.0, 'projected_earned': 1902.0, 'days_left': 23,
+                'per_day': 769.57, 'plan': 'Van sales · standard', 'method': 'tiered', 'approved': false,
+                'next_step': null,
+                'lines': [
+                  {'from': 'From AED 10,000.00', 'from_amount': 10000.0, 'rate': 5.0, 'bonus': 0.0, 'text': '5% on each part'},
+                  {'from': 'From AED 40,000.00', 'from_amount': 40000.0, 'rate': 2.0, 'bonus': 0.0, 'text': '2% on each part'},
+                ],
+                'product_bonus': 100.0,
+                'products': [
+                  {'product_id': 1, 'name': 'Parle-G Biscuits (Box of 24)', 'qty': 200.0, 'achieved': 132.0, 'unit': 'cs'},
+                ],
+              }
+            : false;
+      case 'beatpro.survey.beatpro_surveys':
+        return {
+          'surveys': [
+            if (withGrowth)
+              {
+                'id': 4,
+                'name': 'Monthly shelf check',
+                'frequency': 'month',
+                'questions': [
+                  {'id': 41, 'name': 'Is our display stand in place?', 'kind': 'yes_no', 'choices': [], 'suffix': '', 'required': true},
+                  {'id': 42, 'name': 'Shelf facings for Parle-G', 'kind': 'number', 'choices': [], 'suffix': 'facings', 'required': true},
+                  {'id': 43, 'name': 'Where is our product placed?', 'kind': 'choice', 'choices': ['Eye level', 'Top shelf'], 'suffix': '', 'required': false},
+                ],
+                'photos': [
+                  {'tag': 'Main shelf', 'count': 2},
+                ],
+              },
+          ],
+          'due': {
+            if (withGrowth) '9': [4],
+          },
+          'photo_tags': ['Main shelf', 'Display stand', 'Competitor', 'Out of stock', 'Price label'],
+        };
+      case 'beatpro.visit.beatpro_submit_extras':
+        for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>()) {
+          _record('beatpro.visit.extras', v);
+        }
+        return [
+          for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
+            for (final p in (v['photos'] as List)) (p as Map)['mobile_uuid'],
+        ];
+      case 'beatpro.location.beatpro_submit_locations':
+        for (final p in (body['points'] as List).cast<Map<String, dynamic>>()) {
+          _record('beatpro.location', p);
+        }
+        return (body['points'] as List).length;
       case 'res.partner.beatpro_credit':
         return {
           for (final id in (body['partner_ids'] as List))

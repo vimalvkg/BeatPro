@@ -3,8 +3,11 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 import 'core/local_db.dart';
+import 'core/location_tracker.dart';
+import 'core/growth.dart';
 import 'core/models.dart';
 import 'core/odoo_client.dart';
 import 'core/printer.dart';
@@ -141,6 +144,35 @@ class SyncController extends Notifier<AsyncValue<SyncReport?>> {
 final syncControllerProvider = NotifierProvider<SyncController, AsyncValue<SyncReport?>>(SyncController.new);
 
 // -- Data the screens show -------------------------------------------------
+
+/// The camera, for shelf photos. Tests use a fake.
+final photoServiceProvider = Provider<PhotoService>((ref) => const CameraPhotoService());
+
+/// Where shelf photos wait on the phone until they sync.
+final photoDirProvider = FutureProvider<Directory>((ref) async =>
+    Directory('${(await getApplicationSupportDirectory()).path}/photos'));
+
+/// The Live Map's position timer; main() starts it, tests don't.
+final locationTrackerProvider = Provider<LocationTracker>((ref) {
+  final tracker = LocationTracker(ref.watch(repositoryProvider), ref.watch(locationProvider));
+  ref.onDispose(tracker.stop);
+  return tracker;
+});
+
+final myTargetProvider = FutureProvider<MyTarget?>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).myTarget();
+});
+
+final surveysForProvider = FutureProvider.family<List<Survey>, String>((ref, customerKey) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).surveysFor(customerKey);
+});
+
+final photosForProvider = FutureProvider.family<List<LocalRecord>, String>((ref, visitUuid) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).photosFor(visitUuid);
+});
 
 final appContextProvider = FutureProvider<AppContext?>((ref) {
   ref.watch(dataVersionProvider);

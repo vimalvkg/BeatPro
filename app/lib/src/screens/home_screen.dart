@@ -9,6 +9,8 @@ import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'growth_screens.dart';
+import 'van_screens.dart' show packTotal;
 
 /// My Day: progress, the next shop and today's route.
 class HomeScreen extends ConsumerWidget {
@@ -44,7 +46,8 @@ class HomeScreen extends ConsumerWidget {
             child: Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('My Day', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                  const Text('My Day',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                   Text(
                     [DateFormat.EEEE().format(DateTime.now()), if (routeNames.isNotEmpty) routeNames].join(' · '),
                     style: const TextStyle(color: BeatproColors.onBrand, fontSize: 13),
@@ -58,51 +61,56 @@ class HomeScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(left: 4, right: 8),
                 decoration: const BoxDecoration(color: BeatproColors.amber, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: Text(initials, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: BeatproColors.ink)),
+                child: Text(initials,
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: BeatproColors.ink)),
               ),
             ]),
           ),
           // Summary card over the band.
           Transform.translate(
             offset: const Offset(0, -50),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: const [BoxShadow(color: Color(0x1A4A0E14), blurRadius: 18, offset: Offset(0, 6))],
-                ),
-                child: Row(children: [
-                  ProgressRing(done: done, total: planned),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Expanded(child: SmallFigure(label: 'Orders', value: money(summary?.orderValue ?? 0))),
-                        Expanded(
-                          child: SmallFigure(
-                            label: 'Collected',
-                            value: money(summary?.totalCollected ?? 0),
-                            color: BeatproColors.success,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [BoxShadow(color: Color(0x1A4A0E14), blurRadius: 18, offset: Offset(0, 6))],
+                  ),
+                  child: Row(children: [
+                    ProgressRing(done: done, total: planned),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Expanded(child: SmallFigure(label: 'Orders', value: money(summary?.orderValue ?? 0))),
+                          Expanded(
+                            child: SmallFigure(
+                              label: 'Collected',
+                              value: money(summary?.totalCollected ?? 0),
+                              color: BeatproColors.success,
+                            ),
                           ),
+                        ]),
+                        const SizedBox(height: 8),
+                        Text(
+                          planned == 0
+                              ? 'Nothing planned for today'
+                              : left == 0
+                                  ? 'Every shop visited. Close the day when you\'re done.'
+                                  : '$left ${left == 1 ? 'shop' : 'shops'} left today',
+                          style: const TextStyle(fontSize: 13, color: BeatproColors.muted),
                         ),
                       ]),
-                      const SizedBox(height: 8),
-                      Text(
-                        planned == 0
-                            ? 'Nothing planned for today'
-                            : left == 0
-                                ? 'Every shop visited. Close the day when you\'re done.'
-                                : '$left ${left == 1 ? 'shop' : 'shops'} left today',
-                        style: const TextStyle(fontSize: 13, color: BeatproColors.muted),
-                      ),
-                    ]),
-                  ),
-                ]),
+                    ),
+                  ]),
+                ),
               ),
-            ),
+              // Reps on salary + incentive: the month's target, under the day's figures.
+              const Padding(padding: EdgeInsets.only(top: 12), child: TargetCard()),
+            ]),
           ),
           Transform.translate(
             offset: const Offset(0, -50),
@@ -177,6 +185,19 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              if (appContext?.trackLocation ?? false)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Row(children: [
+                    Icon(Icons.my_location, size: 16, color: BeatproColors.muted),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                          'Your location is shared with your supervisor from your first visit until you close the day.',
+                          style: TextStyle(fontSize: 12, color: BeatproColors.muted)),
+                    ),
+                  ]),
+                ),
             ]),
           ),
         ]),
@@ -202,7 +223,10 @@ class _VanCard extends ConsumerWidget {
     } else if (stock.loaded == 0 && stock.inVan == 0) {
       status = 'Empty · load the van before you leave';
     } else {
-      status = '${formatQty(stock.inVan)} cases · ${money(stock.value)}';
+      final products = ref.watch(productsByIdProvider).value ?? const {};
+      status = '${packTotal(products, [
+            for (final i in stock.items) (i.productId, i.left > 0 ? i.left : 0)
+          ])} · ${money(stock.value)}';
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
@@ -230,7 +254,8 @@ class _NextCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final money = ref.watch(moneyProvider);
     final customer = view.customer;
-    final due = (ref.watch(invoicesProvider(customer.key)).value ?? const []).fold<double>(0, (s, i) => s + i.amountDue);
+    final due =
+        (ref.watch(invoicesProvider(customer.key)).value ?? const []).fold<double>(0, (s, i) => s + i.amountDue);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -245,10 +270,12 @@ class _NextCard extends ConsumerWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(customer.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-              if (customer.city != null) Text(customer.city!, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
+              if (customer.city != null)
+                Text(customer.city!, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
             ]),
           ),
-          if (due > 0) Pill('${money(due)} due', background: BeatproColors.dangerSoft, foreground: BeatproColors.danger),
+          if (due > 0)
+            Pill('${money(due)} due', background: BeatproColors.dangerSoft, foreground: BeatproColors.danger),
         ]),
         const SizedBox(height: 12),
         Row(children: [
@@ -267,14 +294,18 @@ class _NextCard extends ConsumerWidget {
               icon: Icons.near_me_outlined,
               label: 'Directions',
               onTap: () => launchUrl(
-                Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${customer.latitude},${customer.longitude}'),
+                Uri.parse(
+                    'https://www.google.com/maps/dir/?api=1&destination=${customer.latitude},${customer.longitude}'),
                 mode: LaunchMode.externalApplication,
               ),
             ),
           ],
           if (customer.phone != null) ...[
             const SizedBox(width: 8),
-            _SquareButton(icon: Icons.call_outlined, label: 'Call', onTap: () => launchUrl(Uri(scheme: 'tel', path: customer.phone))),
+            _SquareButton(
+                icon: Icons.call_outlined,
+                label: 'Call',
+                onTap: () => launchUrl(Uri(scheme: 'tel', path: customer.phone))),
           ],
         ]),
       ]),
@@ -338,7 +369,8 @@ class StopCard extends ConsumerWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(customer.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                if (customer.city != null) Text(customer.city!, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
+                if (customer.city != null)
+                  Text(customer.city!, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
               ]),
             ),
             Pill(label, background: bg, foreground: fg),

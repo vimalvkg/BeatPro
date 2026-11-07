@@ -51,6 +51,8 @@ dependencies:
   print_bluetooth_thermal: ^1.2.5
   pdf: ^3.13.1
   permission_handler: ^13.0.2
+  image_picker: ^1.1.2
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
