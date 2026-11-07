@@ -18,3 +18,6 @@ from . import product_product
 from . import beatpro_scheme
 from . import beatpro_dashboard
 from . import account_payment_method_line
+from . import beatpro_incentive
+from . import beatpro_survey
+from . import beatpro_location

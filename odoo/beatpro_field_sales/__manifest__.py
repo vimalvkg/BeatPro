@@ -1,6 +1,6 @@
 {
     'name': 'BeatPro Field Sales',
-    'version': '19.0.1.6.0',
+    'version': '19.0.1.7.0',
     'category': 'Sales/Sales',
     'summary': 'Routes, shop visits and day-end close for field sales reps using the BeatPro mobile app',
     'description': """
@@ -15,6 +15,9 @@ Server side of the BeatPro mobile app for Odoo Community.
 * Schemes: free goods and quantity discounts, applied on the phone and again in Odoo
 * Cases and pieces: sell and count stock in a product's packagings
 * Credit warnings: credit limit and overdue invoices shown before taking an order
+* Targets and incentives for reps paid on salary + incentive, with commission lines
+* Shelf photos and shop surveys taken during visits, also offline
+* Live map of reps and today's routes for supervisors
 * Day-end close: each rep's orders and collections for the day
 * Idempotent sync: every record made on the phone carries a mobile UUID,
   so a retried upload never creates a duplicate
@@ -39,6 +42,7 @@ Server side of the BeatPro mobile app for Odoo Community.
         'views/account_move_views.xml',
         'report/beatpro_invoice_slip.xml',
         'views/beatpro_scheme_views.xml',
+        'views/beatpro_growth_views.xml',
         'views/res_config_settings_views.xml',
         'wizard/beatpro_payment_wizard_views.xml',
         'views/beatpro_van_views.xml',

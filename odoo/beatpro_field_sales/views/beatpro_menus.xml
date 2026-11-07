@@ -28,6 +28,12 @@
               action="action_beatpro_orders_approval" sequence="10"/>
     <menuitem id="menu_beatpro_schemes" name="Schemes" parent="menu_beatpro_supervisor"
               action="action_beatpro_scheme" sequence="15"/>
+    <menuitem id="menu_beatpro_targets_board" name="Targets" parent="menu_beatpro_supervisor"
+              action="action_beatpro_targets_board" sequence="16"/>
+    <menuitem id="menu_beatpro_live_map" name="Live Map" parent="menu_beatpro_supervisor"
+              action="action_beatpro_live_map" sequence="17"/>
+    <menuitem id="menu_beatpro_survey_answers" name="Survey Answers" parent="menu_beatpro_supervisor"
+              action="action_beatpro_survey_answer" sequence="18"/>
     <menuitem id="menu_beatpro_visit_analysis" name="Visit Analysis" parent="menu_beatpro_supervisor"
               action="action_beatpro_visit_analysis" sequence="20"/>
     <menuitem id="menu_beatpro_van_desk" name="Vans" parent="menu_beatpro_supervisor"
@@ -45,6 +51,12 @@
     <menuitem id="menu_beatpro_payment_methods" name="Payment Methods" parent="menu_beatpro_supervisor"
               action="action_beatpro_payment_methods" sequence="80"
               groups="account.group_account_manager"/>
+    <menuitem id="menu_beatpro_monthly_targets" name="Monthly Targets" parent="menu_beatpro_supervisor"
+              action="action_beatpro_target" sequence="82"/>
+    <menuitem id="menu_beatpro_incentive_plans" name="Incentive Plans" parent="menu_beatpro_supervisor"
+              action="action_beatpro_incentive_plan" sequence="84"/>
+    <menuitem id="menu_beatpro_surveys" name="Shop Surveys" parent="menu_beatpro_supervisor"
+              action="action_beatpro_survey" sequence="86"/>
     <menuitem id="menu_beatpro_settings" name="Settings" parent="menu_beatpro_supervisor"
               action="action_beatpro_config_settings" sequence="90"
               groups="base.group_system"/>

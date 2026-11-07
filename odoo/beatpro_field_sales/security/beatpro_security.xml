@@ -162,5 +162,29 @@
             <field name="model_id" ref="model_beatpro_day_close"/>
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
+        <record id="rule_beatpro_visit_photo_rep" model="ir.rule">
+            <field name="name">BeatPro Visit Photo: own visits</field>
+            <field name="model_id" ref="model_beatpro_visit_photo"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_visit_photo_supervisor" model="ir.rule">
+            <field name="name">BeatPro Visit Photo: all visits</field>
+            <field name="model_id" ref="model_beatpro_visit_photo"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
+        <record id="rule_beatpro_survey_answer_rep" model="ir.rule">
+            <field name="name">BeatPro Survey Answer: own visits</field>
+            <field name="model_id" ref="model_beatpro_survey_answer"/>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_rep'))]"/>
+        </record>
+        <record id="rule_beatpro_survey_answer_supervisor" model="ir.rule">
+            <field name="name">BeatPro Survey Answer: all visits</field>
+            <field name="model_id" ref="model_beatpro_survey_answer"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_beatpro_supervisor'))]"/>
+        </record>
     </data>
 </odoo>

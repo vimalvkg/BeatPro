@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Incentive plans -->
+    <record id="view_beatpro_incentive_plan_form" model="ir.ui.view">
+        <field name="name">beatpro.incentive.plan.form</field>
+        <field name="model">beatpro.incentive.plan</field>
+        <field name="arch" type="xml">
+            <form string="Incentive Plan">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Van sales · standard"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="slab_basis" widget="radio"/>
+                            <field name="method" widget="radio"/>
+                            <field name="product_target_bonus"/>
+                            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group string="Try it">
+                            <field name="example_amount"/>
+                            <field name="example_target" invisible="slab_basis != 'target'"/>
+                            <field name="example_text" string="Pays" class="fw-bold"/>
+                        </group>
+                    </group>
+                    <p class="text-muted">
+                        Counted on what the rep invoices in the month, before VAT, less credit notes.
+                        Add a line for each step, for example from 10,000 at 5% and from 40,000 at 2%.
+                    </p>
+                    <field name="line_ids">
+                        <list editable="bottom">
+                            <field name="threshold" string="From (amount or % of target)"/>
+                            <field name="rate"/>
+                            <field name="bonus"/>
+                            <field name="currency_id" column_invisible="1"/>
+                        </list>
+                    </field>
+                    <field name="user_ids" widget="many2many_tags" readonly="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_incentive_plan_list" model="ir.ui.view">
+        <field name="name">beatpro.incentive.plan.list</field>
+        <field name="model">beatpro.incentive.plan</field>
+        <field name="arch" type="xml">
+            <list string="Incentive Plans">
+                <field name="name"/>
+                <field name="slab_basis"/>
+                <field name="method"/>
+                <field name="example_text" string="Example"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_beatpro_incentive_plan" model="ir.actions.act_window">
+        <field name="name">Incentive Plans</field>
+        <field name="res_model">beatpro.incentive.plan</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create an incentive plan</p>
+            <p>Set commission lines by sales amount, for example from AED 10,000 at 5% and from AED 40,000 at 2%.
+                Then pick the plan on each rep paid on salary + incentive.</p>
+        </field>
+    </record>
+
+    <!-- Monthly targets -->
+    <record id="view_beatpro_target_form" model="ir.ui.view">
+        <field name="name">beatpro.target.form</field>
+        <field name="model">beatpro.target</field>
+        <field name="arch" type="xml">
+            <form string="Monthly Target">
+                <header>
+                    <button name="action_approve" type="object" string="Approve Incentive" class="btn-primary"
+                            invisible="state != 'open'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <button name="action_reopen" type="object" string="Reopen"
+                            invisible="state != 'approved'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="user_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="month" readonly="state == 'approved'"/>
+                            <field name="amount" readonly="state == 'approved'"/>
+                            <field name="plan_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="achieved"/>
+                            <field name="progress" widget="progressbar"/>
+                            <field name="earned"/>
+                            <field name="projected_earned"/>
+                            <field name="approved_amount" invisible="state != 'approved'"/>
+                            <field name="approved_by_id" invisible="state != 'approved'"/>
+                        </group>
+                    </group>
+                    <field name="line_ids" readonly="state == 'approved'">
+                        <list editable="bottom">
+                            <field name="product_id" options="{'no_create': True}"/>
+                            <field name="qty"/>
+                            <field name="uom_id" options="{'no_create': True}" groups="uom.group_uom"/>
+                            <field name="achieved_qty"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_target_list" model="ir.ui.view">
+        <field name="name">beatpro.target.list</field>
+        <field name="model">beatpro.target</field>
+        <field name="arch" type="xml">
+            <list string="Monthly Targets" editable="bottom" decoration-success="state == 'approved'">
+                <field name="month"/>
+                <field name="user_id" widget="many2one_avatar_user" options="{'no_create': True}"/>
+                <field name="amount" sum="Total"/>
+                <field name="plan_id" options="{'no_create': True}"/>
+                <field name="achieved"/>
+                <field name="progress" widget="progressbar"/>
+                <field name="earned"/>
+                <field name="state" readonly="1"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_target_search" model="ir.ui.view">
+        <field name="name">beatpro.target.search</field>
+        <field name="model">beatpro.target</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="month"/>
+                <filter name="this_month" string="This Month"
+                        domain="[('month', '=', context_today().strftime('%Y-%m-01'))]"/>
+                <filter name="to_approve" string="To Approve" domain="[('state', '=', 'open')]"/>
+                <group>
+                    <filter name="group_month" string="Month" context="{'group_by': 'month:month'}"/>
+                    <filter name="group_user" string="Rep" context="{'group_by': 'user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_target" model="ir.actions.act_window">
+        <field name="name">Monthly Targets</field>
+        <field name="res_model">beatpro.target</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_this_month': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Set this month's targets</p>
+            <p>One line per rep paid on salary + incentive. Reps on monthly salary only have no target.</p>
+        </field>
+    </record>
+
+    <record id="action_beatpro_targets_board" model="ir.actions.client">
+        <field name="name">Targets</field>
+        <field name="tag">beatpro.targets_board</field>
+    </record>
+
+    <!-- Shop surveys -->
+    <record id="view_beatpro_survey_form" model="ir.ui.view">
+        <field name="name">beatpro.survey.form</field>
+        <field name="model">beatpro.survey</field>
+        <field name="arch" type="xml">
+            <form string="Shop Survey">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_answers" type="object" class="oe_stat_button" icon="fa-check-square-o">
+                            <field name="answer_count" widget="statinfo" string="Answered"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Monthly shelf check"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="frequency" widget="radio"/>
+                            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Who fills it in">
+                            <field name="user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            <field name="route_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Questions" name="questions">
+                            <field name="question_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="kind"/>
+                                    <field name="choices" invisible="kind != 'choice'" placeholder="Eye level, Top shelf, Bottom shelf"/>
+                                    <field name="suffix" invisible="kind not in ('number', 'price')"/>
+                                    <field name="required"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Photos Needed" name="photos">
+                            <field name="photo_ids">
+                                <list editable="bottom">
+                                    <field name="tag"/>
+                                    <field name="count"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_survey_list" model="ir.ui.view">
+        <field name="name">beatpro.survey.list</field>
+        <field name="model">beatpro.survey</field>
+        <field name="arch" type="xml">
+            <list string="Shop Surveys">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="frequency"/>
+                <field name="user_ids" widget="many2many_avatar_user"/>
+                <field name="route_ids" widget="many2many_tags"/>
+                <field name="answer_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_beatpro_survey" model="ir.actions.act_window">
+        <field name="name">Shop Surveys</field>
+        <field name="res_model">beatpro.survey</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a shop survey</p>
+            <p>Questions and shelf photos reps fill in at the shop, also without signal. Give it to reps or to routes.</p>
+        </field>
+    </record>
+
+    <record id="view_beatpro_survey_answer_list" model="ir.ui.view">
+        <field name="name">beatpro.survey.answer.list</field>
+        <field name="model">beatpro.survey.answer</field>
+        <field name="arch" type="xml">
+            <list string="Survey Answers" create="0">
+                <field name="date"/>
+                <field name="partner_id"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="survey_id"/>
+                <field name="question_id"/>
+                <field name="value"/>
+                <field name="value_number" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_survey_answer_pivot" model="ir.ui.view">
+        <field name="name">beatpro.survey.answer.pivot</field>
+        <field name="model">beatpro.survey.answer</field>
+        <field name="arch" type="xml">
+            <pivot string="Survey Answers">
+                <field name="partner_id" type="row"/>
+                <field name="question_id" type="col"/>
+                <field name="value_number" type="measure" string="Average" />
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_beatpro_survey_answer_search" model="ir.ui.view">
+        <field name="name">beatpro.survey.answer.search</field>
+        <field name="model">beatpro.survey.answer</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <field name="survey_id"/>
+                <field name="question_id"/>
+                <filter name="this_month" string="This Month"
+                        domain="[('date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
+                <group>
+                    <filter name="group_question" string="Question" context="{'group_by': 'question_id'}"/>
+                    <filter name="group_shop" string="Shop" context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_survey_answer" model="ir.actions.act_window">
+        <field name="name">Survey Answers</field>
+        <field name="res_model">beatpro.survey.answer</field>
+        <field name="view_mode">list,pivot</field>
+    </record>
+
+    <record id="view_beatpro_visit_photo_kanban" model="ir.ui.view">
+        <field name="name">beatpro.visit.photo.kanban</field>
+        <field name="model">beatpro.visit.photo</field>
+        <field name="arch" type="xml">
+            <kanban create="0">
+                <templates>
+                    <t t-name="card">
+                        <field name="image" widget="image" options="{'size': [180, 220], 'zoom': true}" alt="Shelf photo"/>
+                        <field name="tag" class="fw-bold"/>
+                        <field name="taken_at" class="text-muted small"/>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_beatpro_visit_form_growth" model="ir.ui.view">
+        <field name="name">beatpro.visit.form.growth</field>
+        <field name="model">beatpro.visit</field>
+        <field name="inherit_id" ref="beatpro_field_sales.view_beatpro_visit_form"/>
+        <field name="arch" type="xml">
+            <page name="timing" position="before">
+                <page string="Photos" name="photos" invisible="not photo_ids">
+                    <field name="photo_ids" mode="kanban" readonly="1"/>
+                </page>
+                <page string="Survey" name="survey" invisible="not answer_ids">
+                    <field name="answer_ids" readonly="1">
+                        <list>
+                            <field name="survey_id"/>
+                            <field name="question_id"/>
+                            <field name="value"/>
+                        </list>
+                    </field>
+                </page>
+            </page>
+        </field>
+    </record>
+
+    <!-- Live map -->
+    <record id="action_beatpro_live_map" model="ir.actions.client">
+        <field name="name">Live Map</field>
+        <field name="tag">beatpro.live_map</field>
+    </record>
+
+    <!-- Reps: pay, targets, location, surveys -->
+    <record id="view_users_form_beatpro_growth" model="ir.ui.view">
+        <field name="name">res.users.form.beatpro.growth</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="beatpro_field_sales.view_users_form_beatpro"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='beatpro']/group" position="after">
+                <group>
+                    <group string="Pay">
+                        <field name="beatpro_pay_type" widget="radio"/>
+                        <field name="beatpro_incentive_plan_id" invisible="beatpro_pay_type != 'incentive'"
+                               required="beatpro_pay_type == 'incentive'"/>
+                    </group>
+                    <group string="Field work">
+                        <field name="beatpro_track_location"/>
+                        <field name="beatpro_survey_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                    </group>
+                </group>
+                <field name="beatpro_target_ids" invisible="beatpro_pay_type != 'incentive'" context="{'default_user_id': id}">
+                    <list editable="bottom">
+                        <field name="month"/>
+                        <field name="amount"/>
+                        <field name="achieved"/>
+                        <field name="progress" widget="progressbar"/>
+                        <field name="earned"/>
+                        <field name="state" readonly="1"/>
+                        <field name="currency_id" column_invisible="1"/>
+                    </list>
+                </field>
+                <div class="alert alert-info" role="status" invisible="beatpro_pay_type != 'salary'">
+                    On monthly salary only: no target or incentive in the app, and no incentive payout.
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

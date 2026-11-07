@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.TargetsBoard">
+        <div class="o_action o_beatpro bp-page bp-targets">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap pt-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <h1 class="bp-title mb-0">Targets</h1>
+                    <div class="bp-month" role="group" aria-label="Month">
+                        <button type="button" class="bp-btn bp-quiet" t-on-click="() => this.shift(-1)" aria-label="Previous month">‹</button>
+                        <span class="fw-bold" t-esc="d.month_label"/>
+                        <button type="button" class="bp-btn bp-quiet" t-on-click="() => this.shift(1)" aria-label="Next month">›</button>
+                    </div>
+                    <button type="button" class="bp-btn bp-primary ms-auto" t-on-click="setTargets">Set targets</button>
+                </div>
+                <div class="bp-kpis mt-3">
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Team target</span><span class="bp-kpi-value" t-esc="d.team_target"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Sold so far</span><span class="bp-kpi-value"><t t-esc="d.team_sold"/> <small>· <t t-esc="d.team_progress"/>%</small></span></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Incentive earned</span><span class="bp-kpi-value" t-esc="d.earned"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label"><t t-if="d.past">Payout</t><t t-else="">Expected payout</t></span><span class="bp-kpi-value" t-esc="d.payout"/></div>
+                </div>
+                <div class="bp-card bp-targets-table mt-3" role="table" aria-label="Reps">
+                    <div class="bp-trow bp-thead" role="row">
+                        <span role="columnheader">Rep</span><span role="columnheader">Sold</span><span role="columnheader">Target</span>
+                        <span role="columnheader">Earned</span><span role="columnheader">At this pace</span><span role="columnheader"/>
+                    </div>
+                    <t t-foreach="d.rows" t-as="row" t-key="row.user_id">
+                        <div class="bp-trow" role="row">
+                            <button type="button" class="bp-rep" t-on-click="() => this.open(row)">
+                                <span class="bp-avatar" t-esc="row.initials"/>
+                                <span class="d-flex flex-column text-start"><b t-esc="row.name"/><small class="bp-muted" t-esc="row.pay_label"/></span>
+                            </button>
+                            <span class="fw-bold" t-esc="row.sold_text"/>
+                            <span>
+                                <t t-if="row.target">
+                                    <small class="bp-muted"><t t-esc="Math.round(row.progress)"/>% of <t t-esc="row.target_text"/></small>
+                                    <div class="bp-bar"><div t-att-style="barStyle(row)"/></div>
+                                </t>
+                                <small t-elif="row.pay_type === 'incentive'" class="bp-amber">No target set for this month</small>
+                                <small t-else="" class="bp-muted">No target · monthly salary</small>
+                            </span>
+                            <span class="fw-bold"><t t-if="row.target" t-esc="row.earned_text"/><t t-else="">—</t></span>
+                            <span class="bp-green fw-semibold"><t t-if="row.target and !d.past" t-esc="row.projected_text"/><t t-elif="row.target">—</t><t t-else="">—</t></span>
+                            <span class="text-end">
+                                <t t-if="row.approved"><span class="bp-pill bp-done">Approved <t t-esc="row.approved_text"/></span></t>
+                                <button t-elif="row.target and d.past" type="button" class="bp-btn bp-primary bp-btn-sm"
+                                        t-att-disabled="state.busy === row.user_id" t-on-click="() => this.approve(row)">Approve</button>
+                            </span>
+                        </div>
+                    </t>
+                </div>
+                <p class="bp-muted small mt-2">Sold is what each rep invoiced in the month, before VAT, less credit notes. Once the month is over, approve each rep's incentive; approved amounts are kept on their target for payroll.</p>
+            </div>
+            </div>
+        </div>
+    </t>
+</templates>

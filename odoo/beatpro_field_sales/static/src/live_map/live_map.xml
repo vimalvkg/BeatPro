@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.LiveMap">
+        <div class="o_action o_beatpro bp-page bp-live-map">
+            <div class="o_content">
+            <div class="bp-wrap pt-3">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h1 class="bp-title mb-0">Live Map</h1>
+                    <span class="bp-muted">Today · reps share their location from the first check-in until they close the day</span>
+                </div>
+                <div class="bp-map-layout mt-3">
+                    <div class="bp-card bp-map" t-ref="map" role="application" aria-label="Map of reps and shops"/>
+                    <div class="bp-card bp-card-pad bp-map-side">
+                        <t t-foreach="state.data.reps" t-as="rep" t-key="rep.user_id">
+                            <button type="button" class="bp-map-rep-row" t-att-class="{active: state.focus === rep.user_id}"
+                                    t-att-aria-pressed="state.focus === rep.user_id ? 'true' : 'false'" t-on-click="() => this.focus(rep)">
+                                <span class="bp-avatar bp-avatar-brand" t-esc="rep.initials"/>
+                                <span class="d-flex flex-column text-start">
+                                    <b t-esc="rep.name"/>
+                                    <small class="bp-muted"><t t-if="rep.tracking" t-esc="rep.where"/><t t-else="">Location sharing is off</t></small>
+                                    <small class="fw-bold" t-att-class="rep.stale ? 'bp-amber' : 'bp-green'" t-esc="rep.progress"/>
+                                </span>
+                            </button>
+                        </t>
+                        <p t-if="!state.data.reps.length" class="bp-muted">No reps yet.</p>
+                        <div class="bp-map-legend">
+                            <span><i style="background:#1F6B45"/>Visited</span><span><i style="background:#B26A00"/>Next</span>
+                            <span><i style="background:#A3242B"/>Missed</span><span><i style="background:#9A8A8C"/>Not yet</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+    </t>
+</templates>

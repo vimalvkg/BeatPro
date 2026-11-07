@@ -15,6 +15,21 @@ class ResUsers(models.Model):
         'stock.warehouse', string="Van Warehouse",
         domain="[('beatpro_is_van', '=', True)]",
         help="The rep's vehicle, set up as its own warehouse, for van sales.")
+    beatpro_pay_type = fields.Selection(
+        [('salary', "Monthly salary only"), ('incentive', "Salary + targets and incentive")],
+        string="Paid On", default='salary', required=True,
+        help="Reps on monthly salary only see no target or incentive in the app and get no incentive payout.")
+    beatpro_incentive_plan_id = fields.Many2one(
+        'beatpro.incentive.plan', string="Incentive Plan",
+        help="How this rep's incentive is worked out from what they invoice in the month.")
+    beatpro_target_ids = fields.One2many('beatpro.target', 'user_id', string="Monthly Targets")
+    beatpro_track_location = fields.Boolean(
+        string="Share Location While Working", default=True,
+        help="The app sends the rep's position every 5 minutes, from the first check-in of the day "
+             "until the day is closed, for the supervisor's Live Map.")
+    beatpro_survey_ids = fields.Many2many(
+        'beatpro.survey', 'beatpro_survey_user_rel', 'user_id', 'survey_id', string="Shop Surveys",
+        help="Surveys this rep fills in at the shops they visit.")
     beatpro_self_load = fields.Boolean(
         string="Loads Own Van",
         help="The rep loads the van without a storekeeper, for example at a small depot. "
@@ -24,7 +39,7 @@ class ResUsers(models.Model):
     def SELF_READABLE_FIELDS(self):
         return super().SELF_READABLE_FIELDS + [
             'beatpro_discount_limit', 'beatpro_route_ids', 'beatpro_van_warehouse_id',
-            'beatpro_self_load',
+            'beatpro_self_load', 'beatpro_pay_type', 'beatpro_incentive_plan_id', 'beatpro_track_location',
         ]
 
     @api.model
@@ -64,6 +79,9 @@ class ResUsers(models.Model):
                                for key, label in RETURN_REASONS],
             'warehouse_id': (user.beatpro_van_warehouse_id or self.env['stock.warehouse'].search(
                 [('company_id', '=', company.id)], limit=1)).id,
+            'pay_type': user.beatpro_pay_type,
+            'track_location': user.beatpro_track_location,
+            'location_minutes': 5,
             'server_time': fields.Datetime.to_string(fields.Datetime.now()),
         }
 

@@ -24,3 +24,20 @@ access_beatpro_scheme_rep,beatpro.scheme rep,model_beatpro_scheme,group_beatpro_
 access_beatpro_scheme_supervisor,beatpro.scheme supervisor,model_beatpro_scheme,group_beatpro_supervisor,1,1,1,1
 access_beatpro_scheme_salesman,beatpro.scheme salesman,model_beatpro_scheme,sales_team.group_sale_salesman,1,0,0,0
 access_beatpro_scheme_sale_manager,beatpro.scheme sales manager,model_beatpro_scheme,sales_team.group_sale_manager,1,1,1,1
+access_beatpro_incentive_plan_rep,beatpro.incentive.plan rep,model_beatpro_incentive_plan,group_beatpro_rep,1,0,0,0
+access_beatpro_incentive_plan_supervisor,beatpro.incentive.plan supervisor,model_beatpro_incentive_plan,group_beatpro_supervisor,1,1,1,1
+access_beatpro_incentive_plan_line_rep,beatpro.incentive.plan.line rep,model_beatpro_incentive_plan_line,group_beatpro_rep,1,0,0,0
+access_beatpro_incentive_plan_line_supervisor,beatpro.incentive.plan.line supervisor,model_beatpro_incentive_plan_line,group_beatpro_supervisor,1,1,1,1
+access_beatpro_target_supervisor,beatpro.target supervisor,model_beatpro_target,group_beatpro_supervisor,1,1,1,1
+access_beatpro_target_line_supervisor,beatpro.target.line supervisor,model_beatpro_target_line,group_beatpro_supervisor,1,1,1,1
+access_beatpro_survey_rep,beatpro.survey rep,model_beatpro_survey,group_beatpro_rep,1,0,0,0
+access_beatpro_survey_supervisor,beatpro.survey supervisor,model_beatpro_survey,group_beatpro_supervisor,1,1,1,1
+access_beatpro_survey_question_rep,beatpro.survey.question rep,model_beatpro_survey_question,group_beatpro_rep,1,0,0,0
+access_beatpro_survey_question_supervisor,beatpro.survey.question supervisor,model_beatpro_survey_question,group_beatpro_supervisor,1,1,1,1
+access_beatpro_survey_photo_rep,beatpro.survey.photo rep,model_beatpro_survey_photo,group_beatpro_rep,1,0,0,0
+access_beatpro_survey_photo_supervisor,beatpro.survey.photo supervisor,model_beatpro_survey_photo,group_beatpro_supervisor,1,1,1,1
+access_beatpro_visit_photo_rep,beatpro.visit.photo rep,model_beatpro_visit_photo,group_beatpro_rep,1,0,0,0
+access_beatpro_visit_photo_supervisor,beatpro.visit.photo supervisor,model_beatpro_visit_photo,group_beatpro_supervisor,1,1,1,1
+access_beatpro_survey_answer_rep,beatpro.survey.answer rep,model_beatpro_survey_answer,group_beatpro_rep,1,0,0,0
+access_beatpro_survey_answer_supervisor,beatpro.survey.answer supervisor,model_beatpro_survey_answer,group_beatpro_supervisor,1,1,1,1
+access_beatpro_location_supervisor,beatpro.location supervisor,model_beatpro_location,group_beatpro_supervisor,1,0,0,1
