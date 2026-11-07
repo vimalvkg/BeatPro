@@ -217,11 +217,11 @@ class SyncService {
         await db.saveRecord(current.copyWith(state: SyncState.failed, error: e.message));
       }
     }
-    await _uploadLocations();
+    await uploadLocations();
   }
 
   /// Positions for the supervisor's Live Map, in batches.
-  Future<void> _uploadLocations() async {
+  Future<void> uploadLocations() async {
     final repo = Repository(db);
     final queue = await repo.locationQueue();
     for (var i = 0; i < queue.length; i += 200) {

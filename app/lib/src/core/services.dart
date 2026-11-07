@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
@@ -54,6 +56,10 @@ class MemoryCredentialStore implements CredentialStore {
 abstract class LocationService {
   /// The current position, or null when location is off or refused.
   Future<GeoPoint?> current();
+
+  /// Positions about every [interval], also while the app is in the background,
+  /// for the supervisor's Live Map. Empty when location is off or refused.
+  Stream<GeoPoint> watch(Duration interval);
 }
 
 class GpsLocationService implements LocationService {
@@ -78,6 +84,43 @@ class GpsLocationService implements LocationService {
       return null;
     }
   }
+
+  @override
+  Stream<GeoPoint> watch(Duration interval) async* {
+    if (!await Geolocator.isLocationServiceEnabled()) return;
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+    final LocationSettings settings;
+    if (!kIsWeb && Platform.isAndroid) {
+      // A foreground service with a notification keeps positions coming when the app is closed.
+      settings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        intervalDuration: interval,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'BeatPro is sharing your location',
+          notificationText: 'Until you close the day. Your supervisor sees it on the Live Map.',
+          notificationChannelName: 'Location while working',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    } else if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) {
+      settings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 50,
+        activityType: ActivityType.automotiveNavigation,
+        pauseLocationUpdatesAutomatically: true,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    } else {
+      settings = const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 50);
+    }
+    yield* Geolocator.getPositionStream(locationSettings: settings)
+        .map((p) => GeoPoint(p.latitude, p.longitude))
+        .handleError((Object _) {});
+  }
 }
 
 class FixedLocationService implements LocationService {
@@ -87,6 +130,9 @@ class FixedLocationService implements LocationService {
 
   @override
   Future<GeoPoint?> current() async => point;
+
+  @override
+  Stream<GeoPoint> watch(Duration interval) => const Stream.empty();
 }
 
 /// Formats amounts in the company currency: "AED 1,200.00" for dirhams.

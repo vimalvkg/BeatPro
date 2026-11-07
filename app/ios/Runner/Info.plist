@@ -5,7 +5,13 @@
 	<key>NSCameraUsageDescription</key>
 	<string>BeatPro uses the camera to scan product barcodes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>BeatPro records where each shop visit takes place and pins new shops on the map.</string>
+	<string>BeatPro records where each shop visit takes place, pins new shops on the map, and shows your supervisor where you are while you work, until you close the day.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>BeatPro shows your supervisor where you are while you work, until you close the day, also when the app is in the background.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

@@ -154,7 +154,11 @@ final photoDirProvider = FutureProvider<Directory>((ref) async =>
 
 /// The Live Map's position timer; main() starts it, tests don't.
 final locationTrackerProvider = Provider<LocationTracker>((ref) {
-  final tracker = LocationTracker(ref.watch(repositoryProvider), ref.watch(locationProvider));
+  final tracker = LocationTracker(
+    ref.watch(repositoryProvider),
+    ref.watch(locationProvider),
+    upload: () async => ref.read(syncServiceProvider)?.uploadLocations(),
+  );
   ref.onDispose(tracker.stop);
   return tracker;
 });
