@@ -1,4 +1,4 @@
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onMounted, onWillStart, onWillUnmount, useState } from "@odoo/owl";
 import { browser } from "@web/core/browser/browser";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { WebClient } from "@web/webclient/webclient";
@@ -26,6 +26,31 @@ export class BeatproSidebar extends Component {
             this.state.data = await this.orm.call("beatpro.theme", "beatpro_sidebar", []);
         });
         useBus(this.env.bus, "ACTION_MANAGER:UI-UPDATED", () => this.syncActive());
+
+        // Odoo's top bar fits its menu to its width only when the window is resized.
+        // The side menu changes that width too (opening, closing, first load), and the
+        // font can arrive late: tell the top bar to measure again, so the menu moves
+        // into "More" instead of running under the icons on the right.
+        onMounted(() => {
+            const navbar = document.querySelector(".o_main_navbar");
+            if (navbar && window.ResizeObserver) {
+                let width = navbar.offsetWidth;
+                this.observer = new ResizeObserver(() => {
+                    if (navbar.offsetWidth !== width) {
+                        width = navbar.offsetWidth;
+                        this.remeasureNavbar();
+                    }
+                });
+                this.observer.observe(navbar);
+            }
+            document.fonts?.ready.then(() => this.remeasureNavbar());
+            this.remeasureNavbar();
+        });
+        onWillUnmount(() => this.observer?.disconnect());
+    }
+
+    remeasureNavbar() {
+        browser.dispatchEvent(new Event("resize"));
     }
 
     syncActive() {
