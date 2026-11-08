@@ -13,6 +13,7 @@ import 'screens/invoice_screen.dart';
 import 'screens/more_screen.dart';
 import 'screens/order_screen.dart';
 import 'screens/orders_screen.dart';
+import 'screens/expense_screens.dart';
 import 'screens/growth_screens.dart';
 import 'screens/payment_screen.dart';
 import 'screens/printer_screen.dart';
@@ -75,6 +76,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/target', builder: (_, _) => const TargetScreen()),
+      GoRoute(path: '/expense/new', builder: (_, _) => const AddExpenseScreen()),
+      GoRoute(path: '/expenses', builder: (_, _) => const MyExpensesScreen()),
       GoRoute(
         path: '/order/new',
         builder: (_, state) => OrderScreen(

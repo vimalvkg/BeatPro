@@ -375,4 +375,40 @@ void main() {
     await dir.delete(recursive: true);
     await db.close();
   }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
+
+  // Needs a rep whose day isn't closed yet, with a shop on today's route.
+  test('an expense paid from cash comes off the hand over in Odoo', () async {
+    final client = OdooClient(await credentials());
+    sqfliteFfiInit();
+    final db = await LocalDb.open(factory: databaseFactoryFfi, path: inMemoryDatabasePath);
+    final repo = Repository(db);
+    final sync = SyncService(db, client);
+    await sync.download();
+    final context = (await repo.appContext())!;
+    final fuel = context.expenseCategories.firstWhere((c) => c.$2 == 'Fuel');
+    final stop = (await repo.todayPlan()).first;
+    await repo.collectPayment(
+      customerKey: stop.customer.key,
+      amount: 300,
+      method: context.paymentMethods.firstWhere((m) => m.kind == 'cash'),
+    );
+    final expense = await repo.addExpense(categoryId: fuel.$1, categoryName: fuel.$2, amount: 50, paidFrom: 'cash', note: 'Live test');
+    final close = await repo.closeDay(distanceKm: 10);
+    final report = await sync.sync();
+    expect(report.failed, 0, reason: (await db.records(state: SyncState.failed)).map((r) => r.error).join('; '));
+    final serverExpense = (await client.searchRead('beatpro.expense', domain: [
+      ['mobile_uuid', '=', expense.uuid],
+    ], fields: ['state', 'amount', 'paid_from'])).single;
+    expect(serverExpense['state'], 'waiting');
+    final serverClose = (await client.searchRead('beatpro.day.close', domain: [
+      ['id', '=', (await db.record(close.uuid))!.serverId],
+    ], fields: ['state', 'cash_amount', 'cash_expense_amount', 'cash_to_hand_in', 'handover_state'])).single;
+    expect(serverClose['state'], 'closed');
+    expect(serverClose['handover_state'], 'waiting');
+    expect((serverClose['cash_expense_amount'] as num).toDouble(), greaterThanOrEqualTo(50));
+    expect((serverClose['cash_to_hand_in'] as num).toDouble(),
+        closeTo((serverClose['cash_amount'] as num).toDouble() - (serverClose['cash_expense_amount'] as num).toDouble(), 0.01));
+    expect((await repo.myExpenses()).any((e) => e['mobile_uuid'] == expense.uuid), isTrue);
+    await db.close();
+  }, skip: url == null ? 'Set BEATPRO_ODOO_URL to run against a live Odoo server' : false);
 }

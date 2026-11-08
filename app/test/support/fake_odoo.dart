@@ -30,6 +30,9 @@ class FakeOdoo {
   /// and Patel Kirana has a monthly shelf check due.
   bool withGrowth = false;
 
+  /// Expenses the rep sent, with their approval.
+  final expenses = <Map<String, dynamic>>[];
+
   /// The van's stock per product: loaded, sold, returned, left.
   final van = <int, Map<String, double>>{};
   Map<String, dynamic>? openLoad;
@@ -109,6 +112,11 @@ class FakeOdoo {
           'is_rep': true,
           'is_supervisor': false,
           'discount_limit': 5.0,
+          'expense_categories': [
+            {'id': 1, 'name': 'Fuel'},
+            {'id': 2, 'name': 'Parking'},
+            {'id': 3, 'name': 'Salik toll'},
+          ],
           'pay_type': withGrowth ? 'incentive' : 'salary',
           'track_location': withGrowth,
           'location_minutes': 5,
@@ -269,6 +277,21 @@ class FakeOdoo {
           for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
             for (final p in (v['photos'] as List)) (p as Map)['mobile_uuid'],
         ];
+      case 'beatpro.expense.beatpro_submit_expenses':
+        return {
+          for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
+            v['mobile_uuid']: () {
+              _record('beatpro.expense', v);
+              expenses.add({
+                'id': _nextId, 'mobile_uuid': v['mobile_uuid'], 'date': v['date'], 'category': 'Fuel',
+                'category_id': v['category_id'], 'amount': v['amount'], 'paid_from': v['paid_from'],
+                'note': v['note'], 'state': 'waiting', 'reject_reason': false,
+              });
+              return {'id': _nextId++, 'state': 'waiting'};
+            }(),
+        };
+      case 'beatpro.expense.beatpro_my_expenses':
+        return expenses;
       case 'beatpro.location.beatpro_submit_locations':
         for (final p in (body['points'] as List).cast<Map<String, dynamic>>()) {
           _record('beatpro.location', p);

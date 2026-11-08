@@ -205,7 +205,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'Distance travelled'), '23');
     await screen('day-close');
-    await tester.tap(find.text('Close day and send to supervisor'));
+    await tester.tap(find.text('Close day and hand over'));
     await tester.pumpAndSettle();
     expect(find.text('Today is closed'), findsOneWidget);
     expect(odoo.uploaded['beatpro.day.close']!.single['distance_km'], 23.0);
@@ -996,6 +996,102 @@ void main() {
     expect(odoo.uploaded['beatpro.location'], hasLength(2));
     expect(await repo.locationQueue(), isEmpty);
     expect(photoDir.listSync(), isEmpty, reason: 'photos leave the phone once Odoo has them');
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
+  testWidgets('expenses come off the cash handed in at day end', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo();
+    final camera = FakePhotoService();
+    final photoDir = (await tester.runAsync(() => Directory.systemTemp.createTemp('beatpro_receipts')))!;
+    addTearDown(() => tester.runAsync(() => photoDir.delete(recursive: true)));
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+      photoServiceProvider.overrideWithValue(camera),
+      photoDirProvider.overrideWith((ref) async => photoDir),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+
+    // AED 500 collected in cash at a shop.
+    odoo.offline = true;
+    await repo.collectPayment(
+      customerKey: 'srv:8',
+      amount: 500,
+      method: (await repo.appContext())!.paymentMethods.firstWhere((m) => m.kind == 'cash'),
+    );
+
+    // Fuel paid from that cash, with a receipt photo.
+    router.push('/expense/new');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fuel'));
+    await tester.enterText(find.widgetWithText(TextField, 'Amount'), '120');
+    await tester.enterText(find.widgetWithText(TextField, 'Where (optional)'), 'ENOC Al Quoz');
+    await tester.tap(find.text('Receipt photo (optional)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Receipt photo taken · retake'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/31-expense.png'));
+    }
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Save expense'));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pumpAndSettle();
+    // Parking paid with own money: not taken off the cash.
+    await repo.addExpense(categoryId: 2, categoryName: 'Parking', amount: 8, paidFrom: 'own');
+
+    router.push('/day-close');
+    await tester.pumpAndSettle();
+    expect(find.text('Hand in to the cashier'), findsOneWidget);
+    expect(find.text('after AED 120.00 expenses'), findsOneWidget);
+    expect(find.text('AED 380.00'), findsWidgets, reason: '500 collected less 120 fuel');
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/32-day-close-hand-over.png'));
+    }
+    router.pop();
+    await tester.pumpAndSettle();
+
+    // Online again: the expenses reach Odoo, with the receipt.
+    odoo.offline = false;
+    await tester.runAsync(() => container.read(syncControllerProvider.notifier).run());
+    await tester.pumpAndSettle();
+    final sent = odoo.uploaded['beatpro.expense']!;
+    expect(sent, hasLength(2));
+    final fuel = sent.firstWhere((e) => e['paid_from'] == 'cash');
+    expect(fuel['amount'], 120.0);
+    expect(fuel['note'], 'ENOC Al Quoz');
+    expect(base64Decode(fuel['receipt'] as String).sublist(0, 2), [0xFF, 0xD8]);
+    expect(sent.firstWhere((e) => e['paid_from'] == 'own').containsKey('receipt'), isFalse, reason: 'the receipt is optional');
+    expect(photoDir.listSync(), isEmpty, reason: 'the receipt leaves the phone once Odoo has it');
+
+    router.push('/expenses');
+    await tester.pumpAndSettle();
+    expect(find.text('Waiting'), findsWidgets);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/33-my-expenses.png'));
+    }
 
     await tester.pumpWidget(const SizedBox());
     await db.close();

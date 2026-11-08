@@ -18,6 +18,7 @@ String _kindLabel(LocalRecord r) => switch (r.kind) {
       RecordKind.vanTransfer => r.data['kind'] == 'unload' ? 'Van unload' : 'Van load',
       RecordKind.photo => 'Shelf photo',
       RecordKind.surveyAnswer => 'Survey answers',
+      RecordKind.expense => 'Expense',
     };
 
 class SyncScreen extends ConsumerWidget {

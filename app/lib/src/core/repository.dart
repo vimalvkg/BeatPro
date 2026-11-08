@@ -391,6 +391,77 @@ class Repository {
     await db.setValue('location_queue', jsonEncode(left));
   }
 
+  // -- Expenses ------------------------------------------------------------------
+
+  /// Records an expense the rep paid: from the cash collected today, their own
+  /// money, or the company card. The receipt photo is optional.
+  Future<LocalRecord> addExpense({
+    required int categoryId,
+    required String categoryName,
+    required double amount,
+    required String paidFrom,
+    String? note,
+    Uint8List? receipt,
+    Directory? dir,
+  }) async {
+    if (amount <= 0) throw ArgumentError('Enter the amount.');
+    final uuid = _uuid.v4();
+    String? path;
+    if (receipt != null && dir != null) {
+      await dir.create(recursive: true);
+      path = '${dir.path}/$uuid.jpg';
+      await File(path).writeAsBytes(receipt, flush: true);
+    }
+    final record = LocalRecord(
+      uuid: uuid,
+      kind: RecordKind.expense,
+      createdAt: now,
+      data: {
+        'categoryId': categoryId,
+        'category': categoryName,
+        'amount': amount,
+        'paidFrom': paidFrom,
+        'note': note,
+        'receiptPath': path,
+        'date': todayIso,
+        'state': 'waiting',
+      },
+    );
+    await db.saveRecord(record);
+    return record;
+  }
+
+  /// The rep's expenses: from Odoo with their approval, and the ones on the phone.
+  Future<List<Map<String, dynamic>>> myExpenses() async {
+    final raw = await db.getValue('my_expenses');
+    final server = raw == null ? <Map<String, dynamic>>[] : (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
+    final known = {for (final e in server) e['mobile_uuid']};
+    final local = [
+      for (final r in (await db.records(kind: RecordKind.expense)).reversed)
+        if (!known.contains(r.uuid))
+          {
+            'mobile_uuid': r.uuid,
+            'date': r.data['date'],
+            'category': r.data['category'],
+            'amount': r.data['amount'],
+            'paid_from': r.data['paidFrom'],
+            'note': r.data['note'],
+            'state': 'waiting',
+            'on_phone': r.state != SyncState.synced,
+          },
+    ];
+    return [...local, ...server];
+  }
+
+  /// Today's expenses, from Odoo or the phone, not rejected.
+  Future<List<Map<String, dynamic>>> todayExpenses() async =>
+      (await myExpenses()).where((e) => e['date'] == todayIso && e['state'] != 'rejected').toList();
+
+  /// Cash collected today the rep spent on expenses: taken off what they hand in.
+  Future<double> cashSpentToday() async => (await todayExpenses())
+      .where((e) => e['paid_from'] == 'cash')
+      .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
+
   // -- Orders ---------------------------------------------------------------
 
   /// The customer's prices, with quantity prices (slabs) from their price list.

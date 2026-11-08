@@ -163,6 +163,16 @@ final locationTrackerProvider = Provider<LocationTracker>((ref) {
   return tracker;
 });
 
+final myExpensesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).myExpenses();
+});
+
+final cashSpentTodayProvider = FutureProvider<double>((ref) {
+  ref.watch(dataVersionProvider);
+  return ref.watch(repositoryProvider).cashSpentToday();
+});
+
 final myTargetProvider = FutureProvider<MyTarget?>((ref) {
   ref.watch(dataVersionProvider);
   return ref.watch(repositoryProvider).myTarget();

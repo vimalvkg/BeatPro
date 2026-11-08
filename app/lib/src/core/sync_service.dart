@@ -137,6 +137,8 @@ class SyncService {
     // The rep's target (reps on salary + incentive only) and shop surveys.
     final myTarget = app.onIncentive ? await _optional(() => client.call('beatpro.target', 'beatpro_my_target')) : null;
     final surveys = await _optional(() => client.call('beatpro.survey', 'beatpro_surveys'));
+    final expenses = await _optional(() => client.call('beatpro.expense', 'beatpro_my_expenses'));
+    await db.setValue('my_expenses', expenses is List ? jsonEncode(expenses) : null);
     await db.setValue('my_target', myTarget is Map ? jsonEncode(myTarget) : null);
     await db.setValue('surveys', surveys is Map ? jsonEncode(surveys) : null);
     await db.setValue('price_breaks', breaks == null ? null : jsonEncode(breaks));
@@ -406,6 +408,25 @@ class SyncService {
           await file.delete();
         }
         await _markSynced(r, visitId);
+        return true;
+
+      case RecordKind.expense:
+        final receipt = r.data['receiptPath'] == null ? null : File(r.data['receiptPath'] as String);
+        final result = await client.call('beatpro.expense', 'beatpro_submit_expenses', kwargs: {
+          'vals_list': [
+            {
+              'mobile_uuid': r.uuid,
+              'category_id': r.data['categoryId'],
+              'amount': r.data['amount'],
+              'paid_from': r.data['paidFrom'],
+              'note': r.data['note'] ?? false,
+              'date': r.data['date'],
+              if (receipt != null && await receipt.exists()) 'receipt': base64Encode(await receipt.readAsBytes()),
+            },
+          ],
+        }) as Map<String, dynamic>;
+        if (receipt != null && await receipt.exists()) await receipt.delete();
+        await _markSynced(r, (result[r.uuid] as Map)['id'] as int);
         return true;
 
       case RecordKind.surveyAnswer:

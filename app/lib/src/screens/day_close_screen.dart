@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/models.dart';
 import '../core/repository.dart';
@@ -9,6 +10,7 @@ import '../core/services.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'expense_screens.dart';
 
 class DayCloseScreen extends ConsumerStatefulWidget {
   const DayCloseScreen({super.key});
@@ -50,6 +52,10 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
   Widget build(BuildContext context) {
     final money = ref.watch(moneyProvider);
     final summary = ref.watch(daySummaryProvider);
+    final spent = ref.watch(cashSpentTodayProvider).value ?? 0;
+    final expenses = (ref.watch(myExpensesProvider).value ?? const <Map<String, dynamic>>[])
+        .where((e) => e['date'] == repoToday(ref) && e['state'] != 'rejected')
+        .toList();
     final closed = ref.watch(todayCloseProvider).value;
     final appContext = ref.watch(appContextProvider).value;
     final repo = ref.watch(repositoryProvider);
@@ -70,7 +76,9 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
       body: AsyncBody<DaySummary>(
         value: summary,
         builder: (s) {
-          final cash = s.collected['cash'] ?? 0;
+          final collectedCash = s.collected['cash'] ?? 0;
+          // Expenses paid from the cash collected come off what the rep hands in.
+          final cash = collectedCash - spent;
           final cheque = s.collected['cheque'] ?? 0;
           final bank = s.collected['bank'] ?? 0;
           return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 140), children: [
@@ -91,14 +99,16 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(gradient: BeatproColors.bandGradient, borderRadius: BorderRadius.circular(18)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Hand in to the office', style: TextStyle(color: BeatproColors.onBrand, fontSize: 13, fontWeight: FontWeight.w700)),
+                const Text('Hand in to the cashier', style: TextStyle(color: BeatproColors.onBrand, fontSize: 13, fontWeight: FontWeight.w700)),
                 Text(money(cash + cheque),
                     style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800, height: 1.15)),
                 const SizedBox(height: 12),
                 const Divider(color: Color(0x29FFFFFF), height: 1),
                 const SizedBox(height: 12),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: _HandInPart(label: 'Cash', amount: money(cash))),
+                  Expanded(
+                    child: _HandInPart(label: 'Cash', amount: money(cash), note: spent > 0 ? 'after ${money(spent)} expenses' : null),
+                  ),
                   Expanded(child: _HandInPart(label: 'Cheque', amount: money(cheque), note: '$cheques ${cheques == 1 ? 'cheque' : 'cheques'}')),
                   Expanded(child: _HandInPart(label: 'Bank and card', amount: money(bank), note: 'already in bank')),
                 ]),
@@ -112,6 +122,29 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
               const SizedBox(width: 10),
               Expanded(child: _StatTile(label: 'Value', value: money(s.orderValue))),
             ]),
+            const Eyebrow('Expenses today', padding: EdgeInsets.fromLTRB(0, 18, 0, 8)),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(children: [
+                for (final e in expenses) ...[
+                  ListTile(
+                    dense: true,
+                    title: Text(e['category'] as String? ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text(paidFromLabel(e['paid_from'] as String?)),
+                    trailing: Text(money((e['amount'] as num).toDouble()), style: const TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                  const Divider(height: 1, color: BeatproColors.lineSoft),
+                ],
+                if (closed == null)
+                  ListTile(
+                    leading: const Icon(Icons.add, color: BeatproColors.brand),
+                    title: const Text('Add expense', style: TextStyle(color: BeatproColors.brand, fontWeight: FontWeight.w800)),
+                    onTap: () => context.push('/expense/new'),
+                  ),
+                if (expenses.isEmpty && closed != null)
+                  const ListTile(dense: true, title: Text('No expenses today')),
+              ]),
+            ),
             if (visits.isNotEmpty) ...[
               const SizedBox(height: 12),
               Card(
@@ -148,10 +181,10 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
                     FilledButton(
                       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                       onPressed: _saving ? null : _close,
-                      child: const Text('Close day and send to supervisor'),
+                      child: const Text('Close day and hand over'),
                     ),
                     const SizedBox(height: 6),
-                    const Text("After closing, only your supervisor can change today's figures.",
+                    const Text("The cashier counts it in Odoo. Any difference goes to your supervisor.",
                         textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: BeatproColors.muted)),
                   ]),
                 ),
@@ -169,11 +202,19 @@ class _HandInPart extends StatelessWidget {
   final String? note;
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 12, fontWeight: FontWeight.w700)),
-        Text(amount, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
-        if (note != null) Text(note!, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 12)),
-      ]);
+  Widget build(BuildContext context) => Padding(
+        // A gap between the three columns, so long amounts and notes don't touch.
+        padding: const EdgeInsets.only(right: 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 12, fontWeight: FontWeight.w700)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(amount, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+          if (note != null) Text(note!, style: const TextStyle(color: BeatproColors.onBrand, fontSize: 12)),
+        ]),
+      );
 }
 
 class _StatTile extends StatelessWidget {
@@ -226,3 +267,5 @@ class _VisitRecap extends ConsumerWidget {
     );
   }
 }
+
+String repoToday(WidgetRef ref) => ref.read(repositoryProvider).todayIso;
