@@ -21,3 +21,5 @@ from . import account_payment_method_line
 from . import beatpro_incentive
 from . import beatpro_survey
 from . import beatpro_location
+from . import beatpro_expense
+from . import beatpro_handover

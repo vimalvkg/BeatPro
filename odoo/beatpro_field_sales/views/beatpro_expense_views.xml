@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_beatpro_expense_list" model="ir.ui.view">
+        <field name="name">beatpro.expense.list</field>
+        <field name="model">beatpro.expense</field>
+        <field name="arch" type="xml">
+            <list string="Expenses" create="0" decoration-muted="state == 'rejected'" decoration-success="state == 'approved'">
+                <field name="receipt" widget="image" options="{'size': [44, 56], 'zoom': true}" string="Receipt"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="category_id"/>
+                <field name="note"/>
+                <field name="date"/>
+                <field name="paid_from"/>
+                <field name="amount" sum="Total"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge" decoration-warning="state == 'waiting'" decoration-success="state == 'approved'"
+                       decoration-danger="state == 'rejected'"/>
+                <button name="action_reject" type="object" string="Reject" invisible="state != 'waiting'"
+                        groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                <button name="action_approve" type="object" string="Approve" class="btn-primary" invisible="state != 'waiting'"
+                        groups="beatpro_field_sales.group_beatpro_supervisor"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_beatpro_expense_form" model="ir.ui.view">
+        <field name="name">beatpro.expense.form</field>
+        <field name="model">beatpro.expense</field>
+        <field name="arch" type="xml">
+            <form string="Expense">
+                <header>
+                    <button name="action_approve" type="object" string="Approve" class="btn-primary" invisible="state != 'waiting'"
+                            groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <button name="action_reject" type="object" string="Reject" invisible="state != 'waiting'"
+                            groups="beatpro_field_sales.group_beatpro_supervisor"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <field name="receipt" widget="image" class="oe_avatar" options="{'zoom': true, 'size': [160, 200]}"/>
+                    <div class="oe_title"><h1><field name="category_id" readonly="state != 'waiting'" options="{'no_create': True}"/></h1></div>
+                    <group>
+                        <group>
+                            <field name="user_id" readonly="state != 'waiting'" options="{'no_create': True}"/>
+                            <field name="date" readonly="state != 'waiting'"/>
+                            <field name="note" readonly="state != 'waiting'"/>
+                        </group>
+                        <group>
+                            <field name="amount" readonly="state != 'waiting'"/>
+                            <field name="paid_from" widget="radio" readonly="state != 'waiting'"/>
+                            <field name="reject_reason" invisible="state != 'rejected'"/>
+                            <field name="move_id" invisible="not move_id"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_beatpro_expense_search" model="ir.ui.view">
+        <field name="name">beatpro.expense.search</field>
+        <field name="model">beatpro.expense</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="user_id"/>
+                <field name="category_id"/>
+                <filter name="waiting" string="Waiting for Approval" domain="[('state', '=', 'waiting')]"/>
+                <filter name="own_money" string="To Pay Back" domain="[('paid_from', '=', 'own'), ('state', '=', 'approved')]"/>
+                <separator/>
+                <filter name="no_receipt" string="No Receipt" domain="[('receipt', '=', False)]"/>
+                <group>
+                    <filter name="group_user" string="Rep" context="{'group_by': 'user_id'}"/>
+                    <filter name="group_category" string="Expense" context="{'group_by': 'category_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_beatpro_expense" model="ir.actions.act_window">
+        <field name="name">Expenses</field>
+        <field name="res_model">beatpro.expense</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_waiting': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No expenses waiting</p>
+            <p>Reps add fuel, parking, Salik and other expenses in the app, with a receipt photo if they have one.</p>
+        </field>
+    </record>
+
+    <record id="view_beatpro_expense_category_list" model="ir.ui.view">
+        <field name="name">beatpro.expense.category.list</field>
+        <field name="model">beatpro.expense.category</field>
+        <field name="arch" type="xml">
+            <list string="Expense Categories" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="account_id" options="{'no_create': True}"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_beatpro_expense_category" model="ir.actions.act_window">
+        <field name="name">Expense Categories</field>
+        <field name="res_model">beatpro.expense.category</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <record id="action_beatpro_cash_handover" model="ir.actions.client">
+        <field name="name">Cash Handover</field>
+        <field name="tag">beatpro.cash_handover</field>
+    </record>
+
+    <!-- The day close shows the hand over -->
+    <record id="view_beatpro_day_close_form_handover" model="ir.ui.view">
+        <field name="name">beatpro.day.close.form.handover</field>
+        <field name="model">beatpro.day.close</field>
+        <field name="inherit_id" ref="beatpro_field_sales.view_beatpro_day_close_form"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <button name="action_approve_difference" type="object" string="Approve Difference" class="btn-primary"
+                        invisible="handover_state != 'to_approve'" groups="beatpro_field_sales.group_beatpro_supervisor"/>
+            </header>
+            <div class="bp-day-stats" position="after">
+                <group string="Cash hand over" invisible="state != 'closed'">
+                    <group>
+                        <field name="cash_amount" string="Cash collected"/>
+                        <field name="cash_expense_amount"/>
+                        <field name="cash_to_hand_in"/>
+                    </group>
+                    <group>
+                        <field name="handover_state" widget="badge" decoration-warning="handover_state == 'to_approve'"
+                               decoration-success="handover_state in ('done', 'written_off')"/>
+                        <field name="counted_cash" invisible="handover_state == 'waiting'" readonly="1"/>
+                        <field name="cash_difference" invisible="handover_state == 'waiting'"/>
+                        <field name="missing_cheque_ids" widget="many2many_tags" invisible="not missing_cheque_ids"/>
+                        <field name="counted_by_id" invisible="not counted_by_id"/>
+                        <field name="writeoff_move_id" invisible="not writeoff_move_id"/>
+                    </group>
+                </group>
+            </div>
+        </field>
+    </record>
+</odoo>

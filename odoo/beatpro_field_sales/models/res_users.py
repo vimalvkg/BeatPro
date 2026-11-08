@@ -79,6 +79,7 @@ class ResUsers(models.Model):
                                for key, label in RETURN_REASONS],
             'warehouse_id': (user.beatpro_van_warehouse_id or self.env['stock.warehouse'].search(
                 [('company_id', '=', company.id)], limit=1)).id,
+            'expense_categories': self.env['beatpro.expense'].beatpro_expense_categories(),
             'pay_type': user.beatpro_pay_type,
             'track_location': user.beatpro_track_location,
             'location_minutes': 5,

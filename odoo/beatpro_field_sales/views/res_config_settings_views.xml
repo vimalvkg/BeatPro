@@ -36,6 +36,20 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Expenses and cash hand over" name="beatpro_cash">
+                        <setting string="Reps' field cash" help="The cash journal reps collect cash into. Expenses paid from collected cash and hand-over differences are booked in it. Accountants count the hand over (Invoicing › Customers › Reps' Cash Handover); differences are written off to the company's cash difference accounts once a supervisor approves.">
+                            <field name="beatpro_field_cash_journal_id" options="{'no_create': True}" placeholder="The reps' cash payment method"/>
+                        </setting>
+                        <setting string="Company card" help="The journal of the card reps pay fuel and tolls with.">
+                            <field name="beatpro_card_journal_id" options="{'no_create': True}"/>
+                        </setting>
+                        <setting string="Owed to reps" help="Expenses reps paid with their own money, until they are paid back. Created when first needed.">
+                            <field name="beatpro_reimburse_account_id" options="{'no_create': True}"/>
+                        </setting>
+                        <setting string="Expense categories" help="Fuel, parking, Salik and the rest, each with its expense account.">
+                            <button name="%(beatpro_field_sales.action_beatpro_expense_category)d" type="action" string="Expense Categories" icon="oi-arrow-right" class="btn-link"/>
+                        </setting>
+                    </block>
                     <block title="Reps" name="beatpro_reps">
                         <setting string="Mobile app access" help="Reps sign in to the BeatPro app with their Odoo email and password; Odoo then gives each phone its own API key, listed on the user's profile (Security tab) where it can be revoked. Set each rep's discount limit on the BeatPro tab of their user."/>
                     </block>

@@ -41,3 +41,10 @@ access_beatpro_visit_photo_supervisor,beatpro.visit.photo supervisor,model_beatp
 access_beatpro_survey_answer_rep,beatpro.survey.answer rep,model_beatpro_survey_answer,group_beatpro_rep,1,0,0,0
 access_beatpro_survey_answer_supervisor,beatpro.survey.answer supervisor,model_beatpro_survey_answer,group_beatpro_supervisor,1,1,1,1
 access_beatpro_location_supervisor,beatpro.location supervisor,model_beatpro_location,group_beatpro_supervisor,1,0,0,1
+access_beatpro_expense_rep,beatpro.expense rep,model_beatpro_expense,group_beatpro_rep,1,1,1,0
+access_beatpro_expense_supervisor,beatpro.expense supervisor,model_beatpro_expense,group_beatpro_supervisor,1,1,1,1
+access_beatpro_expense_accountant,beatpro.expense accountant,model_beatpro_expense,account.group_account_user,1,0,0,0
+access_beatpro_expense_category_rep,beatpro.expense.category rep,model_beatpro_expense_category,group_beatpro_rep,1,0,0,0
+access_beatpro_expense_category_supervisor,beatpro.expense.category supervisor,model_beatpro_expense_category,group_beatpro_supervisor,1,1,1,1
+access_beatpro_expense_category_accountant,beatpro.expense.category accountant,model_beatpro_expense_category,account.group_account_manager,1,1,1,1
+access_beatpro_day_close_accountant,beatpro.day.close accountant,model_beatpro_day_close,account.group_account_user,1,0,0,0

@@ -51,6 +51,14 @@
     <menuitem id="menu_beatpro_payment_methods" name="Payment Methods" parent="menu_beatpro_supervisor"
               action="action_beatpro_payment_methods" sequence="80"
               groups="account.group_account_manager"/>
+    <menuitem id="menu_beatpro_cash_handover" name="Cash Handover" parent="menu_beatpro_supervisor"
+              action="action_beatpro_cash_handover" sequence="6"/>
+    <menuitem id="menu_beatpro_expenses" name="Expenses" parent="menu_beatpro_supervisor"
+              action="action_beatpro_expense" sequence="7"/>
+    <menuitem id="menu_account_beatpro_cash_handover" name="Reps' Cash Handover" parent="account.menu_finance_receivables"
+              action="action_beatpro_cash_handover" sequence="90" groups="account.group_account_user"/>
+    <menuitem id="menu_beatpro_expense_categories" name="Expense Categories" parent="menu_beatpro_supervisor"
+              action="action_beatpro_expense_category" sequence="85"/>
     <menuitem id="menu_beatpro_monthly_targets" name="Monthly Targets" parent="menu_beatpro_supervisor"
               action="action_beatpro_target" sequence="82"/>
     <menuitem id="menu_beatpro_incentive_plans" name="Incentive Plans" parent="menu_beatpro_supervisor"

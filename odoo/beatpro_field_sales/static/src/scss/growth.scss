@@ -37,3 +37,13 @@
 }
 .bp-map-rep { span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #7B1C24;
     color: #fff; font-weight: 800; font-size: 12px; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); } }
+
+// Cash Handover.
+.o_beatpro.bp-page.bp-cash {
+    .bp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .bp-kpi { padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; }
+    .bp-kpi-label { font-size: 12px; font-weight: 800; color: var(--bp-muted, #6E5A5C); text-transform: uppercase; letter-spacing: 0.06em; }
+    .bp-kpi-value { font-size: 24px; font-weight: 800; line-height: 1.1; small { font-size: 16px; color: var(--bp-muted, #6E5A5C); } }
+    .bp-hand { display: grid; grid-template-columns: 1.3fr 1fr 1.8fr 1.1fr auto; gap: 18px; align-items: center; padding: 16px 20px; }
+    @media (max-width: 991px) { .bp-hand { grid-template-columns: 1fr 1fr; } }
+}

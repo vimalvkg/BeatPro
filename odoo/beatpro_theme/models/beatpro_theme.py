@@ -24,6 +24,8 @@ SIDEBAR = [
     ('products', "Products", 'fa-cube', ['sale.product_template_action']),
     ('schemes', "Schemes", 'fa-gift', ['beatpro_field_sales.action_beatpro_scheme']),
     ('returns', "Returns", 'fa-undo', ['beatpro_field_sales.action_beatpro_shop_return']),
+    ('cash', "Cash Handover", 'fa-money', ['beatpro_field_sales.action_beatpro_cash_handover']),
+    ('expenses', "Expenses", 'fa-credit-card', ['beatpro_field_sales.action_beatpro_expense']),
     ('targets', "Targets", 'fa-bullseye', ['beatpro_field_sales.action_beatpro_targets_board']),
     ('live_map', "Live Map", 'fa-map', ['beatpro_field_sales.action_beatpro_live_map']),
     ('surveys', "Surveys", 'fa-camera', ['beatpro_field_sales.action_beatpro_survey_answer']),
@@ -40,6 +42,7 @@ CLIENT_ACTION_GROUPS = {
     'beatpro.my_van': (REP,),
     'beatpro.targets_board': (SUPERVISOR,),
     'beatpro.live_map': (SUPERVISOR,),
+    'beatpro.cash_handover': (SUPERVISOR, 'account.group_account_user'),
 }
 
 

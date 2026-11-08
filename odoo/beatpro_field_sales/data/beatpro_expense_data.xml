@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="expense_category_fuel" model="beatpro.expense.category"><field name="name">Fuel</field><field name="sequence">1</field></record>
+    <record id="expense_category_parking" model="beatpro.expense.category"><field name="name">Parking</field><field name="sequence">2</field></record>
+    <record id="expense_category_salik" model="beatpro.expense.category"><field name="name">Salik toll</field><field name="sequence">3</field></record>
+    <record id="expense_category_repair" model="beatpro.expense.category"><field name="name">Van repair</field><field name="sequence">4</field></record>
+    <record id="expense_category_food" model="beatpro.expense.category"><field name="name">Food</field><field name="sequence">5</field></record>
+    <record id="expense_category_other" model="beatpro.expense.category"><field name="name">Other</field><field name="sequence">9</field></record>
+</odoo>

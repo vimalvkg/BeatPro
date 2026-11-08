@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.CashHandover">
+        <div class="o_action o_beatpro bp-page bp-cash">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap pt-3">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h1 class="bp-title mb-0">Cash Handover</h1>
+                    <span class="bp-muted">Count what each rep hands in at day end</span>
+                </div>
+                <div class="bp-kpis mt-3">
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">To count</span><span class="bp-kpi-value"><t t-esc="d.to_count"/> <small>reps</small></span></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Cash expected</span><span class="bp-kpi-value" t-esc="d.cash_expected"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Cheques</span><span class="bp-kpi-value" t-esc="d.cheques"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Short today</span><span class="bp-kpi-value" t-esc="d.short"/></div>
+                </div>
+                <p t-if="!d.open.length" class="bp-card bp-card-pad bp-muted mt-3 mb-0">Nothing to count. Reps show up here once they close the day.</p>
+                <t t-foreach="d.open" t-as="card" t-key="card.id">
+                    <div class="bp-card bp-hand mt-3">
+                        <button type="button" class="bp-rep" t-on-click="() => this.open(card)">
+                            <span class="bp-avatar" t-esc="card.initials"/>
+                            <span class="d-flex flex-column text-start"><b t-esc="card.rep"/>
+                                <small class="bp-muted">Day closed <t t-esc="card.date"/><t t-if="card.van"> · <t t-esc="card.van"/></t></small></span>
+                        </button>
+                        <div class="d-flex flex-column">
+                            <small class="bp-muted fw-bold">Cash expected</small>
+                            <b class="fs-5" t-esc="card.cash_text"/>
+                            <small t-if="card.expenses_text" class="bp-muted">after <t t-esc="card.expenses_text"/> expenses</small>
+                        </div>
+                        <div class="d-flex flex-column gap-1">
+                            <small class="bp-muted fw-bold">Cheques received</small>
+                            <t t-foreach="card.cheques" t-as="cheque" t-key="cheque.id">
+                                <label class="d-flex gap-2 align-items-start small">
+                                    <input type="checkbox" class="form-check-input mt-0" t-model="state.cheques[card.id][cheque.id]"
+                                           t-att-disabled="!d.can_count or card.state === 'to_approve'"/>
+                                    <span t-esc="cheque.text"/>
+                                </label>
+                            </t>
+                            <small t-if="!card.cheques.length" class="bp-muted">No cheques</small>
+                        </div>
+                        <div class="d-flex flex-column gap-1">
+                            <label class="bp-muted fw-bold small" t-att-for="'counted_' + card.id">Counted</label>
+                            <input type="number" step="0.01" min="0" class="form-control" t-att-id="'counted_' + card.id"
+                                   t-model.number="state.counted[card.id]" t-att-disabled="!d.can_count or card.state === 'to_approve'"/>
+                            <small class="fw-bold" t-att-class="difference(card) === 0 ? 'bp-green' : 'text-danger'">
+                                Difference <t t-esc="difference(card).toFixed(2)"/>
+                            </small>
+                        </div>
+                        <div class="d-flex flex-column gap-1 align-items-end">
+                            <t t-if="card.state === 'to_approve'">
+                                <small class="text-danger fw-bold text-end" t-esc="card.difference_text"/>
+                                <button t-if="d.can_approve" type="button" class="bp-btn bp-primary" t-att-disabled="state.busy === card.id"
+                                        t-on-click="() => this.approve(card)">Approve and write off</button>
+                                <small t-else="" class="bp-muted">Waiting for the supervisor</small>
+                            </t>
+                            <t t-elif="d.can_count">
+                                <button type="button" class="bp-btn bp-primary" t-att-disabled="state.busy === card.id" t-on-click="() => this.count(card)">
+                                    <t t-if="matches(card)">Confirm hand over</t><t t-else="">Send to supervisor</t>
+                                </button>
+                                <small t-if="!matches(card)" class="text-danger fw-bold text-end">
+                                    <t t-if="difference(card) &lt; 0">Short <t t-esc="(-difference(card)).toFixed(2)"/></t>
+                                    <t t-elif="difference(card) &gt; 0">Over <t t-esc="difference(card).toFixed(2)"/></t>
+                                    <t t-if="missingCheques(card).length"> · <t t-esc="missingCheques(card).length"/> cheque not handed in</t>
+                                </small>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+                <div t-if="d.settled.length" class="bp-card bp-card-pad mt-3">
+                    <b>Settled today</b>
+                    <t t-foreach="d.settled" t-as="card" t-key="card.id">
+                        <div class="d-flex gap-3 align-items-center mt-2">
+                            <span><t t-esc="card.rep"/> · <t t-esc="card.cash_text"/> cash<t t-if="card.counted_by"> · counted by <t t-esc="card.counted_by"/> <t t-esc="card.counted_at"/></t></span>
+                            <span class="ms-auto bp-pill" t-att-class="card.state === 'done' ? 'bp-done' : 'bp-live'">
+                                <t t-if="card.state === 'done'">Matched</t><t t-else="">Written off</t>
+                            </span>
+                        </div>
+                    </t>
+                </div>
+            </div>
+            </div>
+        </div>
+    </t>
+</templates>

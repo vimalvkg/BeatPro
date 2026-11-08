@@ -1,6 +1,6 @@
 {
     'name': 'BeatPro Field Sales',
-    'version': '19.0.1.7.0',
+    'version': '19.0.1.8.0',
     'category': 'Sales/Sales',
     'summary': 'Routes, shop visits and day-end close for field sales reps using the BeatPro mobile app',
     'description': """
@@ -18,6 +18,8 @@ Server side of the BeatPro mobile app for Odoo Community.
 * Targets and incentives for reps paid on salary + incentive, with commission lines
 * Shelf photos and shop surveys taken during visits, also offline
 * Live map of reps and today's routes for supervisors
+* Rep expenses (fuel, parking, Salik...) from the app, approved by supervisors and posted
+* Day-end cash hand over counted by accountants; differences approved and written off
 * Day-end close: each rep's orders and collections for the day
 * Idempotent sync: every record made on the phone carries a mobile UUID,
   so a retried upload never creates a duplicate
@@ -30,6 +32,7 @@ Server side of the BeatPro mobile app for Odoo Community.
         'security/beatpro_security.xml',
         'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',
+        'data/beatpro_expense_data.xml',
         'views/beatpro_route_views.xml',
         'views/beatpro_visit_views.xml',
         'views/beatpro_day_close_views.xml',
@@ -43,6 +46,7 @@ Server side of the BeatPro mobile app for Odoo Community.
         'report/beatpro_invoice_slip.xml',
         'views/beatpro_scheme_views.xml',
         'views/beatpro_growth_views.xml',
+        'views/beatpro_expense_views.xml',
         'views/res_config_settings_views.xml',
         'wizard/beatpro_payment_wizard_views.xml',
         'views/beatpro_van_views.xml',
