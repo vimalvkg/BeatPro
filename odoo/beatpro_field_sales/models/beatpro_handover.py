@@ -85,6 +85,31 @@ class BeatproDayClose(models.Model):
             close.message_post(body=close._difference_text())
         return True
 
+    def _rejected_cash_expenses(self):
+        self.ensure_one()
+        return self.env['beatpro.expense'].sudo().search([
+            ('user_id', '=', self.user_id.id), ('date', '=', self.date), ('company_id', '=', self.company_id.id),
+            ('paid_from', '=', 'cash'), ('state', '=', 'rejected'),
+        ])
+
+    def _beatpro_expense_rejected(self, expense):
+        """A cash expense of this day was rejected: the money it took is missing.
+
+        Not counted yet: the cash expected goes up, so the count shows the shortage.
+        Already settled: the hand over goes back to the supervisor for the missing amount.
+        """
+        for close in self.sudo():
+            amount = formatLang(self.env, expense.amount, currency_obj=close.currency_id)
+            if close.handover_state in ('done', 'written_off'):
+                close.write({'handover_state': 'to_approve', 'cash_difference': -expense.amount})
+                close.message_post(body=self.env._(
+                    "%(expense)s of %(amount)s paid from cash was rejected after the hand over: the cash is short by "
+                    "%(amount)s.", expense=expense.category_id.name, amount=amount))
+            else:
+                close.message_post(body=self.env._(
+                    "%(expense)s of %(amount)s paid from cash was rejected: the rep hands in %(amount)s more.",
+                    expense=expense.category_id.name, amount=amount))
+
     def _difference_text(self):
         self.ensure_one()
         parts = []
@@ -92,6 +117,10 @@ class BeatproDayClose(models.Model):
             amount = formatLang(self.env, abs(self.cash_difference), currency_obj=self.currency_id)
             parts.append(self.env._("Cash short by %s", amount) if self.cash_difference < 0
                          else self.env._("Cash over by %s", amount))
+        for expense in self._rejected_cash_expenses():
+            parts.append(self.env._("includes %(expense)s %(amount)s paid from cash, rejected",
+                                    expense=expense.category_id.name,
+                                    amount=formatLang(self.env, expense.amount, currency_obj=self.currency_id)))
         for cheque in self.missing_cheque_ids:
             parts.append(self.env._("Cheque %(number)s from %(shop)s not handed in",
                                     number=cheque.beatpro_cheque_number or cheque.name, shop=cheque.partner_id.name))

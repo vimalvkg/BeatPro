@@ -137,7 +137,11 @@ class BeatproExpense(models.Model):
             if expense.paid_from == 'cash':
                 expense.message_post(body=self.env._(
                     "Rejected, but paid from cash collected: the money is missing from the hand over and "
-                    "shows as a shortage to approve."))
+                    "shows as a shortage for the supervisor."))
+                close = self.env['beatpro.day.close'].sudo().search([
+                    ('user_id', '=', expense.user_id.id), ('date', '=', expense.date),
+                    ('company_id', '=', expense.company_id.id)], limit=1)
+                close._beatpro_expense_rejected(expense)
         return True
 
     # -- For the app ----------------------------------------------------------------

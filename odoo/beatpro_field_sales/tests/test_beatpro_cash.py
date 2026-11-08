@@ -104,3 +104,33 @@ class TestBeatproCash(AccountTestInvoicingCommon):
         loss = close.writeoff_move_id.line_ids.filtered(lambda l: l.debit)
         self.assertEqual(loss.account_id, self.env.company.default_cash_difference_expense_account_id)
         self.assertAlmostEqual(loss.debit, 20)
+
+    def test_rejected_cash_expense_shows_to_supervisor(self):
+        self._collect('pay-cash', 500, self.cash_line)
+        expense = self.env['beatpro.expense'].browse(self._expenses()['exp-fuel']['id'])
+        close = self._close_day()
+        close.with_user(self.accountant).action_count(380, [])
+        self.assertEqual(close.handover_state, 'done')
+
+        # Rejected after the hand over: back to the supervisor for the 120 missing.
+        expense.with_user(self.supervisor).action_reject()
+        self.assertEqual(close.handover_state, 'to_approve')
+        self.assertAlmostEqual(close.cash_difference, -120)
+        self.assertIn('Fuel', close._difference_text())
+        desk = self.env['beatpro.day.close'].with_user(self.supervisor).beatpro_handover_desk()
+        card = next(c for c in desk['open'] if c['id'] == close.id)
+        self.assertIn('rejected', card['difference_text'])
+        close.with_user(self.supervisor).action_approve_difference()
+        self.assertEqual(close.handover_state, 'written_off')
+        self.assertAlmostEqual(close.writeoff_move_id.amount_total, 120)
+
+    def test_rejected_before_count_raises_expected_cash(self):
+        self._collect('pay-cash', 500, self.cash_line)
+        expense = self.env['beatpro.expense'].browse(self._expenses()['exp-fuel']['id'])
+        close = self._close_day()
+        expense.with_user(self.supervisor).action_reject()
+        close.invalidate_recordset()
+        self.assertAlmostEqual(close.cash_to_hand_in, 500, msg='the rejected expense no longer comes off')
+        close.with_user(self.accountant).action_count(380, [])
+        self.assertEqual(close.handover_state, 'to_approve')
+        self.assertIn('rejected', close._difference_text())

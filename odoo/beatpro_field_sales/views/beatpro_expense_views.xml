@@ -67,6 +67,7 @@
                 <field name="category_id"/>
                 <filter name="waiting" string="Waiting for Approval" domain="[('state', '=', 'waiting')]"/>
                 <filter name="own_money" string="To Pay Back" domain="[('paid_from', '=', 'own'), ('state', '=', 'approved')]"/>
+                <filter name="rejected_cash" string="Rejected, Paid from Cash" domain="[('paid_from', '=', 'cash'), ('state', '=', 'rejected')]"/>
                 <separator/>
                 <filter name="no_receipt" string="No Receipt" domain="[('receipt', '=', False)]"/>
                 <group>
