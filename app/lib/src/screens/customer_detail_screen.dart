@@ -83,6 +83,12 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                       icon: const Icon(Icons.directions_outlined),
                       label: const Text('Directions'),
                     ),
+                  if (c.serverId != null)
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/customer/${Uri.encodeComponent(c.key)}/statement'),
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      label: const Text('Statement'),
+                    ),
                 ]),
               ]),
             ),

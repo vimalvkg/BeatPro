@@ -1097,6 +1097,88 @@ void main() {
     await db.close();
   });
 
+  testWidgets('route planning and the customer statement', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo();
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    // Far from the planned order: Shree Ganesh Mart (Saki Naka) is nearest.
+    const here = GeoPoint(19.0950, 72.8950);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(here)),
+      httpClientProvider.overrideWithValue(odoo.client),
+      printerServiceProvider.overrideWithValue(FakePrinter()),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    final router = container.read(routerProvider);
+    final repo = container.read(repositoryProvider);
+
+    // The shortest way from here starts at the nearest shop.
+    final shortest = (await repo.shortestRoute(here))!;
+    expect(shortest.$1.first, 'srv:11');
+    expect(shortest.$2, greaterThan(0.5));
+
+    router.push('/route');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Shortest way from where you are: saves'), findsOneWidget);
+    await tester.tap(find.text('Use this order'));
+    await tester.pumpAndSettle();
+    expect((await repo.todayPlan()).first.customer.key, 'srv:11');
+    expect(find.textContaining('Shortest way from where you are'), findsNothing, reason: 'already the shortest');
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/34-route.png'));
+    }
+
+    // Patel Kirana is closed today; New Bombay Traders moves to tomorrow.
+    Finder menuOf(String shop) => find.descendant(of: find.widgetWithText(Material, shop).first, matching: find.byTooltip('More for this shop'));
+    await tester.tap(menuOf('Patel Kirana'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Skip today · shop closed'));
+    await tester.pumpAndSettle();
+    expect(find.text('Skipped · closed'), findsOneWidget);
+    await tester.tap(menuOf('New Bombay Traders'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to tomorrow'));
+    await tester.pumpAndSettle();
+    expect(find.text('New Bombay Traders moved to tomorrow.'), findsOneWidget);
+    expect((await repo.todayPlan()).map((s) => s.customer.key), isNot(contains('srv:10')));
+    await tester.runAsync(() => container.read(syncControllerProvider.notifier).run());
+    await tester.pumpAndSettle();
+    final moves = odoo.uploaded['beatpro.route.move']!;
+    expect({for (final m in moves) m['partner_id']: m['kind']}, {9: 'skip', 10: 'tomorrow'});
+    router.pop();
+    await tester.pumpAndSettle();
+
+    // Sharma General Store's statement.
+    router.push('/customer/${Uri.encodeComponent('srv:8')}/statement');
+    await tester.pumpAndSettle();
+    expect(find.text('STATEMENT OF ACCOUNT'), findsOneWidget);
+    expect(find.text('AED 2,075.55'), findsWidgets);
+    expect(find.textContaining('Invoice VAN1/2026/00012'), findsOneWidget);
+    expect(find.textContaining('Collect payment · AED 2,075.55'), findsOneWidget);
+    if (Platform.environment['BEATPRO_SCREENSHOTS'] != null) {
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/35-statement.png'));
+    }
+
+    await tester.pumpWidget(const SizedBox());
+    await db.close();
+  });
+
   testWidgets('work done offline waits on the phone, then syncs', (tester) async {
     final odoo = FakeOdoo();
     // Real file access must run outside the test's fake clock.

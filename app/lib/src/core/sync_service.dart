@@ -153,6 +153,10 @@ class SyncService {
             .map(OpenInvoice.fromOdoo)
             .toList();
 
+    // Shops skipped today (closed), as Odoo knows them.
+    await db.setValue('skipped:${Repository(db).todayIso}',
+        jsonEncode([for (final s in plan) if (s['skipped'] == true) 'srv:${s['partner_id']}']));
+
     final stops = [
       for (final s in plan)
         RouteStop(
@@ -410,6 +414,23 @@ class SyncService {
         await _markSynced(r, visitId);
         return true;
 
+      case RecordKind.routeMove:
+        final partnerId = await _customerId(r.data['customerKey'] as String);
+        if (partnerId == null) return false;
+        final ids = await client.call('beatpro.route.move', 'beatpro_submit_moves', kwargs: {
+          'vals_list': [
+            {
+              'mobile_uuid': r.uuid,
+              'partner_id': partnerId,
+              'route_id': r.data['routeId'] ?? false,
+              'kind': r.data['kind'],
+              'date': r.data['date'],
+            },
+          ],
+        }) as Map<String, dynamic>;
+        await _markSynced(r, ids[r.uuid] as int);
+        return true;
+
       case RecordKind.expense:
         final receipt = r.data['receiptPath'] == null ? null : File(r.data['receiptPath'] as String);
         final result = await client.call('beatpro.expense', 'beatpro_submit_expenses', kwargs: {
@@ -534,6 +555,14 @@ class SyncService {
         return true;
     }
   }
+
+  /// A customer's statement: `this_month`, `last_month` or `3_months`. Needs signal.
+  Future<Map<String, dynamic>> statement(int partnerId, String period) async => (await client.call(
+        'res.partner',
+        'beatpro_statement',
+        kwargs: {'partner_id': partnerId, 'period': period},
+      ) as Map)
+          .cast<String, dynamic>();
 
   /// A link for the customer to pay an invoice online, from Odoo's payment providers.
   /// Needs signal.

@@ -19,6 +19,7 @@ String _kindLabel(LocalRecord r) => switch (r.kind) {
       RecordKind.photo => 'Shelf photo',
       RecordKind.surveyAnswer => 'Survey answers',
       RecordKind.expense => 'Expense',
+      RecordKind.routeMove => r.data['kind'] == 'skip' ? 'Shop skipped' : 'Shop moved to tomorrow',
     };
 
 class SyncScreen extends ConsumerWidget {

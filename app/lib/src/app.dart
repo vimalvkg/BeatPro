@@ -16,6 +16,7 @@ import 'screens/orders_screen.dart';
 import 'screens/expense_screens.dart';
 import 'screens/growth_screens.dart';
 import 'screens/payment_screen.dart';
+import 'screens/statement_screen.dart';
 import 'screens/printer_screen.dart';
 import 'screens/return_screen.dart';
 import 'screens/route_screen.dart';
@@ -65,6 +66,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           customerKey: state.pathParameters['key']!,
           routeId: int.tryParse(state.uri.queryParameters['route'] ?? ''),
         ),
+      ),
+      GoRoute(
+        path: '/customer/:key/statement',
+        builder: (_, state) => StatementScreen(customerKey: state.pathParameters['key']!),
       ),
       GoRoute(path: '/visit/:uuid', builder: (_, state) => VisitScreen(visitUuid: state.pathParameters['uuid']!)),
       GoRoute(path: '/visit/:uuid/photos', builder: (_, state) => VisitPhotosScreen(visitUuid: state.pathParameters['uuid']!)),

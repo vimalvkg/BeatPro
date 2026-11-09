@@ -334,17 +334,25 @@ class _SquareButton extends StatelessWidget {
 
 /// One shop on today's route.
 class StopCard extends ConsumerWidget {
-  const StopCard({super.key, required this.view, required this.number, this.isNext = false});
+  const StopCard({super.key, required this.view, required this.number, this.isNext = false, this.trailing, this.subtitle});
 
   final StopView view;
   final int number;
   final bool isNext;
+
+  /// Shown after the status, e.g. a menu.
+  final Widget? trailing;
+
+  /// Replaces the city, e.g. with the distance.
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final customer = view.customer;
     final (label, bg, fg) = view.visited
         ? ('Visited', BeatproColors.successSoft, BeatproColors.success)
+        : view.skipped && view.visit == null
+            ? ('Skipped · closed', BeatproColors.lineSoft, BeatproColors.muted)
         : view.inProgress
             ? ('In progress', BeatproColors.amberSoft, BeatproColors.amberInk)
             : isNext
@@ -369,11 +377,12 @@ class StopCard extends ConsumerWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(customer.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                if (customer.city != null)
-                  Text(customer.city!, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
+                if (subtitle != null || customer.city != null)
+                  Text(subtitle ?? customer.city!, style: const TextStyle(fontSize: 13, color: BeatproColors.muted)),
               ]),
             ),
             Pill(label, background: bg, foreground: fg),
+            ?trailing,
           ]),
         ),
       ),

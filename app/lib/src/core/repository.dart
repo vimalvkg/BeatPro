@@ -8,6 +8,7 @@ import 'growth.dart';
 import 'invoice.dart';
 import 'local_db.dart';
 import 'models.dart';
+import 'route_plan.dart';
 import 'schemes.dart';
 
 /// A GPS fix, or null when the phone couldn't get one.
@@ -20,11 +21,14 @@ class GeoPoint {
 
 /// A customer on today's plan, with today's visit if there is one.
 class StopView {
-  StopView(this.stop, this.customer, this.visit);
+  StopView(this.stop, this.customer, this.visit, {this.skipped = false});
 
   final RouteStop stop;
   final Customer customer;
   final LocalRecord? visit;
+
+  /// The rep skipped it today: the shop was closed.
+  final bool skipped;
 
   bool get visited => visit?.data['state'] == 'done';
   bool get inProgress => visit?.data['state'] == 'in_progress';
@@ -185,17 +189,83 @@ class Repository {
   Future<List<LocalRecord>> visitsToday() =>
       db.records(kind: RecordKind.visit, since: startOfToday.toUtc());
 
+  /// Today's shops in visiting order: the rep's own order if they chose one,
+  /// without shops moved to tomorrow, and with shops skipped today marked.
   Future<List<StopView>> todayPlan() async {
     final stops = await db.stops();
     final visits = await visitsToday();
+    final moves = (await db.records(kind: RecordKind.routeMove)).where((r) => r.data['date'] == todayIso).toList();
+    final movedOut = {for (final m in moves) if (m.data['kind'] == 'tomorrow') m.data['customerKey']};
+    final skipped = {
+      for (final m in moves) if (m.data['kind'] == 'skip') m.data['customerKey'],
+      ...await _keys('skipped:$todayIso'),
+    };
     final result = <StopView>[];
     for (final stop in stops) {
+      if (movedOut.contains(stop.customerKey)) continue;
       final customer = await db.customer(stop.customerKey);
       if (customer == null) continue;
       final visit = visits.lastWhereOrNull((v) => v.data['customerKey'] == stop.customerKey);
-      result.add(StopView(stop, customer, visit));
+      result.add(StopView(stop, customer, visit, skipped: skipped.contains(stop.customerKey)));
+    }
+    final order = await _keys('route_order:$todayIso');
+    if (order.isNotEmpty) {
+      int rank(StopView s) {
+        final i = order.indexOf(s.customer.key);
+        return i < 0 ? order.length : i;
+      }
+      final indexed = result.indexed.toList()
+        ..sort((a, b) {
+          final byRank = rank(a.$2).compareTo(rank(b.$2));
+          return byRank != 0 ? byRank : a.$1.compareTo(b.$1);
+        });
+      return [for (final (_, s) in indexed) s];
     }
     return result;
+  }
+
+  Future<List<String>> _keys(String kvKey) async {
+    final raw = await db.getValue(kvKey);
+    return raw == null ? const [] : (jsonDecode(raw) as List).cast<String>();
+  }
+
+  /// The shortest way through the shops still to visit, from [from]: the order
+  /// (customer keys) and the km saved against the current order. Null when it
+  /// saves less than half a km. Shops without a pin keep their place at the end.
+  Future<(List<String>, double)?> shortestRoute(GeoPoint? from) async {
+    final plan = await todayPlan();
+    final open = plan.where((s) => s.visit == null && !s.skipped).toList();
+    final pinned = open.where((s) => s.customer.latitude != null && s.customer.longitude != null).toList();
+    if (pinned.length < 2) return null;
+    final points = [for (final s in pinned) (s.customer.latitude!, s.customer.longitude!)];
+    final start = from == null ? null : (from.latitude, from.longitude);
+    final order = shortestOrder(start, points);
+    final saved = pathKm(start, points) - pathKm(start, [for (final i in order) points[i]]);
+    if (saved < 0.5) return null;
+    final done = plan.where((s) => s.visit != null || s.skipped).map((s) => s.customer.key);
+    final unpinned = open.where((s) => !pinned.contains(s)).map((s) => s.customer.key);
+    return ([...done, for (final i in order) pinned[i].customer.key, ...unpinned], saved);
+  }
+
+  /// Visit today's shops in this order (customer keys), on this phone.
+  Future<void> useRouteOrder(List<String> keys) => db.setValue('route_order:$todayIso', jsonEncode(keys));
+
+  /// Moves a shop on today's plan to tomorrow, or skips it today because it is closed.
+  Future<LocalRecord> moveStop(StopView stop, {required bool skip}) async {
+    final record = LocalRecord(
+      uuid: _uuid.v4(),
+      kind: RecordKind.routeMove,
+      createdAt: now,
+      data: {
+        'customerKey': stop.customer.key,
+        'customerName': stop.customer.name,
+        'routeId': stop.stop.routeId,
+        'kind': skip ? 'skip' : 'tomorrow',
+        'date': todayIso,
+      },
+    );
+    await db.saveRecord(record);
+    return record;
   }
 
   Future<LocalRecord?> activeVisit() async {

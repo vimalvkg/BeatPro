@@ -292,6 +292,30 @@ class FakeOdoo {
         };
       case 'beatpro.expense.beatpro_my_expenses':
         return expenses;
+      case 'beatpro.route.move.beatpro_submit_moves':
+        return {
+          for (final v in (body['vals_list'] as List).cast<Map<String, dynamic>>())
+            v['mobile_uuid']: () {
+              _record('beatpro.route.move', v);
+              return _nextId++;
+            }(),
+        };
+      case 'res.partner.beatpro_statement':
+        return {
+          'partner': {'name': 'Sharma General Store', 'city': 'Andheri East', 'trn': ''},
+          'date_from': '2026-11-01',
+          'date_to': '2026-11-09',
+          'opening': 2140.0,
+          'lines': [
+            {'date': '2026-11-03', 'label': 'Invoice VAN1/2026/00012', 'kind': 'invoice', 'debit': 935.55, 'credit': 0.0, 'balance': 3075.55},
+            {'date': '2026-11-04', 'label': 'Payment · Cash', 'kind': 'payment', 'debit': 0.0, 'credit': 1000.0, 'balance': 2075.55},
+          ],
+          'closing': 2075.55,
+          'overdue': 935.55,
+          'ageing': {'not_due': 1140.0, 'd30': 935.55, 'd60': 0.0, 'older': 0.0},
+          'note': 'Pay by bank transfer to IBAN AE07 0331 2345 6789 0123 456.',
+          'currency': 'AED',
+        };
       case 'beatpro.location.beatpro_submit_locations':
         for (final p in (body['points'] as List).cast<Map<String, dynamic>>()) {
           _record('beatpro.location', p);

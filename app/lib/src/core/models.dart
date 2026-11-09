@@ -434,7 +434,7 @@ class OpenInvoice {
 
 /// What kind of thing a [LocalRecord] is. Uploaded in this order, so that
 /// orders can point to visits and customers already in Odoo.
-enum RecordKind { customer, visit, order, payment, dayClose, shopReturn, vanTransfer, photo, surveyAnswer, expense }
+enum RecordKind { customer, visit, order, payment, dayClose, shopReturn, vanTransfer, photo, surveyAnswer, expense, routeMove }
 
 /// The order in which records go to Odoo: a morning load before the day's
 /// orders, goods taken back before the day-end unload, and the day close last.
@@ -448,6 +448,7 @@ int uploadRank(LocalRecord r) => switch (r.kind) {
       RecordKind.payment => 5,
       // Photos and survey answers go with their visit, once it is in Odoo.
       RecordKind.photo || RecordKind.surveyAnswer || RecordKind.expense => 6,
+      RecordKind.routeMove => 1,
       RecordKind.dayClose => 8,
     };
 
