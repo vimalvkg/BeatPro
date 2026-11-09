@@ -81,20 +81,39 @@ class BeatproRoute(models.Model):
     def beatpro_today_plan(self):
         """Today's visit plan for the current user, as the mobile app shows it.
 
+        Shops the rep moved to today are added at the end; shops moved to tomorrow are
+        left out; shops skipped because they were closed come with ``skipped``.
+
         :return: one dict per customer, in visit order across today's routes
         """
-        weekday = str(fields.Date.context_today(self).weekday())
+        today = fields.Date.context_today(self)
+        weekday = str(today.weekday())
         routes = self.search([
             ('user_id', '=', self.env.uid),
             '|', ('weekday', '=', weekday), ('weekday', '=', False),
         ])
-        return [{
+        moved_out, moved_in, skipped = self._beatpro_moves_for(self.env.user, today)
+        out = set(moved_out.partner_id.ids)
+        plan = [{
             'route_id': line.route_id.id,
             'route_name': line.route_id.name,
             'sequence': line.sequence,
             'partner_id': line.partner_id.id,
             'partner_name': line.partner_id.display_name,
-        } for line in routes.line_ids]
+            'skipped': line.partner_id in skipped.partner_id,
+        } for line in routes.line_ids if line.partner_id.id not in out]
+        known = {p['partner_id'] for p in plan}
+        for move in moved_in.filtered(lambda m: m.partner_id.id not in known):
+            plan.append({
+                'route_id': move.route_id.id or (routes[:1].id if routes else False),
+                'route_name': move.route_id.name or self.env._("Moved from yesterday"),
+                'sequence': 1000 + move.id,
+                'partner_id': move.partner_id.id,
+                'partner_name': move.partner_id.display_name,
+                'skipped': False,
+                'moved_in': True,
+            })
+        return plan
 
 
 class BeatproRouteLine(models.Model):

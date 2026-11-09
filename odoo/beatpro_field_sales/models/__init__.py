@@ -1,5 +1,6 @@
 from . import beatpro_mobile_mixin
 from . import beatpro_route
+from . import beatpro_route_plan
 from . import beatpro_visit
 from . import beatpro_day_close
 from . import stock_warehouse
@@ -23,3 +24,5 @@ from . import beatpro_survey
 from . import beatpro_location
 from . import beatpro_expense
 from . import beatpro_handover
+from . import beatpro_statement
+from . import beatpro_reports

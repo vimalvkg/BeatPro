@@ -48,3 +48,7 @@ access_beatpro_expense_category_rep,beatpro.expense.category rep,model_beatpro_e
 access_beatpro_expense_category_supervisor,beatpro.expense.category supervisor,model_beatpro_expense_category,group_beatpro_supervisor,1,1,1,1
 access_beatpro_expense_category_accountant,beatpro.expense.category accountant,model_beatpro_expense_category,account.group_account_manager,1,1,1,1
 access_beatpro_day_close_accountant,beatpro.day.close accountant,model_beatpro_day_close,account.group_account_user,1,0,0,0
+access_beatpro_route_move_rep,beatpro.route.move rep,model_beatpro_route_move,group_beatpro_rep,1,1,1,0
+access_beatpro_route_move_supervisor,beatpro.route.move supervisor,model_beatpro_route_move,group_beatpro_supervisor,1,1,1,1
+access_beatpro_statement_wizard_rep,beatpro.statement.wizard rep,model_beatpro_statement_wizard,group_beatpro_rep,1,1,1,1
+access_beatpro_statement_wizard_invoice,beatpro.statement.wizard invoicing,model_beatpro_statement_wizard,account.group_account_invoice,1,1,1,1

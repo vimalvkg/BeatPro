@@ -5,7 +5,7 @@ import { useService } from "@web/core/utils/hooks";
 import { standardActionServiceProps } from "@web/webclient/actions/action_service";
 
 const LIB = "/beatpro_field_sales/static/lib/leaflet/";
-const COLORS = { visited: "#1F6B45", next: "#B26A00", missed: "#A3242B", later: "#9A8A8C" };
+const COLORS = { visited: "#1F6B45", next: "#B26A00", missed: "#A3242B", later: "#9A8A8C", skipped: "#6E5A5C" };
 const DUBAI = [25.2048, 55.2708];
 
 /** Where each rep is, their trail today and how their route is going. */

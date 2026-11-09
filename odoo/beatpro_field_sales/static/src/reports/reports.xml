@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.SalesReports">
+        <div class="o_action o_beatpro bp-page bp-reports">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap pt-3">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h1 class="bp-title mb-0">Sales Reports</h1>
+                    <span class="bp-muted" t-esc="d.label"/>
+                </div>
+                <div class="bp-tabs mt-3" role="tablist">
+                    <t t-foreach="tabs" t-as="tab" t-key="tab[0]">
+                        <button type="button" role="tab" t-att-aria-selected="state.tab === tab[0] ? 'true' : 'false'"
+                                t-att-class="{active: state.tab === tab[0]}" t-on-click="() => this.state.tab = tab[0]" t-esc="tab[1]"/>
+                    </t>
+                    <select class="form-select ms-auto w-auto" aria-label="Period" t-on-change="setPeriod">
+                        <option value="this_month" t-att-selected="state.period === 'this_month'">This month</option>
+                        <option value="last_month" t-att-selected="state.period === 'last_month'">Last month</option>
+                        <option value="3_months" t-att-selected="state.period === '3_months'">Last 3 months</option>
+                    </select>
+                </div>
+
+                <t t-if="state.tab === 'overview'">
+                    <div class="bp-kpis mt-3">
+                        <div class="bp-card bp-kpi"><span class="bp-kpi-label">Net sales</span><span class="bp-kpi-value" t-esc="d.kpis.net"/>
+                            <small t-if="d.kpis.net_change !== null" t-att-class="d.kpis.net_change >= 0 ? 'bp-green fw-bold' : 'text-danger fw-bold'">
+                                <t t-if="d.kpis.net_change >= 0">▲</t><t t-else="">▼</t> <t t-esc="Math.abs(d.kpis.net_change)"/>% on the period before</small></div>
+                        <div class="bp-card bp-kpi"><span class="bp-kpi-label">Active shops</span><span class="bp-kpi-value"><t t-esc="d.kpis.active"/> of <t t-esc="d.kpis.shops"/></span>
+                            <small class="bp-muted"><t t-esc="d.kpis.shops - d.kpis.active"/> route shops bought nothing</small></div>
+                        <div class="bp-card bp-kpi"><span class="bp-kpi-label">Visit compliance</span>
+                            <span class="bp-kpi-value"><t t-if="d.kpis.compliance !== null"><t t-esc="d.kpis.compliance"/>%</t><t t-else="">—</t></span>
+                            <small class="bp-amber fw-bold"><t t-esc="d.kpis.missed"/> planned visits missed</small></div>
+                        <div class="bp-card bp-kpi"><span class="bp-kpi-label">Scheme cost</span><span class="bp-kpi-value" t-esc="d.kpis.scheme_cost"/>
+                            <small class="bp-muted"><t t-esc="d.kpis.scheme_share"/>% of sales</small></div>
+                    </div>
+                    <div class="bp-two mt-3">
+                        <div class="bp-card bp-card-pad"><b>Top brands</b>
+                            <div t-foreach="d.categories.slice(0, 6)" t-as="c" t-key="c.name" class="bp-barrow">
+                                <b t-esc="c.name"/><div class="bp-bar"><div t-att-style="barStyle(c.pct)"/></div><span class="fw-bold text-end" t-esc="c.amount"/>
+                            </div>
+                            <p t-if="!d.categories.length" class="bp-muted mb-0">No invoices in this period.</p>
+                        </div>
+                        <div class="bp-card bp-card-pad"><b>Visit compliance by rep</b>
+                            <div t-foreach="d.reps" t-as="r" t-key="r.name" class="bp-barrow">
+                                <b t-esc="r.name"/><div class="bp-bar"><div t-att-style="barStyle(r.pct, r.pct >= 90)"/></div><span class="fw-bold text-end"><t t-esc="r.pct"/>%</span>
+                            </div>
+                        </div>
+                        <div class="bp-card bp-card-pad"><b>Shops that stopped buying</b> <small class="bp-muted">· no invoice for <t t-esc="d.lost_days"/>+ days</small>
+                            <div t-foreach="d.lost.slice(0, 5)" t-as="s" t-key="s.name" class="bp-listrow">
+                                <b class="flex-fill" t-esc="s.name"/><span class="bp-muted"><t t-esc="s.rep"/> · <t t-esc="s.city"/></span>
+                                <span class="text-danger fw-bold bp-w-days"><t t-esc="s.days"/> days</span>
+                            </div>
+                            <p t-if="!d.lost.length" class="bp-muted mb-0">Every shop bought recently.</p>
+                        </div>
+                        <div class="bp-card bp-card-pad"><b>How schemes did</b>
+                            <t t-call="beatpro_field_sales.SalesReportsSchemes"/>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-elif="state.tab === 'products'">
+                    <div class="bp-two mt-3">
+                        <div class="bp-card bp-card-pad"><b>Brands</b>
+                            <div t-foreach="d.categories" t-as="c" t-key="c.name" class="bp-barrow">
+                                <b t-esc="c.name"/><div class="bp-bar"><div t-att-style="barStyle(c.pct)"/></div><span class="fw-bold text-end" t-esc="c.amount"/>
+                            </div>
+                        </div>
+                        <div class="bp-card bp-card-pad"><b>Top products</b>
+                            <div t-foreach="d.products" t-as="p" t-key="p.name" class="bp-listrow">
+                                <b class="flex-fill" t-esc="p.name"/><span class="bp-muted" t-esc="p.qty"/><span class="fw-bold bp-w-amount" t-esc="p.amount"/>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-elif="state.tab === 'reps'">
+                    <div class="bp-two mt-3">
+                        <div class="bp-card bp-card-pad"><b>Reps</b>
+                            <div class="bp-listrow bp-muted small fw-bold"><span class="flex-fill">Rep</span><span class="bp-w-num">Orders</span><span class="bp-w-num">Visits</span><span class="bp-w-amount">Sales</span></div>
+                            <div t-foreach="d.reps" t-as="r" t-key="r.name" class="bp-listrow">
+                                <b class="flex-fill" t-esc="r.name"/><span class="bp-w-num" t-esc="r.orders"/>
+                                <span class="bp-w-num"><t t-esc="r.visited"/>/<t t-esc="r.planned"/></span><span class="fw-bold bp-w-amount" t-esc="r.sales"/>
+                            </div>
+                        </div>
+                        <div class="bp-card bp-card-pad"><b>Routes</b>
+                            <div t-foreach="d.routes" t-as="r" t-key="r.name" class="bp-listrow">
+                                <b class="flex-fill" t-esc="r.name"/><span class="fw-bold bp-w-amount" t-esc="r.sales"/>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-elif="state.tab === 'schemes'">
+                    <div class="bp-card bp-card-pad mt-3"><t t-call="beatpro_field_sales.SalesReportsSchemes"/>
+                        <p class="bp-muted small mb-0 mt-2">Cost is the value of free goods and scheme discounts given. Sales lift compares the quantity of the scheme's products sold with the period before.</p></div>
+                </t>
+
+                <t t-elif="state.tab === 'lost'">
+                    <div class="bp-card bp-card-pad mt-3"><b>Shops that bought in the last 6 months but nothing for <t t-esc="d.lost_days"/>+ days</b>
+                        <div t-foreach="d.lost" t-as="s" t-key="s.name" class="bp-listrow">
+                            <b class="flex-fill" t-esc="s.name"/><span class="bp-muted"><t t-esc="s.rep"/> · <t t-esc="s.city"/></span>
+                            <span class="text-danger fw-bold bp-w-days"><t t-esc="s.days"/> days</span>
+                        </div>
+                        <p t-if="!d.lost.length" class="bp-muted mb-0">Every shop bought recently.</p>
+                    </div>
+                </t>
+
+                <t t-else="">
+                    <div class="bp-card bp-card-pad mt-3"><b>Planned shops visited</b>
+                        <small class="bp-muted d-block">A shop skipped because it was closed counts as visited; a shop moved to tomorrow counts on the next day.</small>
+                        <div class="bp-listrow bp-muted small fw-bold"><span class="flex-fill">Rep</span><span class="bp-w-num">Planned</span><span class="bp-w-num">Visited</span><span class="bp-w-num">Missed</span><span class="bp-w-amount">Compliance</span></div>
+                        <div t-foreach="d.reps" t-as="r" t-key="r.name" class="bp-listrow">
+                            <b class="flex-fill" t-esc="r.name"/><span class="bp-w-num" t-esc="r.planned"/><span class="bp-w-num" t-esc="r.visited"/>
+                            <span class="bp-w-num text-danger fw-bold" t-esc="r.missed"/><span class="bp-w-amount fw-bold"><t t-esc="r.pct"/>%</span>
+                        </div>
+                    </div>
+                </t>
+            </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="beatpro_field_sales.SalesReportsSchemes">
+        <div class="bp-listrow bp-muted small fw-bold"><span class="flex-fill">Scheme</span><span class="bp-w-num">Used</span><span class="bp-w-amount">Cost</span><span class="bp-w-amount">Sales lift</span></div>
+        <div t-foreach="d.schemes" t-as="s" t-key="s.name" class="bp-listrow">
+            <b class="flex-fill" t-esc="s.name"/><span class="bp-w-num"><t t-esc="s.orders"/> orders</span><span class="bp-w-amount" t-esc="s.cost"/>
+            <span class="bp-w-amount fw-bold" t-att-class="s.lift === null ? 'bp-muted' : s.lift >= 0 ? 'bp-green' : 'text-danger'">
+                <t t-if="s.lift === null">new</t><t t-elif="s.lift >= 0">▲ <t t-esc="s.lift"/>%</t><t t-else="">▼ <t t-esc="-s.lift"/>%</t>
+            </span>
+        </div>
+        <p t-if="!d.schemes.length" class="bp-muted mb-0">No scheme was used in this period.</p>
+    </t>
+</templates>

@@ -80,13 +80,16 @@ class BeatproLocation(models.Model):
             visited = {v.partner_id.id: v for v in visits}
             closed = self.env['beatpro.day.close'].sudo().search(
                 [('user_id', '=', rep.id), ('date', '=', today)], limit=1)
-            lines = routes.line_ids
+            moved_out, _moved_in, skipped = self.env['beatpro.route']._beatpro_moves_for(rep, today)
+            lines = routes.line_ids.filtered(lambda l: l.partner_id not in moved_out.partner_id)
             last_done = max([i for i, line in enumerate(lines) if line.partner_id.id in visited], default=-1)
             stops, next_given = [], False
             for i, line in enumerate(lines):
                 partner = line.partner_id
                 if partner.id in visited:
                     status = 'visited'
+                elif partner in skipped.partner_id:
+                    status = 'skipped'
                 elif closed or i < last_done:
                     status = 'missed'
                 elif not next_given:

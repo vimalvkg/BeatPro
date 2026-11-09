@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_beatpro_statement" model="ir.actions.report">
+        <field name="name">Customer Statement</field>
+        <field name="model">res.partner</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">beatpro_field_sales.report_beatpro_statement</field>
+        <field name="report_file">beatpro_field_sales.report_beatpro_statement</field>
+        <field name="print_report_name">'Statement - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="base.model_res_partner"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_beatpro_statement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="partner">
+                <t t-set="s" t-value="statements[partner.id]"/>
+                <t t-set="cur" t-value="company.currency_id"/>
+                <t t-set="money" t-value="lambda v: '{:,.2f}'.format(v)"/>
+                <t t-call="web.external_layout">
+                    <t t-set="o" t-value="partner"/>
+                    <div class="page bp-statement" style="font-size: 12px;">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div/>
+                            <div class="text-end">
+                                <h3 class="mb-0" style="color: #7B1C24;">STATEMENT OF ACCOUNT</h3>
+                                <div style="font-family: 'DejaVu Sans'; font-size: 15px;" dir="rtl">كشف حساب</div>
+                                <div><t t-esc="fmt_date(s['date_from'])"/> – <t t-esc="fmt_date(s['date_to'])"/></div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-3 p-2" style="background: #F8F3F3; border-radius: 6px;">
+                            <div>
+                                <strong t-esc="s['partner']['name'].upper()"/><br/>
+                                <span t-esc="s['partner']['city']"/>
+                                <t t-if="s['partner']['trn']"> · TRN <t t-esc="s['partner']['trn']"/></t>
+                            </div>
+                            <div class="text-end">Balance due<br/><strong style="font-size: 16px;"><t t-esc="cur.name"/> <t t-esc="money(s['closing'])"/></strong></div>
+                        </div>
+                        <table class="table table-sm mt-3">
+                            <thead>
+                                <tr style="background: #7B1C24; color: #fff;">
+                                    <th>Date</th><th>Item</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td t-esc="fmt_date(s['date_from'])"/><td>Opening balance</td><td/><td/>
+                                    <td class="text-end fw-bold" t-esc="money(s['opening'])"/>
+                                </tr>
+                                <tr t-foreach="s['lines']" t-as="l">
+                                    <td t-esc="fmt_date(l['date'])"/>
+                                    <td t-esc="l['label']"/>
+                                    <td class="text-end"><t t-if="l['debit']" t-esc="money(l['debit'])"/></td>
+                                    <td class="text-end"><t t-if="l['credit']" t-esc="money(l['credit'])"/></td>
+                                    <td class="text-end fw-bold" t-esc="money(l['balance'])"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="row text-center mt-2">
+                            <t t-foreach="[('Not due', 'not_due'), ('1–30 days', 'd30'), ('31–60 days', 'd60'), ('Over 60 days', 'older')]" t-as="b">
+                                <div class="col-3">
+                                    <div class="p-2" style="border: 1px solid #EEE; border-radius: 6px;">
+                                        <div class="text-muted" t-esc="b[0]"/>
+                                        <strong t-esc="money(s['ageing'][b[1]])"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                        <p t-if="s['note']" class="mt-4 text-muted" style="white-space: pre-line;" t-esc="s['note']"/>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="view_beatpro_statement_wizard_form" model="ir.ui.view">
+        <field name="name">beatpro.statement.wizard.form</field>
+        <field name="model">beatpro.statement.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Customer Statement">
+                <group>
+                    <field name="partner_id" readonly="1"/>
+                    <field name="period" widget="radio"/>
+                    <field name="date_from" readonly="period != 'custom'"/>
+                    <field name="date_to" readonly="period != 'custom'"/>
+                </group>
+                <footer>
+                    <button name="action_print" type="object" string="Print" class="btn-primary"/>
+                    <button special="cancel" string="Cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_partner_form_beatpro_statement" model="ir.ui.view">
+        <field name="name">res.partner.form.beatpro.statement</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <div name="button_box" position="inside">
+                <button name="action_beatpro_statement" type="object" class="oe_stat_button" icon="fa-file-text-o"
+                        string="Statement" groups="beatpro_field_sales.group_beatpro_rep,account.group_account_invoice"/>
+            </div>
+        </field>
+    </record>
+</odoo>

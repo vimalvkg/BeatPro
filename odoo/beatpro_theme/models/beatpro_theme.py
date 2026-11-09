@@ -30,7 +30,7 @@ SIDEBAR = [
     ('live_map', "Live Map", 'fa-map', ['beatpro_field_sales.action_beatpro_live_map']),
     ('surveys', "Surveys", 'fa-camera', ['beatpro_field_sales.action_beatpro_survey_answer']),
     ('invoices', "Invoices", 'fa-money', ['account.action_move_out_invoice_type']),
-    ('reports', "Reports", 'fa-bar-chart', ['sale.action_order_report_all']),
+    ('reports', "Reports", 'fa-bar-chart', ['beatpro_field_sales.action_beatpro_sales_reports', 'sale.action_order_report_all']),
     ('settings', "Settings", 'fa-cog', ['base.res_config_setting_act_window']),
 ]
 
@@ -42,6 +42,7 @@ CLIENT_ACTION_GROUPS = {
     'beatpro.my_van': (REP,),
     'beatpro.targets_board': (SUPERVISOR,),
     'beatpro.live_map': (SUPERVISOR,),
+    'beatpro.sales_reports': (SUPERVISOR,),
     'beatpro.cash_handover': (SUPERVISOR, 'account.group_account_user'),
 }
 

@@ -20,6 +20,11 @@
         <field name="model">beatpro.route</field>
         <field name="arch" type="xml">
             <form string="Route">
+                <header>
+                    <button name="action_beatpro_shortest_order" type="object" string="Use Shortest Order" class="btn-primary"
+                            invisible="shortest_km &gt;= distance_km - 0.05"
+                            confirm="Put the shops in the shortest order? The current order is replaced."/>
+                </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_view_visits" type="object" class="oe_stat_button" icon="fa-map-marker">
@@ -39,6 +44,13 @@
                         <group>
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="active" invisible="1"/>
+                            <label for="distance_km" string="Distance"/>
+                            <div>
+                                <field name="distance_km" class="oe_inline"/> km now ·
+                                <field name="shortest_km" class="oe_inline fw-bold"/> km in the shortest order
+                                <div class="text-muted small">From the main warehouse, as the crow flies between shop pins.
+                                    <span invisible="not unpinned_count"><field name="unpinned_count" class="oe_inline"/> shops have no pin and stay at the end.</span></div>
+                            </div>
                         </group>
                     </group>
                     <notebook>
@@ -49,6 +61,17 @@
                                     <field name="partner_id"/>
                                     <field name="phone"/>
                                     <field name="city"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Moved by Reps" name="moves" invisible="not move_ids">
+                            <field name="move_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="partner_id"/>
+                                    <field name="kind"/>
+                                    <field name="to_date"/>
+                                    <field name="user_id" widget="many2one_avatar_user"/>
                                 </list>
                             </field>
                         </page>

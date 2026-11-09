@@ -107,6 +107,11 @@
         <field name="view_mode">list</field>
     </record>
 
+    <record id="action_beatpro_sales_reports" model="ir.actions.client">
+        <field name="name">Sales Reports</field>
+        <field name="tag">beatpro.sales_reports</field>
+    </record>
+
     <record id="action_beatpro_cash_handover" model="ir.actions.client">
         <field name="name">Cash Handover</field>
         <field name="tag">beatpro.cash_handover</field>

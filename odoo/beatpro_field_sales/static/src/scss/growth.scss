@@ -47,3 +47,20 @@
     .bp-hand { display: grid; grid-template-columns: 1.3fr 1fr 1.8fr 1.1fr auto; gap: 18px; align-items: center; padding: 16px 20px; }
     @media (max-width: 991px) { .bp-hand { grid-template-columns: 1fr 1fr; } }
 }
+
+// Sales Reports.
+.o_beatpro.bp-page.bp-reports {
+    .bp-tabs { display: flex; gap: 4px; align-items: center; border-bottom: 1px solid var(--bp-line, #EADCDD); flex-wrap: wrap;
+        button { border: 0; background: none; padding: 10px 14px; font-weight: 600; color: var(--bp-muted, #6E5A5C); border-bottom: 3px solid transparent;
+            &.active { color: #7B1C24; font-weight: 800; border-bottom-color: #7B1C24; } } }
+    .bp-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    .bp-kpi { padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; }
+    .bp-kpi-label { font-size: 12px; font-weight: 800; color: var(--bp-muted, #6E5A5C); text-transform: uppercase; letter-spacing: 0.06em; }
+    .bp-kpi-value { font-size: 24px; font-weight: 800; line-height: 1.1; }
+    .bp-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+    .bp-barrow { display: grid; grid-template-columns: 150px 1fr 120px; gap: 12px; align-items: center; padding: 7px 0; }
+    .bp-listrow { display: flex; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--bp-line-soft, #F3E8E9); }
+    .bp-w-num { width: 80px; text-align: end; }
+    .bp-w-amount { width: 130px; text-align: end; }
+    .bp-w-days { width: 90px; text-align: end; }
+}

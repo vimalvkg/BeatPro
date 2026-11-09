@@ -9,3 +9,5 @@ class ResConfigSettings(models.TransientModel):
     beatpro_field_cash_journal_id = fields.Many2one(related='company_id.beatpro_field_cash_journal_id', readonly=False)
     beatpro_card_journal_id = fields.Many2one(related='company_id.beatpro_card_journal_id', readonly=False)
     beatpro_reimburse_account_id = fields.Many2one(related='company_id.beatpro_reimburse_account_id', readonly=False)
+    beatpro_statement_note = fields.Text(related='company_id.beatpro_statement_note', readonly=False)
+    beatpro_lost_days = fields.Integer(related='company_id.beatpro_lost_days', readonly=False)
