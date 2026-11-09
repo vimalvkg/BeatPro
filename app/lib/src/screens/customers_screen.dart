@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,9 +27,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 prefixIcon: Icon(Icons.search),
-                hintText: 'Search customers',
+                hintText: tr('Search customers'),
                 isDense: true,
               ),
               onChanged: (v) => setState(() => _search = v.trim()),
@@ -48,7 +48,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             ? EmptyState(
                 icon: Icons.storefront_outlined,
                 title: _search.isEmpty ? 'No customers yet' : 'No customer matches "$_search"',
-                message: _search.isEmpty ? 'Customers on your routes appear here after a sync.' : null,
+                message: _search.isEmpty ? tr('Customers on your routes appear here after a sync.') : null,
               )
             : ListView.separated(
                 padding: const EdgeInsets.only(bottom: 96),

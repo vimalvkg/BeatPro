@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -91,6 +93,18 @@ flutter:
         - asset: assets/fonts/Manrope-Bold.ttf
           weight: 700
         - asset: assets/fonts/Manrope-ExtraBold.ttf
+          weight: 800
+    # Arabic in the app. Noto Sans Arabic, SIL Open Font License
+    # (assets/fonts/OFL-NotoSansArabic.txt).
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSansArabic-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/NotoSansArabic-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/NotoSansArabic-ExtraBold.ttf
           weight: 800
     # Arabic on invoices and slips. Noto Naskh Arabic, SIL Open Font License
     # (assets/fonts/OFL-NotoNaskhArabic.txt).

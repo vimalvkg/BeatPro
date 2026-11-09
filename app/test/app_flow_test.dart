@@ -10,6 +10,7 @@ import 'package:beatpro/src/core/local_db.dart';
 import 'package:beatpro/src/core/models.dart';
 import 'package:beatpro/src/core/repository.dart';
 import 'package:beatpro/src/core/services.dart';
+import 'package:beatpro/src/l10n/l10n.dart' show appLanguage, trMisses;
 import 'package:beatpro/src/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -51,6 +52,11 @@ Future<void> _loadFonts() async {
     arabic.addFont(Future.value(ByteData.sublistView(File('assets/fonts/NotoNaskhArabic-$w.ttf').readAsBytesSync())));
   }
   await arabic.load();
+  final arabicUi = FontLoader('NotoSansArabic');
+  for (final w in ['Medium', 'SemiBold', 'Bold', 'ExtraBold']) {
+    arabicUi.addFont(Future.value(ByteData.sublistView(File('assets/fonts/NotoSansArabic-$w.ttf').readAsBytesSync())));
+  }
+  await arabicUi.load();
 }
 
 Future<void> _loadImages(WidgetTester tester) async {
@@ -67,6 +73,12 @@ void main() {
   setUpAll(() async {
     sqfliteFfiInit();
     await _loadFonts();
+    // BEATPRO_TR_MISSES=<file> lists the texts drawn that have no Arabic.
+    if (Platform.environment['BEATPRO_TR_MISSES'] != null) trMisses = {};
+  });
+  tearDownAll(() {
+    final out = Platform.environment['BEATPRO_TR_MISSES'];
+    if (out != null) File(out).writeAsStringSync((trMisses!.toList()..sort()).join('\n'));
   });
 
   testWidgets("a rep's day in the app", (tester) async {
@@ -1233,5 +1245,82 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     await db.close();
+  });
+
+  testWidgets('the app in Arabic, right to left', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo();
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(GeoPoint(19.1136, 72.8697))),
+      httpClientProvider.overrideWithValue(odoo.client),
+    ]);
+    addTearDown(container.dispose);
+    addTearDown(() => appLanguage = 'en');
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    var shot = 35;
+    Future<void> screen(String name) async {
+      await tester.pumpAndSettle();
+      shot++;
+      if (Platform.environment['BEATPRO_SCREENSHOTS'] == null) return;
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/$shot-ar-$name.png'));
+    }
+
+    // The rep switches to Arabic in More.
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('العربية'), 200);
+    await tester.tap(find.text('العربية'));
+    await tester.pumpAndSettle();
+    expect(container.read(languageProvider), 'ar');
+    expect(find.text('المزيد'), findsWidgets, reason: 'tab label and title');
+    expect(find.text('اللغة'), findsOneWidget);
+    expect(Directionality.of(tester.element(find.text('اللغة'))), TextDirection.rtl);
+    await screen('more');
+
+    // Home, route, customer, visit and an order, in Arabic.
+    await tester.tap(find.text('الرئيسية'));
+    await tester.pumpAndSettle();
+    expect(find.text('يومي'), findsOneWidget);
+    expect(find.text('بقي 4 محلات اليوم'), findsOneWidget);
+    await screen('home');
+    await tester.tap(find.text('المسار'));
+    await screen('route');
+    await tester.tap(find.text('Sharma General Store'));
+    await screen('customer');
+    expect(find.text('الفواتير المفتوحة'), findsOneWidget, reason: 'eyebrow in capitals in English');
+    await tester.tap(find.text('تسجيل الوصول'));
+    await screen('visit');
+    await tester.tap(find.text('أخذ طلب'));
+    await tester.pumpAndSettle();
+    expect(find.text('560.00 د.إ / حبة'), findsOneWidget, reason: 'dirhams after the amount in Arabic');
+    await tester.tap(find.descendant(
+        of: find.widgetWithText(ListTile, 'Maggi Noodles (Case of 48)'), matching: find.widgetWithText(OutlinedButton, 'إضافة')));
+    await screen('catalog');
+    await tester.tap(find.textContaining('مراجعة'));
+    await screen('cart');
+    expect(find.text('قبل الضريبة'), findsOneWidget);
+
+    // Back to English: everything, hints included, switches back.
+    await tester.runAsync(() => db.setValue('language', 'en'));
+    container.invalidate(chosenLanguageProvider);
+    await tester.pumpAndSettle();
+    expect(find.text('Before tax'), findsOneWidget);
+    expect(container.read(moneyProvider)(12), 'AED 12.00');
   });
 }

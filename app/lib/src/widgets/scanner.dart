@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -77,7 +77,7 @@ class ScanButton extends ConsumerWidget {
       !ref.watch(barcodeScannerProvider).available
       ? const SizedBox.shrink()
       : IconButton(
-          tooltip: 'Scan barcodes',
+          tooltip: tr('Scan barcodes'),
           icon: const Icon(Icons.qr_code_scanner),
           onPressed: () async {
             await ref
@@ -162,7 +162,7 @@ class _ScanScreenState extends State<_ScanScreen> {
         title: Text(widget.title),
         actions: [
           IconButton(
-            tooltip: 'Torch',
+            tooltip: tr('Torch'),
             icon: const Icon(Icons.flashlight_on_outlined),
             onPressed: () => _controller.toggleTorch(),
           ),

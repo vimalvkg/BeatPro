@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -160,12 +160,12 @@ class _PrinterScreenState extends ConsumerState<PrinterScreen> {
                     subtitle: const Text('For example the shop copy and the van copy'),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       IconButton(
-                          tooltip: 'Fewer',
+                          tooltip: tr('Fewer'),
                           onPressed: s.copies > 1 ? () => _save(s.copyWith(copies: s.copies - 1)) : null,
                           icon: const Icon(Icons.remove)),
                       Text('${s.copies}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                       IconButton(
-                          tooltip: 'More',
+                          tooltip: tr('More'),
                           onPressed: s.copies < 3 ? () => _save(s.copyWith(copies: s.copies + 1)) : null,
                           icon: const Icon(Icons.add)),
                     ]),

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -70,7 +70,7 @@ class _VanStockScreenState extends ConsumerState<VanStockScreen> {
                 ),
               const SizedBox(height: 14),
               TextField(
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search products', isDense: true),
+                decoration: InputDecoration(prefixIcon: Icon(Icons.search), hintText: tr('Search products'), isDense: true),
                 onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
               ),
               const SizedBox(height: 12),
@@ -676,8 +676,8 @@ class _VanUnloadScreenState extends ConsumerState<VanUnloadScreen> {
                       controller: _note,
                       minLines: 2,
                       maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'What happened? For example: one box torn, given to the shop as a free sample.',
+                      decoration: InputDecoration(
+                        hintText: tr('What happened? For example: one box torn, given to the shop as a free sample.'),
                         filled: true,
                         fillColor: Colors.white,
                       ),
@@ -850,7 +850,7 @@ class QtyStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton.outlined(onPressed: () => onChanged(qty - step), icon: const Icon(Icons.remove), tooltip: 'Less'),
+        IconButton.outlined(onPressed: () => onChanged(qty - step), icon: const Icon(Icons.remove), tooltip: tr('Less')),
         SizedBox(
           width: label == null ? 36 : 64,
           child: FittedBox(
@@ -862,7 +862,7 @@ class QtyStepper extends StatelessWidget {
         IconButton.filled(
           onPressed: () => onChanged(qty + step),
           icon: const Icon(Icons.add),
-          tooltip: 'More',
+          tooltip: tr('More'),
           color: Theme.of(context).colorScheme.onPrimary,
         ),
       ]);
@@ -906,7 +906,7 @@ class _PickerSheetState<T> extends State<_PickerSheet<T>> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: TextField(
             autofocus: false,
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search products', isDense: true),
+            decoration: InputDecoration(prefixIcon: Icon(Icons.search), hintText: tr('Search products'), isDense: true),
             onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
           ),
         ),

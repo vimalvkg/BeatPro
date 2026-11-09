@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -408,7 +408,7 @@ class _PhotoTile extends StatelessWidget {
             top: 2,
             right: 2,
             child: IconButton(
-              tooltip: 'Remove photo',
+              tooltip: tr('Remove photo'),
               onPressed: onDelete,
               style: IconButton.styleFrom(backgroundColor: const Color(0x99000000)),
               icon: const Icon(Icons.close, color: Colors.white, size: 18),

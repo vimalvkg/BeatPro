@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -77,26 +77,26 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
           TextFormField(
             controller: _name,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Shop name'),
-            validator: (v) => (v ?? '').trim().isEmpty ? 'Enter the shop name.' : null,
+            decoration: InputDecoration(labelText: tr('Shop name')),
+            validator: (v) => (v ?? '').trim().isEmpty ? tr('Enter the shop name.') : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _phone,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(labelText: 'Phone'),
+            decoration: InputDecoration(labelText: tr('Phone')),
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _street,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Address'),
+            decoration: InputDecoration(labelText: tr('Address')),
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _city,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Area or city'),
+            decoration: InputDecoration(labelText: tr('Area or city')),
           ),
           const SizedBox(height: 16),
           ListTile(

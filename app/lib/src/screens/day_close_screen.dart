@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -107,7 +107,7 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
                 const SizedBox(height: 12),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Expanded(
-                    child: _HandInPart(label: 'Cash', amount: money(cash), note: spent > 0 ? 'after ${money(spent)} expenses' : null),
+                    child: _HandInPart(label: 'Cash', amount: money(cash), note: spent > 0 ? tr('after ${money(spent)} expenses') : null),
                   ),
                   Expanded(child: _HandInPart(label: 'Cheque', amount: money(cheque), note: '$cheques ${cheques == 1 ? 'cheque' : 'cheques'}')),
                   Expanded(child: _HandInPart(label: 'Bank and card', amount: money(bank), note: 'already in bank')),
@@ -162,10 +162,10 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
               TextField(
                 controller: _distance,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Distance travelled', suffixText: 'km'),
+                decoration: InputDecoration(labelText: tr('Distance travelled'), suffixText: tr('km')),
               ),
               const SizedBox(height: 12),
-              TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note for your supervisor (optional)')),
+              TextField(controller: _note, decoration: InputDecoration(labelText: tr('Note for your supervisor (optional)'))),
             ],
           ]);
         },

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -123,7 +123,7 @@ class _ShopReturnScreenState extends ConsumerState<ShopReturnScreen> {
     final credit = _lines.fold(0.0, (s, l) => s + l.subtotal);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.close), tooltip: 'Close', onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Icons.close), tooltip: tr('Close'), onPressed: () => context.pop()),
         actions: [ScanButton(title: 'Scan goods taken back', onCode: _scanned)],
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Take back goods'),

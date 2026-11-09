@@ -6,6 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
+import '../l10n/ar.dart' show arabicMonth;
+import '../l10n/l10n.dart' show isArabic;
 import 'models.dart';
 import 'odoo_client.dart';
 import 'repository.dart';
@@ -147,7 +149,7 @@ class Money {
     final locale = symbol == '₹' ? 'en_IN' : 'en_US';
     final number = NumberFormat.decimalPatternDigits(locale: locale, decimalDigits: decimals).format(amount);
     // UAE reps and shops write dirhams as "AED 1,200.00", not with the Arabic sign.
-    if (context?.currencyCode == 'AED') return 'AED $number';
+    if (context?.currencyCode == 'AED') return isArabic ? '$number د.إ' : 'AED $number';
     if (symbol.isEmpty) return number;
     return (context?.currencyBefore ?? true) ? '$symbol$number' : '$number $symbol';
   }
@@ -155,6 +157,13 @@ class Money {
 
 String formatQty(num qty) => qty == qty.roundToDouble() ? qty.toInt().toString() : qty.toStringAsFixed(2);
 
-String formatTime(DateTime t) => DateFormat.jm().format(t.toLocal());
+String formatTime(DateTime t) {
+  final text = DateFormat.jm().format(t.toLocal());
+  return isArabic ? text.replaceAll('AM', 'ص').replaceAll('PM', 'م') : text;
+}
 
-String formatDate(DateTime t) => DateFormat.yMMMd().format(t.toLocal());
+/// `Nov 9, 2026`, or `9 نوفمبر 2026` in Arabic (Western digits, as in the UAE).
+String formatDate(DateTime t) {
+  final d = t.toLocal();
+  return isArabic ? '${d.day} ${arabicMonth(d.month)} ${d.year}' : DateFormat.yMMMd().format(d);
+}

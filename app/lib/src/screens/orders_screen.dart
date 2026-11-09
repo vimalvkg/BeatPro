@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -88,7 +88,7 @@ class OrderDetailScreen extends ConsumerWidget {
             actions: [
               if (order.state != SyncState.synced)
                 IconButton(
-                  tooltip: 'Cancel order',
+                  tooltip: tr('Cancel order'),
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () async {
                     final ok = await showDialog<bool>(

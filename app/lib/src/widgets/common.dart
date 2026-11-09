@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/models.dart';
@@ -169,7 +169,7 @@ class SyncButton extends ConsumerWidget {
     final pending = ref.watch(pendingCountProvider).value ?? 0;
     final running = ref.watch(syncControllerProvider).isLoading;
     return IconButton(
-      tooltip: pending == 0 ? 'Sync with Odoo' : '$pending waiting to sync',
+      tooltip: tr(pending == 0 ? 'Sync with Odoo' : '$pending waiting to sync'),
       onPressed: running
           ? null
           : () async {
@@ -233,7 +233,7 @@ class NumberMarker extends StatelessWidget {
       decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: done
-          ? Icon(Icons.check, size: size * 0.55, color: fg, semanticLabel: 'Visited')
+          ? Icon(Icons.check, size: size * 0.55, color: fg, semanticLabel: tr('Visited'))
           : Text('$number', style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: size * 0.42)),
     );
   }

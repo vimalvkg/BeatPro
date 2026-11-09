@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
@@ -53,7 +53,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Van Sales Dashboard'),
-        actions: [IconButton(tooltip: 'Refresh', onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh))],
+        actions: [IconButton(tooltip: tr('Refresh'), onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh))],
       ),
       body: d == null
           ? Center(
@@ -160,7 +160,7 @@ class _Filters extends StatelessWidget {
         const SizedBox(height: 10),
         DropdownButtonFormField<int?>(
           initialValue: routeId,
-          decoration: const InputDecoration(labelText: 'Route', isDense: true),
+          decoration: InputDecoration(labelText: tr('Route'), isDense: true),
           items: [
             const DropdownMenuItem<int?>(value: null, child: Text('All routes')),
             for (final r in routes) DropdownMenuItem<int?>(value: r['id'] as int, child: Text(r['name'] as String)),

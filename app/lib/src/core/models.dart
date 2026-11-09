@@ -16,6 +16,9 @@ class AppContext {
 
   int get userId => json['user_id'] as int;
   String get userName => json['name'] as String;
+
+  /// The rep's language in Odoo, for example `ar_001` or `en_US`.
+  String get lang => (json['lang'] as String?) ?? '';
   String get companyName => json['company_name'] as String;
   bool get isSupervisor => json['is_supervisor'] == true;
   double get discountLimit => _num(json['discount_limit']);

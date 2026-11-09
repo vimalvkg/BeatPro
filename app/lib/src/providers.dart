@@ -14,6 +14,7 @@ import 'core/printer.dart';
 import 'core/repository.dart';
 import 'core/services.dart';
 import 'core/sync_service.dart';
+import 'l10n/l10n.dart';
 
 /// Overridden in main() and in tests.
 final localDbProvider = Provider<LocalDb>((ref) => throw UnimplementedError('localDbProvider must be overridden'));
@@ -193,7 +194,28 @@ final appContextProvider = FutureProvider<AppContext?>((ref) {
   return ref.watch(repositoryProvider).appContext();
 });
 
-final moneyProvider = Provider<Money>((ref) => Money(ref.watch(appContextProvider).value));
+/// The language the rep chose in More, if any.
+final chosenLanguageProvider = FutureProvider<String?>((ref) => ref.watch(localDbProvider).getValue('language'));
+
+/// The app's language, `en` or `ar`: the rep's choice in More, else their
+/// language in Odoo.
+final languageProvider = Provider<String>((ref) {
+  final chosen = ref.watch(chosenLanguageProvider).value;
+  final odoo = ref.watch(appContextProvider).value?.lang ?? '';
+  final lang = chosen ?? (odoo.startsWith('ar') ? 'ar' : 'en');
+  appLanguage = lang;
+  return lang;
+});
+
+Future<void> setLanguage(WidgetRef ref, String lang) async {
+  await ref.read(localDbProvider).setValue('language', lang);
+  ref.invalidate(chosenLanguageProvider);
+}
+
+final moneyProvider = Provider<Money>((ref) {
+  ref.watch(languageProvider);
+  return Money(ref.watch(appContextProvider).value);
+});
 
 final todayPlanProvider = FutureProvider<List<StopView>>((ref) {
   ref.watch(dataVersionProvider);

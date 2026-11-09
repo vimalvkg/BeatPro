@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -433,7 +433,7 @@ class _CheckOutSheetState extends State<_CheckOutSheet> {
           ]),
         ],
         const SizedBox(height: 16),
-        TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note (optional)'), maxLines: 2),
+        TextField(controller: _note, decoration: InputDecoration(labelText: tr('Note (optional)')), maxLines: 2),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,

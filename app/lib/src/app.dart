@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'l10n/ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -131,31 +132,55 @@ class _TabsShell extends StatelessWidget {
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    Localizations.maybeLocaleOf(context);
+    return Scaffold(
         body: shell,
         bottomNavigationBar: NavigationBar(
           selectedIndex: shell.currentIndex,
           onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-            NavigationDestination(icon: Icon(Icons.route_outlined), selectedIcon: Icon(Icons.route), label: 'Route'),
-            NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: 'Customers'),
-            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Orders'),
-            NavigationDestination(icon: Icon(Icons.menu), label: 'More'),
+          destinations: [
+            NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: tr('Home')),
+            NavigationDestination(icon: Icon(Icons.route_outlined), selectedIcon: Icon(Icons.route), label: tr('Route')),
+            NavigationDestination(icon: Icon(Icons.storefront_outlined), selectedIcon: Icon(Icons.storefront), label: tr('Customers')),
+            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: tr('Orders')),
+            NavigationDestination(icon: Icon(Icons.menu), label: tr('More')),
           ],
         ),
       );
+  }
 }
 
 class BeatproApp extends ConsumerWidget {
   const BeatproApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
-        title: 'BeatPro',
-        debugShowCheckedModeBanner: false,
-        theme: beatproTheme(Brightness.light),
-        darkTheme: beatproTheme(Brightness.dark),
-        routerConfig: ref.watch(routerProvider),
-      );
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(languageProvider, (before, now) {
+      // Labels and hints drawn outside Text widgets pick up the new language
+      // on the next build: rebuild every screen once.
+      if (before != null && before != now) WidgetsBinding.instance.addPostFrameCallback((_) => _rebuildAll());
+    });
+    final lang = ref.watch(languageProvider);
+    return MaterialApp.router(
+      title: 'BeatPro',
+      debugShowCheckedModeBanner: false,
+      theme: beatproTheme(Brightness.light),
+      darkTheme: beatproTheme(Brightness.dark),
+      // Arabic lays the app out right to left.
+      locale: Locale(lang),
+      supportedLocales: const [Locale('en'), Locale('ar')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      routerConfig: ref.watch(routerProvider),
+    );
+  }
+
+  static void _rebuildAll() {
+    void mark(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(mark);
+    }
+
+    WidgetsBinding.instance.rootElement?.visitChildren(mark);
+  }
 }

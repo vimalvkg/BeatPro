@@ -34,6 +34,9 @@ class BeatproColors {
 
 const _font = 'Manrope';
 
+/// Arabic letters aren't in Manrope; they come from Noto Sans Arabic.
+const _fallback = ['NotoSansArabic'];
+
 ThemeData beatproTheme(Brightness brightness) {
   final light = brightness == Brightness.light;
   final scheme = ColorScheme.fromSeed(
@@ -44,8 +47,8 @@ ThemeData beatproTheme(Brightness brightness) {
     surface: light ? Colors.white : null,
     onSurface: light ? BeatproColors.ink : null,
   );
-  final base = ThemeData(colorScheme: scheme, useMaterial3: true, fontFamily: _font);
-  final text = base.textTheme.apply(fontFamily: _font, bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
+  final base = ThemeData(colorScheme: scheme, useMaterial3: true, fontFamily: _font, fontFamilyFallback: _fallback);
+  final text = base.textTheme.apply(fontFamily: _font, fontFamilyFallback: _fallback, bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
   return base.copyWith(
     scaffoldBackgroundColor: light ? BeatproColors.ground : null,
     textTheme: text.copyWith(
@@ -74,7 +77,7 @@ ThemeData beatproTheme(Brightness brightness) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontFamily: _font, fontSize: 16, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontSize: 16, fontWeight: FontWeight.w800),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -82,7 +85,7 @@ ThemeData beatproTheme(Brightness brightness) {
         minimumSize: const Size(64, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         side: BorderSide(color: light ? BeatproColors.line : scheme.outlineVariant),
-        textStyle: const TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontSize: 15, fontWeight: FontWeight.w700),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -96,17 +99,17 @@ ThemeData beatproTheme(Brightness brightness) {
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-      titleTextStyle: TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w700, color: scheme.onSurface),
-      subtitleTextStyle: TextStyle(fontFamily: _font, fontSize: 13, color: light ? BeatproColors.muted : null),
-      leadingAndTrailingTextStyle: TextStyle(fontFamily: _font, fontSize: 15, fontWeight: FontWeight.w800, color: scheme.onSurface),
+      titleTextStyle: TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontSize: 15, fontWeight: FontWeight.w700, color: scheme.onSurface),
+      subtitleTextStyle: TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontSize: 13, color: light ? BeatproColors.muted : null),
+      leadingAndTrailingTextStyle: TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontSize: 15, fontWeight: FontWeight.w800, color: scheme.onSurface),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: scheme.surface,
       indicatorColor: light ? BeatproColors.brandSoft : null,
-      labelTextStyle: WidgetStatePropertyAll(const TextStyle(fontFamily: _font, fontSize: 12, fontWeight: FontWeight.w700)),
+      labelTextStyle: WidgetStatePropertyAll(const TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontSize: 12, fontWeight: FontWeight.w700)),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
-      style: SegmentedButton.styleFrom(textStyle: const TextStyle(fontFamily: _font, fontWeight: FontWeight.w700)),
+      style: SegmentedButton.styleFrom(textStyle: const TextStyle(fontFamily: _font, fontFamilyFallback: _fallback, fontWeight: FontWeight.w700)),
     ),
   );
 }

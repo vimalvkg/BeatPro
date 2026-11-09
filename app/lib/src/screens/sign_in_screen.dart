@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -92,7 +92,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secretToggle = IconButton(
-      tooltip: _showSecret ? 'Hide' : 'Show',
+      tooltip: tr(_showSecret ? 'Hide' : 'Show'),
       icon: Icon(_showSecret ? Icons.visibility_off : Icons.visibility),
       onPressed: () => setState(() => _showSecret = !_showSecret),
     );
@@ -107,7 +107,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               Row(children: [
                 if (widget.again)
                   IconButton(
-                    tooltip: 'Back',
+                    tooltip: tr('Back'),
                     color: Colors.white,
                     onPressed: () => context.pop(),
                     icon: const Icon(Icons.arrow_back),
@@ -161,7 +161,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             keyboardType: TextInputType.url,
                             autocorrect: false,
                             enabled: !widget.again,
-                            decoration: const InputDecoration(labelText: 'Odoo address', hintText: 'https://mycompany.odoo.com'),
+                            decoration: InputDecoration(labelText: tr('Odoo address'), hintText: 'https://mycompany.odoo.com'),
                             validator: (v) {
                               final uri = Uri.tryParse(v?.trim() ?? '');
                               return uri == null || !uri.hasScheme || uri.host.isEmpty
@@ -174,9 +174,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             controller: _database,
                             autocorrect: false,
                             enabled: !widget.again,
-                            decoration: const InputDecoration(
-                              labelText: 'Database (optional)',
-                              helperText: 'Only needed if your server has more than one database.',
+                            decoration: InputDecoration(
+                              labelText: tr('Database (optional)'),
+                              helperText: tr('Only needed if your server has more than one database.'),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -186,11 +186,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               autocorrect: false,
                               obscureText: !_showSecret,
                               decoration: InputDecoration(
-                                labelText: 'API key',
-                                helperText: 'In Odoo: your profile > Security > New API Key.',
+                                labelText: tr('API key'),
+                                helperText: tr('In Odoo: your profile > Security > New API Key.'),
                                 suffixIcon: secretToggle,
                               ),
-                              validator: (v) => (v ?? '').trim().length < 20 ? 'Paste the API key from Odoo.' : null,
+                              validator: (v) => (v ?? '').trim().length < 20 ? tr('Paste the API key from Odoo.') : null,
                               onFieldSubmitted: (_) => _signIn(),
                             )
                           else ...[
@@ -199,8 +199,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               keyboardType: TextInputType.emailAddress,
                               autocorrect: false,
                               autofillHints: const [AutofillHints.username, AutofillHints.email],
-                              decoration: const InputDecoration(labelText: 'Email or username'),
-                              validator: (v) => (v ?? '').trim().isEmpty ? 'Enter your Odoo email or username.' : null,
+                              decoration: InputDecoration(labelText: tr('Email or username')),
+                              validator: (v) => (v ?? '').trim().isEmpty ? tr('Enter your Odoo email or username.') : null,
                             ),
                             const SizedBox(height: 14),
                             TextFormField(
@@ -208,8 +208,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               obscureText: !_showSecret,
                               autocorrect: false,
                               autofillHints: const [AutofillHints.password],
-                              decoration: InputDecoration(labelText: 'Password', suffixIcon: secretToggle),
-                              validator: (v) => (v ?? '').isEmpty ? 'Enter your password.' : null,
+                              decoration: InputDecoration(labelText: tr('Password'), suffixIcon: secretToggle),
+                              validator: (v) => (v ?? '').isEmpty ? tr('Enter your password.') : null,
                               onFieldSubmitted: (_) => _signIn(),
                             ),
                           ],

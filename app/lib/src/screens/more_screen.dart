@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -71,6 +71,19 @@ class MoreScreen extends ConsumerWidget {
         Section(
           title: 'Account',
           child: Column(children: [
+            ListTile(
+              leading: const Icon(Icons.translate),
+              title: const Text('Language'),
+              trailing: SegmentedButton<String>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: 'en', label: Text('English')),
+                  ButtonSegment(value: 'ar', label: Text('العربية')),
+                ],
+                selected: {ref.watch(languageProvider)},
+                onSelectionChanged: (s) => setLanguage(ref, s.first),
+              ),
+            ),
             ListTile(
               leading: const Icon(Icons.dns_outlined),
               title: const Text('Odoo'),

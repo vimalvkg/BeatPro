@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -222,7 +222,7 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
         ]),
         actions: [
           ScanButton(title: 'Scan products', onCode: _scanned),
-          IconButton(tooltip: 'Repeat last order', onPressed: _repeatLastOrder, icon: const Icon(Icons.replay)),
+          IconButton(tooltip: tr('Repeat last order'), onPressed: _repeatLastOrder, icon: const Icon(Icons.replay)),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
@@ -230,8 +230,8 @@ class _OrderScreenState extends ConsumerState<OrderScreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
               controller: _searchField,
-              decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search), hintText: 'Search or scan products', isDense: true),
+              decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.search), hintText: tr('Search or scan products'), isDense: true),
               onChanged: (v) => setState(() => _search = v.trim().toLowerCase()),
               onSubmitted: _searchSubmitted,
             ),
@@ -433,7 +433,7 @@ class _QtyStepper extends StatelessWidget {
       return OutlinedButton(onPressed: () => onChanged(1), child: const Text('Add'));
     }
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      IconButton.outlined(onPressed: () => onChanged(qty - 1), icon: const Icon(Icons.remove), tooltip: 'Less'),
+      IconButton.outlined(onPressed: () => onChanged(qty - 1), icon: const Icon(Icons.remove), tooltip: tr('Less')),
       SizedBox(
         width: 36,
         child: Text(formatQty(qty), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
@@ -441,7 +441,7 @@ class _QtyStepper extends StatelessWidget {
       IconButton.filled(
         onPressed: () => onChanged(qty + 1),
         icon: const Icon(Icons.add),
-        tooltip: 'More',
+        tooltip: tr('More'),
         // ListTile tints trailing icons; keep the plus readable on the filled button.
         color: Theme.of(context).colorScheme.onPrimary,
       ),
@@ -630,7 +630,7 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
                     Text(money(l.subtotal),
                         style: TextStyle(fontWeight: FontWeight.w600, color: l.free ? BeatproColors.success : null)),
                     if (!l.free)
-                      IconButton(tooltip: 'Discount', icon: const Icon(Icons.percent, size: 20), onPressed: () => _editDiscount(l))
+                      IconButton(tooltip: tr('Discount'), icon: const Icon(Icons.percent, size: 20), onPressed: () => _editDiscount(l))
                     else
                       const SizedBox(width: 48),
                   ]),
@@ -690,7 +690,7 @@ class _CartSheetState extends ConsumerState<_CartSheet> {
             ],
             Padding(
               padding: const EdgeInsets.all(16),
-              child: TextField(controller: _note, decoration: const InputDecoration(labelText: 'Note for the order (optional)')),
+              child: TextField(controller: _note, decoration: InputDecoration(labelText: tr('Note for the order (optional)'))),
             ),
           ]),
         ),

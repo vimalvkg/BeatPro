@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -187,7 +187,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.close), tooltip: 'Close', onPressed: () => context.pop()),
+        leading: IconButton(icon: const Icon(Icons.close), tooltip: tr('Close'), onPressed: () => context.pop()),
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Collect payment'),
           Text(customer?.name ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: BeatproColors.muted)),
@@ -267,7 +267,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             }),
           if (method?.reference == 'reference') ...[
             const SizedBox(height: 16),
-            TextField(controller: _reference, decoration: InputDecoration(labelText: '${method!.name} reference (optional)')),
+            TextField(controller: _reference, decoration: InputDecoration(labelText: tr('${method!.name} reference (optional)'))),
           ],
           if (method?.reference == 'cheque') ...[
             const SizedBox(height: 16),
@@ -276,7 +276,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 child: TextField(
                   controller: _chequeNumber,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Cheque number'),
+                  decoration: InputDecoration(labelText: tr('Cheque number')),
                 ),
               ),
               const SizedBox(width: 8),

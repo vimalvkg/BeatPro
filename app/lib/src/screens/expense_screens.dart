@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -106,10 +106,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           controller: _amount,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-          decoration: InputDecoration(labelText: 'Amount', prefixText: '$currency '),
+          decoration: InputDecoration(labelText: tr('Amount'), prefixText: '$currency '),
         ),
         const SizedBox(height: 12),
-        TextField(controller: _note, decoration: const InputDecoration(labelText: 'Where (optional)', hintText: 'e.g. ENOC Al Quoz')),
+        TextField(controller: _note, decoration: InputDecoration(labelText: tr('Where (optional)'), hintText: tr('e.g. ENOC Al Quoz'))),
         const Eyebrow('Paid from', padding: EdgeInsets.fromLTRB(0, 18, 0, 8)),
         for (final (code, title, text) in paidFromOptions)
           Padding(

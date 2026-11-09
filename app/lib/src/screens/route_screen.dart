@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../l10n/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -116,7 +116,7 @@ class RouteScreen extends ConsumerWidget {
                     trailing: view.visit != null
                         ? null
                         : PopupMenuButton<String>(
-                            tooltip: 'More for this shop',
+                            tooltip: tr('More for this shop'),
                             icon: const Icon(Icons.more_vert, color: BeatproColors.muted),
                             onSelected: (choice) async {
                               switch (choice) {
