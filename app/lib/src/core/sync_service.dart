@@ -572,6 +572,18 @@ class SyncService {
         kwargs: {'invoice_id': invoiceId, 'amount': ?amount},
       ) as Map<String, dynamic>);
 
+  /// The Inventory figures for supervisors: vans, low stock, expiry, alerts. Needs
+  /// signal; the last answer is kept for when there is none.
+  Future<Map<String, dynamic>> inventory() async {
+    final data = (await client.call('beatpro.inventory', 'beatpro_inventory_dashboard') as Map).cast<String, dynamic>();
+    await db.setValue('inventory', jsonEncode(data));
+    return data;
+  }
+
+  /// One van's products and its last 7 unloads, for supervisors. Needs signal.
+  Future<Map<String, dynamic>> inventoryVan(int vanId) async =>
+      (await client.call('beatpro.inventory', 'beatpro_inventory_van', kwargs: {'van_id': vanId}) as Map).cast<String, dynamic>();
+
   /// The Van Sales Dashboard figures, for supervisors. Needs signal.
   Future<Map<String, dynamic>> salesDashboard({String period = 'week', int? routeId}) async => (await client.call(
         'beatpro.theme',

@@ -1247,6 +1247,74 @@ void main() {
     await db.close();
   });
 
+  testWidgets('a supervisor sees van stock and stock alerts', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final odoo = FakeOdoo()..supervisor = true;
+    final db = await LocalDb.open(factory: databaseFactoryFfiNoIsolate, path: inMemoryDatabasePath);
+    final container = ProviderContainer(overrides: [
+      localDbProvider.overrideWithValue(db),
+      credentialStoreProvider.overrideWithValue(MemoryCredentialStore()),
+      locationProvider.overrideWithValue(const FixedLocationService(null)),
+      httpClientProvider.overrideWithValue(odoo.client),
+    ]);
+    addTearDown(container.dispose);
+    const appKey = Key('app');
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const RepaintBoundary(key: appKey, child: BeatproApp()),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Odoo address'), 'https://gulffoods.example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Email or username'), 'ravi@beatpro.test');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'ravi123');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await tester.pumpAndSettle();
+      if (Platform.environment['BEATPRO_SCREENSHOTS'] == null) return;
+      await _loadImages(tester);
+      await expectLater(find.byKey(appKey), matchesGoldenFile('../docs/screenshots/$name.png'));
+    }
+
+    // More › Van stock, for supervisors.
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Van stock'));
+    await tester.pumpAndSettle();
+    expect(find.text('AED 48,600'), findsOneWidget);
+    expect(find.text('Van 2 · Anil Sawant'), findsOneWidget);
+    expect(find.text('Oreo 36 g out · 3 shops waiting'), findsOneWidget);
+    expect(find.text('Out in the warehouse'), findsOneWidget, reason: 'red alerts on top');
+    await shot('43-van-stock');
+
+    // One van's products.
+    await tester.tap(find.text('Van 2 · Anil Sawant'));
+    await tester.pumpAndSettle();
+    expect(find.text('Out · 3 shops want it'), findsOneWidget);
+    expect(find.text('Expires in 6 days'), findsOneWidget);
+    await shot('44-van-stock-detail');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Stock alerts, with a filter.
+    await tester.tap(find.byTooltip('Stock alerts'));
+    await tester.pumpAndSettle();
+    expect(find.text('All 5'), findsOneWidget);
+    await shot('45-stock-alerts');
+    await tester.tap(find.text('Expiry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Expires in 7 days'), findsOneWidget);
+    expect(find.text('Out in the warehouse'), findsNothing);
+
+    // Without signal the last figures stay, marked as such.
+    odoo.offline = true;
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+    expect(find.text('No signal: these are the figures fetched last time.'), findsOneWidget);
+  });
+
   testWidgets('the app in Arabic, right to left', (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;

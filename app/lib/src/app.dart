@@ -15,6 +15,7 @@ import 'screens/more_screen.dart';
 import 'screens/order_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/expense_screens.dart';
+import 'screens/inventory_screens.dart';
 import 'screens/growth_screens.dart';
 import 'screens/payment_screen.dart';
 import 'screens/statement_screen.dart';
@@ -112,6 +113,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/van/load', builder: (_, _) => const VanLoadScreen()),
       GoRoute(path: '/van/unload', builder: (_, _) => const VanUnloadScreen()),
       GoRoute(path: '/dashboard', builder: (_, _) => const DashboardScreen()),
+      GoRoute(path: '/inventory', builder: (_, _) => const FleetStockScreen()),
+      GoRoute(path: '/inventory/alerts', builder: (_, _) => const StockAlertsScreen()),
+      GoRoute(
+        path: '/inventory/van/:id',
+        builder: (_, state) => InventoryVanScreen(vanId: int.parse(state.pathParameters['id']!)),
+      ),
       GoRoute(
         path: '/invoice/:uuid',
         builder: (_, state) => InvoiceScreen(

@@ -35,6 +35,14 @@ class MoreScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/dashboard'),
           ),
+        if (appContext?.isSupervisor ?? false)
+          ListTile(
+            leading: const Icon(Icons.local_shipping_outlined),
+            title: const Text('Van stock'),
+            subtitle: const Text('Every van today, low stock, expiry and alerts · needs signal'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/inventory'),
+          ),
         ListTile(
           leading: const Icon(Icons.inventory_2_outlined),
           title: Text(appContext?.van != null ? 'My van and stock' : 'Stock'),

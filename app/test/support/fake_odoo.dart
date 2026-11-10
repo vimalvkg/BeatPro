@@ -110,7 +110,7 @@ class FakeOdoo {
           'company_name': 'Gulf Foods Distribution LLC',
           'currency': {'id': 130, 'name': 'AED', 'symbol': 'د.إ', 'position': 'after', 'decimals': 2},
           'is_rep': true,
-          'is_supervisor': false,
+          'is_supervisor': supervisor,
           'discount_limit': 5.0,
           'expense_categories': [
             {'id': 1, 'name': 'Fuel'},
@@ -341,6 +341,59 @@ class FakeOdoo {
             'overdue': true,
           },
         ];
+      case 'beatpro.inventory.beatpro_inventory_dashboard':
+        return {
+          'date_label': 'Tuesday 10 November',
+          'van_count': 4,
+          'currency': 'AED',
+          'expiry_days': 30,
+          'kpis': {
+            'van_stock': 'AED 48,600',
+            'van_stock_note': '1,184 cs in 4 vans · AED 9,200 unsold since yesterday',
+            'short': 'AED 3,140',
+            'short_note': '11 orders went to the warehouse · Oreo, Al Ain, Lipton',
+            'expiring': 'AED 2,870',
+            'expiring_note': '6 lots · 2 in vans',
+            'unload_diff': 'AED 412',
+            'unload_diff_note': 'Vans counted a difference last night: 2',
+          },
+          'alerts': [
+            {'kind': 'red', 'title': 'Out in the warehouse', 'text': 'Al Ain Water 500 ml · 4 vans asked for it today', 'action': 'purchase', 'product_id': 8},
+            {'kind': 'red', 'title': 'Van short 3 days running', 'text': 'Van 2 · Anil Sawant · Oreo 36 g', 'action': 'van', 'van_id': 3},
+            {'kind': 'amber', 'title': 'Unload difference', 'text': 'Van 2 · Anil Sawant counted AED 286 short', 'action': 'transfer', 'res_id': 9},
+            {'kind': 'amber', 'title': 'Expires in 7 days', 'text': 'Almarai Laban 1 L · lot L2611 · 18 pc in Van 2', 'action': 'expiry'},
+            {'kind': 'grey', 'title': 'Load request waiting 42+ min', 'text': 'Van 2 · Anil Sawant is waiting for the storekeeper', 'action': 'desk'},
+          ],
+          'vans': [
+            {'id': 3, 'name': 'Van 2', 'rep': 'Anil Sawant', 'sold_pct': 41, 'state': 'red', 'note': 'Oreo 36 g out · 3 shops waiting', 'left_text': '210 cs · AED 18,900'},
+            {'id': 5, 'name': 'Van 4', 'rep': 'Suresh Pillai', 'sold_pct': 35, 'state': 'amber', 'note': '12 products not moving 3+ days', 'left_text': '164 cs · AED 14,200'},
+            {'id': 2, 'name': 'Van 1', 'rep': 'Ravi Kumar', 'sold_pct': 68, 'state': 'green', 'note': 'On track', 'left_text': '96 cs · AED 11,400'},
+            {'id': 4, 'name': 'Van 3', 'rep': 'Farah Khan', 'sold_pct': 82, 'state': 'green', 'note': 'Almost empty', 'left_text': '38 cs · AED 4,100'},
+          ],
+          'low': [],
+          'expiry': [],
+          'returns': {'total': 'AED 1,960', 'trend': -14, 'reasons': [], 'top_product': '', 'top_shop': '', 'top_rep': ''},
+          'waiting': [],
+          'lost': [],
+        };
+      case 'beatpro.inventory.beatpro_inventory_van':
+        return {
+          'id': body['van_id'],
+          'name': 'Van 2',
+          'rep': 'Anil Sawant',
+          'vehicle': 'DXB 4521',
+          'loaded_at': '7:40 AM',
+          'value_left': 'AED 18,900',
+          'today': {'loaded': 356, 'sold': 146, 'short_orders': 5, 'returned': 4},
+          'products': [
+            {'name': 'Oreo 36 g', 'loaded': '30 cs', 'left': '0 pc', 'sold_pct': 100, 'last_sold': 'Today', 'status': 'out', 'label': 'Out · 3 shops want it'},
+            {'name': 'Almarai Laban 1 L', 'loaded': '24 cs', 'left': '18 cs', 'sold_pct': 25, 'last_sold': 'Yesterday', 'status': 'expiring', 'label': 'Expires in 6 days'},
+            {'name': 'Tide 1 kg', 'loaded': '16 cs', 'left': '16 cs', 'sold_pct': 0, 'last_sold': '5 days ago', 'status': 'not_moving', 'label': 'Not moving'},
+            {'name': 'Lipton Yellow 100', 'loaded': '20 cs', 'left': '11 cs', 'sold_pct': 45, 'last_sold': 'Today', 'status': 'selling', 'label': 'Selling'},
+          ],
+          'unloads': [],
+          'unload_note': 'Counted short this month: 3 · AED 286',
+        };
       case 'beatpro.theme.get_sales_dashboard':
         final week = body['period'] == 'week';
         return {
