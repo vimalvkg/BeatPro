@@ -26,3 +26,4 @@ from . import beatpro_expense
 from . import beatpro_handover
 from . import beatpro_statement
 from . import beatpro_reports
+from . import beatpro_inventory

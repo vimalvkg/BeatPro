@@ -36,6 +36,21 @@
                             </div>
                         </setting>
                     </block>
+                    <block title="Inventory for supervisors" name="beatpro_inventory">
+                        <setting string="Load vans earliest expiry first" help="Vans are loaded from the lots that expire first. Turn on Lots &amp; Serial Numbers and Expiration Dates above, and track the products by lots.">
+                            <field name="beatpro_fefo"/>
+                        </setting>
+                        <setting string="Expiring stock" help="Lots expiring within this many days show on the Inventory dashboard.">
+                            <field name="beatpro_expiry_days" class="w-auto"/> days
+                        </setting>
+                        <setting string="Not moving" help="Stock in a van that hasn't sold for this many days shows as not moving.">
+                            <field name="beatpro_not_moving_days" class="w-auto"/> days
+                        </setting>
+                        <setting string="Alerts" help="Raise an alert when an unload is counted short or over by more than this, or when a load request waits this long for the storekeeper.">
+                            <div><field name="beatpro_alert_unload_diff" class="w-auto"/> unload difference</div>
+                            <div><field name="beatpro_alert_load_wait" class="w-auto"/> minutes waiting</div>
+                        </setting>
+                    </block>
                     <block title="Expenses and cash hand over" name="beatpro_cash">
                         <setting string="Reps' field cash" help="The cash journal reps collect cash into. Expenses paid from collected cash and hand-over differences are booked in it. Accountants count the hand over (Invoicing › Customers › Reps' Cash Handover); differences are written off to the company's cash difference accounts once a supervisor approves.">
                             <field name="beatpro_field_cash_journal_id" options="{'no_create': True}" placeholder="The reps' cash payment method"/>

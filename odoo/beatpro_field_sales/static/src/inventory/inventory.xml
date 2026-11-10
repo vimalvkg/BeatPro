@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="beatpro_field_sales.Inventory">
+        <div class="o_action o_beatpro bp-page bp-reports bp-inventory">
+            <div class="o_content">
+            <t t-set="d" t-value="state.data"/>
+            <div class="bp-wrap pt-3">
+                <t t-if="state.van" t-call="beatpro_field_sales.InventoryVan"/>
+                <t t-else="">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h1 class="bp-title mb-0">Inventory</h1>
+                    <span class="bp-muted"><t t-esc="d.date_label"/> · <t t-esc="d.van_count"/> vans</span>
+                    <button type="button" class="btn btn-link ms-auto" t-on-click="load">Refresh</button>
+                </div>
+                <div class="bp-tabs mt-2" role="tablist">
+                    <t t-foreach="tabs" t-as="tab" t-key="tab[0]">
+                        <button type="button" role="tab" t-att-aria-selected="state.tab === tab[0] ? 'true' : 'false'"
+                                t-att-class="{active: state.tab === tab[0]}" t-on-click="() => this.state.tab = tab[0]" t-esc="tab[1]"/>
+                    </t>
+                </div>
+
+                <div t-if="state.tab === 'today' and d.alerts.length" class="bp-alerts mt-3">
+                    <div t-foreach="d.alerts.slice(0, 4)" t-as="a" t-key="a_index" t-att-class="'bp-alert bp-alert-' + a.kind">
+                        <b class="text-nowrap" t-esc="a.title"/><span class="flex-fill" t-esc="a.text"/>
+                        <button t-if="a.action !== 'purchase' or d.has_purchase" type="button" class="btn btn-link p-0 fw-bold text-nowrap" t-on-click="() => this.alertAction(a)" t-esc="alertLabel(a)"/>
+                    </div>
+                </div>
+
+                <div t-if="state.tab === 'today'" class="bp-kpis mt-3">
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Stock in vans</span><span class="bp-kpi-value" t-esc="d.kpis.van_stock"/>
+                        <small class="bp-muted" t-esc="d.kpis.van_stock_note"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Short in vans today</span><span class="bp-kpi-value" t-esc="d.kpis.short"/>
+                        <small class="bp-amber fw-bold" t-esc="d.kpis.short_note"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Expiring in <t t-esc="d.expiry_days"/> days</span><span class="bp-kpi-value" t-esc="d.kpis.expiring"/>
+                        <small class="text-danger fw-bold" t-esc="d.kpis.expiring_note"/></div>
+                    <div class="bp-card bp-kpi"><span class="bp-kpi-label">Unload differences</span><span class="bp-kpi-value" t-esc="d.kpis.unload_diff"/>
+                        <small class="text-danger fw-bold" t-esc="d.kpis.unload_diff_note"/></div>
+                </div>
+
+                <div class="bp-two mt-3">
+                    <div t-if="state.tab === 'today' or state.tab === 'vans'" class="bp-card bp-card-pad">
+                        <div class="d-flex align-items-center"><b class="flex-fill">Van stock today</b><small class="bp-muted">open a van to see its products</small></div>
+                        <div class="bp-vans mt-2">
+                            <button type="button" t-foreach="d.vans" t-as="v" t-key="v.id" class="bp-van" t-att-style="'border-left-color: ' + color(v.state)" t-on-click="() => this.openVan(v.id)">
+                                <span class="d-flex align-items-center gap-2"><b class="flex-fill"><t t-esc="v.name"/><t t-if="v.rep"> · <t t-esc="v.rep"/></t></b>
+                                    <span t-att-class="'bp-pill bp-pill-' + v.state"><t t-if="v.state === 'green'">Selling well</t><t t-elif="v.state === 'amber'">Watch</t><t t-else="">Act now</t></span></span>
+                                <small class="bp-muted" t-esc="v.route"/>
+                                <span class="d-flex align-items-center gap-2"><span class="bp-bar flex-fill mt-0"><span t-att-style="barStyle(v.sold_pct, v.state)"/></span><b><t t-esc="v.sold_pct"/>% sold</b></span>
+                                <span class="d-flex justify-content-between gap-2 small"><span>Left: <b t-esc="v.left_text"/></span><span class="fw-bold" t-att-style="'color: ' + color(v.state)" t-esc="v.note"/></span>
+                            </button>
+                            <p t-if="!d.vans.length" class="bp-muted mb-0">No vans yet. Mark a warehouse as a Sales Van in Inventory › Warehouses.</p>
+                        </div>
+                    </div>
+
+                    <div t-if="state.tab === 'today' or state.tab === 'warehouse'" class="bp-card bp-card-pad">
+                        <div class="d-flex align-items-center"><b class="flex-fill">Low stock in the warehouse</b>
+                            <button t-if="d.can_purchase" type="button" class="btn btn-link p-0 fw-bold" t-on-click="() => this.makePurchaseOrders()">Make purchase orders</button></div>
+                        <div class="bp-lowrow bp-head"><span>Product</span><span>In warehouse</span><span>Next 7 days</span><span class="text-end">Lasts</span></div>
+                        <div t-foreach="d.low" t-as="r" t-key="r.product_id" class="bp-lowrow">
+                            <b t-esc="r.name"/><span t-esc="r.have"/><span t-esc="r.need"/><span class="text-end"><span t-att-class="'bp-pill bp-pill-' + r.state" t-esc="r.label"/></span>
+                        </div>
+                        <p t-if="!d.low.length" class="bp-muted mb-0 mt-2">Every product has two weeks of stock or more.</p>
+                        <small class="bp-muted d-block mt-2">Next 7 days: each weekday's average over the last 4 weeks.</small>
+                    </div>
+
+                    <div t-if="state.tab === 'today' or state.tab === 'returns'" class="bp-card bp-card-pad">
+                        <b>Returns and damage</b> <small class="bp-muted">· this month</small>
+                        <div class="d-flex gap-3 align-items-baseline py-2"><span class="bp-kpi-value" t-esc="d.returns.total"/>
+                            <small t-if="d.returns.trend !== null" t-att-class="d.returns.trend &lt;= 0 ? 'bp-green fw-bold' : 'text-danger fw-bold'">
+                                <t t-if="d.returns.trend &lt;= 0">▼</t><t t-else="">▲</t> <t t-esc="Math.abs(d.returns.trend)"/>% on last month</small></div>
+                        <div t-foreach="d.returns.reasons" t-as="r" t-key="r.label" class="bp-barrow">
+                            <b t-esc="r.label"/><div class="bp-bar"><div t-att-style="barStyle(r.pct, r_index === 0 ? 'red' : 'amber')"/></div><span class="fw-bold text-end" t-esc="r.value"/>
+                        </div>
+                        <p t-if="!d.returns.reasons.length" class="bp-muted mb-0">No goods taken back this month.</p>
+                        <small t-if="d.returns.top_product" class="bp-muted d-block mt-2">Most returned: <b class="text-body" t-esc="d.returns.top_product"/> · <t t-esc="d.returns.top_shop"/> · <t t-esc="d.returns.top_rep"/></small>
+                    </div>
+
+                    <div t-if="state.tab === 'today' or state.tab === 'vans'" class="d-flex flex-column gap-3">
+                        <div class="bp-card bp-card-pad">
+                            <div class="d-flex align-items-center"><b class="flex-fill">Load requests waiting for the storekeeper</b>
+                                <button type="button" class="btn btn-link p-0 fw-bold" t-on-click="openDesk">Open Vans desk</button></div>
+                            <div t-foreach="d.waiting" t-as="w" t-key="w.id" class="bp-listrow">
+                                <b class="flex-fill" t-esc="w.van"/><span class="bp-muted" t-esc="w.items"/>
+                                <span class="bp-w-days"><span t-att-class="'bp-pill bp-pill-' + w.state"><t t-esc="w.minutes"/> min</span></span>
+                            </div>
+                            <p t-if="!d.waiting.length" class="bp-muted mb-0 mt-2">No load request waiting.</p>
+                        </div>
+                        <div class="bp-card bp-card-pad"><b>Stock lost by rep</b> <small class="bp-muted">· unloads counted short, this month</small>
+                            <div t-foreach="d.lost" t-as="r" t-key="r.rep" class="bp-barrow">
+                                <b t-esc="r.rep"/><div class="bp-bar"><div t-att-style="barStyle(r.pct, r.pct > 60 ? 'red' : (r.pct > 20 ? 'amber' : 'green'))"/></div><span class="fw-bold text-end" t-esc="r.value"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div t-if="state.tab === 'expiry'" class="bp-card bp-card-pad bp-span">
+                        <b>Expiring within <t t-esc="d.expiry_days"/> days</b>
+                        <div class="bp-exprow bp-head"><span>Product</span><span>Lot</span><span>Where</span><span>Quantity</span><span>Value</span><span class="text-end">Expires</span></div>
+                        <div t-foreach="d.expiry" t-as="e" t-key="e_index" class="bp-exprow">
+                            <b t-esc="e.product"/><span t-esc="e.lot"/><span t-esc="e.where"/><span t-esc="e.qty"/><span t-esc="e.value"/>
+                            <span class="text-end"><span t-att-class="'bp-pill bp-pill-' + e.state" t-esc="e.label"/></span>
+                        </div>
+                        <p t-if="!d.expiry.length" class="bp-muted mb-0 mt-2">Nothing expires soon. Expiry needs Lots and Expiration Dates on in Inventory › Settings, and products tracked by lots.</p>
+                    </div>
+                </div>
+                </t>
+            </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="beatpro_field_sales.InventoryVan">
+        <t t-set="v" t-value="state.van"/>
+        <div class="bp-muted"><button type="button" class="btn btn-link p-0" t-on-click="closeVan">Inventory</button> / <t t-esc="v.name"/></div>
+        <div class="d-flex align-items-baseline gap-3 flex-wrap mt-1">
+            <h1 class="bp-title mb-0"><t t-esc="v.name"/><t t-if="v.rep"> · <t t-esc="v.rep"/></t></h1>
+            <span class="bp-muted"><t t-esc="v.vehicle"/><t t-if="v.loaded_at"> · loaded <t t-esc="v.loaded_at"/></t></span>
+        </div>
+        <div class="bp-vandetail mt-3">
+            <div class="bp-card bp-card-pad">
+                <div class="d-flex align-items-center"><b class="flex-fill fs-6">Products in the van</b><small class="bp-muted"><t t-esc="v.value_left"/> left</small></div>
+                <div class="bp-prow bp-head"><span>Product</span><span>Loaded</span><span>Left</span><span>Sold</span><span>Last sold</span><span/></div>
+                <div t-foreach="v.products" t-as="p" t-key="p.name" class="bp-prow">
+                    <b t-esc="p.name"/><span t-esc="p.loaded"/><span t-esc="p.left"/>
+                    <span class="d-flex align-items-center gap-2"><span class="bp-bar flex-fill mt-0"><span t-att-style="barStyle(p.sold_pct, statusClass(p.status))"/></span><span class="bp-w-pct" t-esc="p.sold_pct + '%'"/></span>
+                    <span t-esc="p.last_sold"/>
+                    <span class="text-end"><span t-att-class="'bp-pill bp-pill-' + statusClass(p.status)" t-esc="p.label"/></span>
+                </div>
+                <p t-if="!v.products.length" class="bp-muted mb-0 mt-2">The van is empty.</p>
+            </div>
+            <div class="d-flex flex-column gap-3">
+                <div class="bp-card bp-card-pad"><b>Today</b>
+                    <div class="bp-facts mt-2">
+                        <div><small class="bp-muted fw-bold">Loaded</small><b t-esc="v.today.loaded"/></div>
+                        <div><small class="bp-muted fw-bold">Sold</small><b t-esc="v.today.sold"/></div>
+                        <div><small class="bp-muted fw-bold">Short (went to warehouse)</small><b class="bp-amber"><t t-esc="v.today.short_orders"/> orders</b></div>
+                        <div><small class="bp-muted fw-bold">Taken back</small><b t-esc="v.today.returned"/></div>
+                    </div>
+                </div>
+                <div class="bp-card bp-card-pad"><b>Last 7 unloads</b>
+                    <div class="bp-unloads mt-2">
+                        <div t-foreach="v.unloads" t-as="u" t-key="u_index" t-att-title="u.label"><span t-att-style="unloadStyle(u)"/><small class="bp-muted" t-esc="u.day"/></div>
+                    </div>
+                    <small class="bp-muted" t-esc="v.unload_note"/>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -11,3 +11,14 @@ class ResConfigSettings(models.TransientModel):
     beatpro_reimburse_account_id = fields.Many2one(related='company_id.beatpro_reimburse_account_id', readonly=False)
     beatpro_statement_note = fields.Text(related='company_id.beatpro_statement_note', readonly=False)
     beatpro_lost_days = fields.Integer(related='company_id.beatpro_lost_days', readonly=False)
+    beatpro_expiry_days = fields.Integer(related='company_id.beatpro_expiry_days', readonly=False)
+    beatpro_not_moving_days = fields.Integer(related='company_id.beatpro_not_moving_days', readonly=False)
+    beatpro_alert_unload_diff = fields.Monetary(related='company_id.beatpro_alert_unload_diff', readonly=False,
+                                                currency_field='beatpro_currency_id')
+    beatpro_currency_id = fields.Many2one(related='company_id.currency_id', string="BeatPro Currency")
+    beatpro_alert_load_wait = fields.Integer(related='company_id.beatpro_alert_load_wait', readonly=False)
+    beatpro_fefo = fields.Boolean(related='company_id.beatpro_fefo', readonly=False)
+
+    def set_values(self):
+        super().set_values()
+        self.env['stock.warehouse']._beatpro_apply_fefo()

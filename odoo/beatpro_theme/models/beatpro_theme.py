@@ -21,6 +21,7 @@ SIDEBAR = [
     ('routes', "Routes", 'fa-map-marker', ['beatpro_field_sales.action_beatpro_route']),
     ('vans', "Vans", 'fa-truck', ['beatpro_field_sales.action_beatpro_van_desk',
                                   'beatpro_field_sales.action_beatpro_my_van']),
+    ('inventory', "Inventory", 'fa-cubes', ['beatpro_field_sales.action_beatpro_inventory']),
     ('products', "Products", 'fa-cube', ['sale.product_template_action']),
     ('schemes', "Schemes", 'fa-gift', ['beatpro_field_sales.action_beatpro_scheme']),
     ('returns', "Returns", 'fa-undo', ['beatpro_field_sales.action_beatpro_shop_return']),
@@ -43,6 +44,7 @@ CLIENT_ACTION_GROUPS = {
     'beatpro.targets_board': (SUPERVISOR,),
     'beatpro.live_map': (SUPERVISOR,),
     'beatpro.sales_reports': (SUPERVISOR,),
+    'beatpro.inventory': (SUPERVISOR,),
     'beatpro.cash_handover': (SUPERVISOR, 'account.group_account_user'),
 }
 

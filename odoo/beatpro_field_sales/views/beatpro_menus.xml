@@ -51,6 +51,8 @@
     <menuitem id="menu_beatpro_payment_methods" name="Payment Methods" parent="menu_beatpro_supervisor"
               action="action_beatpro_payment_methods" sequence="80"
               groups="account.group_account_manager"/>
+    <menuitem id="menu_beatpro_inventory" name="Inventory" parent="menu_beatpro_supervisor"
+              action="action_beatpro_inventory" sequence="4"/>
     <menuitem id="menu_beatpro_sales_reports" name="Sales Reports" parent="menu_beatpro_supervisor"
               action="action_beatpro_sales_reports" sequence="3"/>
     <menuitem id="menu_beatpro_cash_handover" name="Cash Handover" parent="menu_beatpro_supervisor"

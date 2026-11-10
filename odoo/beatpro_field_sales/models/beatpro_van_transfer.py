@@ -46,11 +46,56 @@ def move_stock(env, source, destination, quantities, picking_type, origin, partn
     return picking
 
 
+def fallback_lot(env, product, company):
+    """A lot for stock that moves without one known: goods coming back from a shop, or
+    more leaving a location than its lots hold. The lot that expires first is used, as
+    that is the stock most likely to be there; a product with no lot yet gets one."""
+    Lot = env['stock.lot'].sudo()
+    domain = [('product_id', '=', product.id), '|', ('company_id', '=', False), ('company_id', '=', company.id)]
+    order = 'expiration_date asc, id desc' if 'expiration_date' in Lot._fields else 'id desc'
+    lot = Lot.search(domain, order=order, limit=1)
+    return lot or Lot.create({'name': env._("%s-NO-LOT", product.default_code or product.id),
+                              'product_id': product.id, 'company_id': company.id})
+
+
+def fill_quantities(moves):
+    """Set each move's done quantity to its full demand. Lot-tracked products take the
+    lots reserved for them (earliest expiry first when the warehouse removes stock FEFO);
+    whatever is left goes on :func:`fallback_lot`."""
+    tracked = moves.filtered(lambda m: m.product_id.tracking != 'none' and m.state not in ('done', 'cancel'))
+    if tracked:
+        tracked._action_assign()
+    for move in moves.filtered(lambda m: m.state not in ('done', 'cancel')):
+        if move.product_id.tracking == 'none':
+            move.quantity = move.product_uom_qty
+        else:
+            # Stock coming in from a shop or a loss location is reserved without a lot.
+            for line in move.move_line_ids.filtered(lambda ml: not ml.lot_id and not ml.lot_name):
+                line.lot_id = fallback_lot(move.env, move.product_id, move.company_id)
+            missing = move.product_uom_qty - move.quantity
+            if float_compare(missing, 0, precision_rounding=move.product_uom.rounding) > 0:
+                lot = fallback_lot(move.env, move.product_id, move.company_id)
+                line = move.move_line_ids.filtered(lambda ml: ml.lot_id == lot)[:1]
+                if line:
+                    line.quantity += missing
+                else:
+                    move.env['stock.move.line'].sudo().create({
+                        'move_id': move.id,
+                        'product_id': move.product_id.id,
+                        'product_uom_id': move.product_uom.id,
+                        'location_id': move.location_id.id,
+                        'location_dest_id': move.location_dest_id.id,
+                        'lot_id': lot.id,
+                        'quantity': missing,
+                        'company_id': move.company_id.id,
+                        'picking_id': move.picking_id.id,
+                    })
+        move.picked = True
+
+
 def validate(pickings):
     """Validate pickings for their full demand, without backorders."""
-    for move in pickings.move_ids.filtered(lambda m: m.state not in ('done', 'cancel')):
-        move.quantity = move.product_uom_qty
-        move.picked = True
+    fill_quantities(pickings.move_ids)
     pickings.with_context(skip_backorder=True, skip_sms=True, skip_expired=True).button_validate()
 
 
@@ -337,8 +382,7 @@ class BeatproVanTransfer(models.Model):
                     'origin': transfer.name,
                 })
                 move._action_confirm()
-                move.quantity = abs(short)
-                move.picked = True
+                fill_quantities(move)
                 move._action_done()
                 moves |= move
             transfer.sudo().write({
