@@ -79,7 +79,11 @@ class CameraPhotoService implements PhotoService {
   @override
   Future<Uint8List?> take() async {
     // Shelf photos don't need full resolution: smaller files sync faster on a weak signal.
-    final file = await ImagePicker().pickImage(source: ImageSource.camera, maxWidth: 1600, maxHeight: 1600, imageQuality: 70);
+    final picker = ImagePicker();
+    // Phones use the camera. The desktop build (for trying the app on a PC) has
+    // none, so it opens a picture file instead.
+    final source = picker.supportsImageSource(ImageSource.camera) ? ImageSource.camera : ImageSource.gallery;
+    final file = await picker.pickImage(source: source, maxWidth: 1600, maxHeight: 1600, imageQuality: 70);
     return file?.readAsBytes();
   }
 }
